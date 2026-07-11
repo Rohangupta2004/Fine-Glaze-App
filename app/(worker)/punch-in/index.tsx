@@ -17,7 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button, Card } from '../../../src/components';
 import { useAuthStore } from '../../../src/stores/authStore';
 import { useProjects } from '../../../src/hooks/useProjects';
-import { usePunchIn } from '../../../src/hooks/useAttendance';
+import { useOutboxStore } from '../../../src/stores/outboxStore';
+import { SyncStatusBadge } from '../../../src/components/SyncStatusBadge';
 import { colors } from '../../../src/theme/colors';
 import { typography, fontFamily } from '../../../src/theme/typography';
 import { spacing, radius, shadows } from '../../../src/theme/spacing';
@@ -51,7 +52,7 @@ export default function PunchInScreen() {
   const profile = useAuthStore((s) => s.profile);
   const { data: projects } = useProjects();
   const activeProject = projects?.[0]; // Single active project per worker in M1
-  const punchIn = usePunchIn();
+  const enqueuePunchIn = useOutboxStore((s) => s.enqueuePunchIn);
 
   const [permission, requestPermission] = useCameraPermissions();
   const [selfieUri, setSelfieUri] = useState<string | null>(null);
@@ -108,11 +109,11 @@ export default function PunchInScreen() {
 
     setSubmitting(true);
     try {
-      // NOTE: selfie is stored locally only for now — Supabase Storage bucket
-      // for attendance selfies not yet provisioned (needs service_role key to
-      // create; see TODO in expo_eas/supabase skill notes). Once a bucket
-      // exists, upload selfieUri here and pass the public/storage URL instead.
-      await punchIn.mutateAsync({
+      // Enqueue into local outbox (local-first).
+      // The outbox will sync to Supabase as soon as connectivity is available.
+      // NOTE: selfie upload needs a Storage bucket (not yet provisioned — needs
+      // service_role key). selfieUrl is kept null until that bucket exists.
+      await enqueuePunchIn({
         profileId: profile.id,
         projectId: activeProject?.id || '',
         lat: location.coords.latitude,
@@ -122,15 +123,16 @@ export default function PunchInScreen() {
       });
       setSubmitting(false);
       Alert.alert(
-        'Punch In Recorded',
+        'Punch In Queued',
         locationVerified
-          ? 'Your attendance has been recorded successfully.'
-          : 'Attendance recorded but location is outside the site radius. This will be flagged for admin review.',
+          ? 'Your attendance has been saved and will sync automatically.'
+          : 'Attendance saved but location is outside the site radius. It will sync and be flagged for admin review.',
         [{ text: 'OK', onPress: () => router.back() }]
       );
-    } catch (e: any) {
+    } catch (e: unknown) {
       setSubmitting(false);
-      Alert.alert('Error', e?.message || 'Failed to record attendance. Please try again.');
+      const msg = e instanceof Error ? e.message : 'Failed to record attendance. Please try again.';
+      Alert.alert('Error', msg);
     }
   };
 
@@ -152,7 +154,7 @@ export default function PunchInScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.ink} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('worker.punchIn')}</Text>
-        <View style={{ width: 24 }} />
+        <SyncStatusBadge />
       </View>
 
       {/* Camera / Selfie preview */}

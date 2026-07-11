@@ -29,28 +29,25 @@ export default function MoreScreen() {
     {
       title: 'Work',
       items: [
-        { icon: 'business-outline', label: t('worker.mySite'), route: '/site' },
-        { icon: 'document-text-outline', label: t('worker.documents'), route: '/documents' },
-        { icon: 'calendar-outline', label: t('worker.leaveRequest'), route: '/leave' },
-        { icon: 'shield-checkmark-outline', label: t('worker.safetyChecklist'), route: '/safety' },
+        { icon: 'business-outline', label: t('worker.mySite'), route: '/(worker)/my-site' },
+        { icon: 'document-text-outline', label: t('worker.documents'), route: '/(worker)/documents' },
+        { icon: 'calendar-outline', label: t('worker.leaveRequest'), route: '/(worker)/leave-request' },
+        { icon: 'shield-checkmark-outline', label: t('worker.safetyChecklist'), route: '/(worker)/safety-checklist' },
       ],
     },
     {
       title: 'Account',
       items: [
-        { icon: 'person-outline', label: t('worker.profile'), route: '/profile' },
-        { icon: 'wallet-outline', label: t('worker.salary'), route: '/salary' },
-        { icon: 'chatbubbles-outline', label: 'Messages', route: '/messages' },
+        { icon: 'person-outline', label: t('worker.profile'), route: '/(worker)/profile' },
+        { icon: 'chatbubbles-outline', label: 'Messages', route: '/(worker)/messages' },
+        { icon: 'cloud-upload-outline', label: 'Offline Sync', route: '/(worker)/offline-sync' },
       ],
     },
     {
       title: t('settings.language'),
       items: [
-        { icon: 'language-outline', label: t('settings.language'), route: '/language' },
-        { icon: 'notifications-outline', label: t('settings.notifications'), route: '/notifications-settings' },
-        { icon: 'finger-print', label: t('settings.biometric'), route: '/biometric-settings' },
-        { icon: 'key-outline', label: t('settings.changePin'), route: '/change-pin' },
-        { icon: 'help-circle-outline', label: t('settings.help'), route: '/help' },
+        { icon: 'key-outline', label: t('settings.changePin'), route: '/(auth)/forgot-pin' },
+        { icon: 'help-circle-outline', label: t('settings.help') },
       ],
     },
   ];
@@ -69,7 +66,7 @@ export default function MoreScreen() {
       }}
     >
       {/* Profile header */}
-      <Card style={styles.profileCard}>
+      <Card style={styles.profileCard} onPress={() => router.push('/(worker)/profile' as any)}>
         <View style={styles.profileRow}>
           <Avatar
             name={profile?.full_name || 'User'}
@@ -98,7 +95,7 @@ export default function MoreScreen() {
                   styles.menuItem,
                   index < section.items.length - 1 && styles.menuItemBorder,
                 ]}
-                onPress={item.onPress || (() => {})}
+                onPress={item.onPress || (item.route ? () => router.push(item.route as any) : () => {})}
               >
                 <Ionicons
                   name={item.icon}

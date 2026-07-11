@@ -15,7 +15,7 @@ import { Card, Avatar, StatusChip, Button } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useMyTasks } from '../../src/hooks/useTasks';
 import { useProjects } from '../../src/hooks/useProjects';
-import { useTodayAttendance } from '../../src/hooks/useAttendance';
+import { useTodayAttendance, usePunchOut } from '../../src/hooks/useAttendance';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius, shadows } from '../../src/theme/spacing';
@@ -44,9 +44,21 @@ export default function WorkerHomeScreen() {
   const { data: tasks } = useMyTasks(profile?.id);
   const { data: projects } = useProjects();
   const { data: todayAttendance } = useTodayAttendance(profile?.id);
+  const punchOut = usePunchOut();
   const activeProject = projects?.[0]; // Single active project per worker in M1
   const pendingTasks = (tasks || []).filter((t) => t.status !== 'done').slice(0, 3);
   const hasPunchedIn = !!todayAttendance?.check_in_at;
+  const hasPunchedOut = !!todayAttendance?.check_out_at;
+
+  const handleAttendanceAction = () => {
+    if (!hasPunchedIn) {
+      router.push('/(worker)/punch-in' as any);
+      return;
+    }
+    if (!hasPunchedOut && todayAttendance) {
+      punchOut.mutate({ attendanceId: todayAttendance.id, checkInAt: todayAttendance.check_in_at });
+    }
+  };
 
   return (
     <ScrollView
@@ -100,19 +112,25 @@ export default function WorkerHomeScreen() {
 
         {/* Punch In Button */}
         <TouchableOpacity
-          style={[styles.punchButton, hasPunchedIn && styles.punchButtonDone]}
+          style={[styles.punchButton, hasPunchedOut && styles.punchButtonDone]}
           activeOpacity={0.8}
-          disabled={hasPunchedIn}
-          onPress={() => router.push('/(worker)/punch-in' as any)}
+          disabled={hasPunchedOut || punchOut.isPending}
+          onPress={handleAttendanceAction}
         >
           <View style={styles.punchInner}>
             <Ionicons
-              name={hasPunchedIn ? 'checkmark-circle' : 'finger-print'}
+              name={hasPunchedOut ? 'checkmark-circle' : hasPunchedIn ? 'log-out-outline' : 'finger-print'}
               size={28}
               color={colors.white}
             />
             <Text style={styles.punchText}>
-              {hasPunchedIn ? t('worker.punchedIn', 'Punched In') : t('worker.punchIn')}
+              {punchOut.isPending
+                ? 'Saving…'
+                : hasPunchedOut
+                  ? 'Shift Completed'
+                  : hasPunchedIn
+                    ? 'Punch Out'
+                    : t('worker.punchIn')}
             </Text>
           </View>
         </TouchableOpacity>
@@ -152,7 +170,11 @@ export default function WorkerHomeScreen() {
       ))}
 
       {/* Safety Banner */}
-      <Card style={styles.safetyBanner} variant="flat">
+      <Card
+        style={styles.safetyBanner}
+        variant="flat"
+        onPress={() => router.push('/(worker)/safety-checklist' as any)}
+      >
         <View style={styles.safetyRow}>
           <Ionicons name="shield-checkmark" size={24} color={colors.warning} />
           <View style={styles.safetyText}>

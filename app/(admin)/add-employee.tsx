@@ -29,6 +29,17 @@ const ROLES: { label: string; value: UserRole }[] = [
 type Step = 'info' | 'role' | 'review';
 const STEPS: Step[] = ['info', 'role', 'review'];
 
+// ── Security note ────────────────────────────────────────────────────────────
+// We do NOT call supabase.auth.signUp() from the client because:
+//   1. The anon key cannot bypass email-confirmation requirements securely.
+//   2. It would create an unauthenticated session for the new user on the
+//      admin's device (session hijack risk).
+//   3. Service-role operations must stay server-side.
+//
+// Instead, we call the `create-user` Edge Function, which runs with the
+// service-role key and returns only the new user's id + generated password.
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function AddEmployeeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -48,47 +59,34 @@ export default function AddEmployeeScreen() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      // Create auth user via Supabase Auth (phone → email mapping)
-      const email = `${phone.replace(/\D/g, '')}@fineglazeapp.com`;
-      const tempPassword = `FineGlaze@${new Date().getFullYear()}`;
-
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password: tempPassword,
-      });
-
-      if (authError) {
-        // If user already exists in auth, just create/update profile
-        if (!authError.message.includes('already registered')) {
-          throw authError;
-        }
-      }
-
-      // Note: profile creation is handled by a database trigger on auth.users insert
-      // or we create it manually if the trigger doesn't exist
-      if (authData?.user) {
-        const { error: profileError } = await supabase.from('profiles').upsert({
-          id: authData.user.id,
-          company_id: (await supabase.from('companies').select('id').single()).data?.id || '',
+      // Call the server-side Edge Function with the caller's JWT so RLS can
+      // verify the caller is an admin of the same company.
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
           full_name: fullName.trim(),
           phone: phone.trim(),
           role,
           daily_rate: dailyRate ? parseFloat(dailyRate) : null,
           address: address.trim() || null,
-          status: 'active',
-        });
-        if (profileError) throw profileError;
+        },
+      });
+
+      if (error) {
+        // error.message contains the HTTP body returned by the function
+        throw new Error(error.message);
       }
 
-      setSubmitting(false);
+      const tempPassword: string = data?.temp_password ?? '(see admin)';
+
       Alert.alert(
         'Employee Added',
         `${fullName} has been added.\nLogin: ${phone}\nTemp password: ${tempPassword}`,
         [{ text: 'OK', onPress: () => router.back() }]
       );
     } catch (e: any) {
-      setSubmitting(false);
       Alert.alert('Error', e?.message || 'Failed to add employee');
+    } finally {
+      setSubmitting(false);
     }
   };
 

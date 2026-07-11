@@ -4,3 +4,8 @@ export { Card } from './Card';
 export { StatusChip } from './StatusChip';
 export { Avatar } from './Avatar';
 export { PinPad } from './PinPad';
+export { SyncStatusBadge } from './SyncStatusBadge';
+export { ProgressBar } from './ProgressBar';
+export { SearchBar } from './SearchBar';
+export { SegmentedControl } from './SegmentedControl';
+export { Banner } from './Banner';

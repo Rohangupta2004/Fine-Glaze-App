@@ -34,8 +34,9 @@ export default function ForgotPinScreen() {
 
     try {
       // Re-authenticate with password to prove identity
+      // Domain must match authStore.ts phoneToEmail() → @fineglazeapp.com
       const phone = profile?.phone || '';
-      const email = `${phone.replace(/\D/g, '')}@fineglaze.app`;
+      const email = `${phone.replace(/\D/g, '')}@fineglazeapp.com`;
 
       const { error: authError } = await supabase.auth.signInWithPassword({
         email,

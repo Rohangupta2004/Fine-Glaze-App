@@ -9,7 +9,14 @@ import { Avatar, Card } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
-import { spacing } from '../../src/theme/spacing';
+import { spacing, TOUCH_TARGET } from '../../src/theme/spacing';
+
+interface MenuItem {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  route?: string;
+  onPress?: () => void;
+}
 
 export default function SupervisorMoreScreen() {
   const insets = useSafeAreaInsets();
@@ -17,19 +24,35 @@ export default function SupervisorMoreScreen() {
   const router = useRouter();
   const { profile, signOut } = useAuthStore();
 
-  const menuItems = [
-    { icon: 'document-text-outline' as const, label: 'Upload DPR' },
-    { icon: 'people-outline' as const, label: 'Team Attendance' },
-    { icon: 'person-outline' as const, label: 'Profile' },
-    { icon: 'wallet-outline' as const, label: 'Salary' },
-    { icon: 'language-outline' as const, label: t('settings.language') },
-    { icon: 'finger-print' as const, label: t('settings.biometric') },
-    { icon: 'help-circle-outline' as const, label: t('settings.help') },
+  const menuItems: MenuItem[] = [
+    {
+      icon: 'document-text-outline',
+      label: 'Daily Progress Report',
+      route: '/(supervisor)/dpr',
+    },
+    {
+      icon: 'people-outline',
+      label: 'Team Attendance',
+      route: '/(supervisor)/team-attendance',
+    },
+    { icon: 'person-outline', label: 'Profile' },
+    { icon: 'wallet-outline', label: 'Salary' },
+    { icon: 'language-outline', label: t('settings.language') },
+    { icon: 'finger-print', label: t('settings.biometric') },
+    { icon: 'help-circle-outline', label: t('settings.help') },
   ];
 
   const handleLogout = async () => {
     await signOut();
     router.replace('/(auth)/welcome');
+  };
+
+  const handleItemPress = (item: MenuItem) => {
+    if (item.route) {
+      router.push(item.route as any);
+    } else if (item.onPress) {
+      item.onPress();
+    }
   };
 
   return (
@@ -52,10 +75,16 @@ export default function SupervisorMoreScreen() {
           <TouchableOpacity
             key={item.label}
             style={[styles.menuItem, index < menuItems.length - 1 && styles.menuItemBorder]}
+            onPress={() => handleItemPress(item)}
+            activeOpacity={0.7}
           >
             <Ionicons name={item.icon} size={22} color={colors.neutral[600]} />
             <Text style={styles.menuLabel}>{item.label}</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.neutral[300]} />
+            {item.route ? (
+              <Ionicons name="chevron-forward" size={18} color={colors.neutral[400]} />
+            ) : (
+              <Ionicons name="chevron-forward" size={18} color={colors.neutral[300]} />
+            )}
           </TouchableOpacity>
         ))}
       </Card>
@@ -76,9 +105,22 @@ const styles = StyleSheet.create({
   profileName: { ...typography.h5, color: colors.ink },
   profileRole: { ...typography.bodySmall, color: colors.neutral[500] },
   menuCard: { padding: 0, overflow: 'hidden', marginBottom: spacing.xl },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.lg, paddingHorizontal: spacing.lg, gap: spacing.md },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: TOUCH_TARGET,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+  },
   menuItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.neutral[100] },
   menuLabel: { flex: 1, ...typography.bodyMedium, fontFamily: fontFamily.medium, color: colors.ink },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.lg },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: TOUCH_TARGET,
+    gap: spacing.sm,
+  },
   logoutText: { ...typography.button, color: colors.error },
 });

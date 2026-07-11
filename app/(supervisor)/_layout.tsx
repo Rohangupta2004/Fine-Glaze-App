@@ -59,6 +59,21 @@ export default function SupervisorLayout() {
           ),
         }}
       />
+      {/* Sub-screens (no tab bar) */}
+      <Tabs.Screen
+        name="team-attendance"
+        options={{
+          href: null, // not in tab bar
+          tabBarStyle: { display: 'none' },
+        }}
+      />
+      <Tabs.Screen
+        name="dpr"
+        options={{
+          href: null,
+          tabBarStyle: { display: 'none' },
+        }}
+      />
     </Tabs>
   );
 }

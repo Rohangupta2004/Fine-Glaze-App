@@ -23,6 +23,7 @@ export default function ClientLayout() {
         },
       }}
     >
+      {/* ── Visible 5-tab structure ── */}
       <Tabs.Screen
         name="home"
         options={{
@@ -66,6 +67,22 @@ export default function ClientLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="menu-outline" size={size} color={color} />
           ),
+        }}
+      />
+
+      {/* ── Stack-hidden routes (no tab bar entry) ── */}
+      <Tabs.Screen
+        name="approvals"
+        options={{
+          href: null, // hide from tab bar
+          title: 'Approvals',
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          href: null, // hide from tab bar
+          title: 'Project Chat',
         }}
       />
     </Tabs>

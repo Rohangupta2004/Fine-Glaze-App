@@ -14,10 +14,10 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-import { Button, Card, Input } from '../../src/components';
+import { Button, Card, Input, SyncStatusBadge } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useProjects } from '../../src/hooks/useProjects';
-import { useSubmitDpr } from '../../src/hooks/useDpr';
+import { useOutboxStore } from '../../src/stores/outboxStore';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
@@ -34,7 +34,7 @@ export default function DprScreen() {
   const profile = useAuthStore((s) => s.profile);
   const { data: projects } = useProjects();
   const activeProject = projects?.[0]; // Single active project per worker in M1
-  const submitDpr = useSubmitDpr();
+  const enqueueDpr = useOutboxStore((s) => s.enqueueDpr);
 
   const [step, setStep] = useState<DprStep>('info');
   const [workType, setWorkType] = useState('');
@@ -77,9 +77,11 @@ export default function DprScreen() {
     if (!profile?.id || !activeProject?.id) return;
     setSubmitting(true);
     try {
+      // Enqueue into local outbox (local-first).
       // NOTE: media stays local-only for now — dpr_media upload needs a Storage
-      // bucket, which needs a service_role key to provision (not yet available).
-      await submitDpr.mutateAsync({
+      // bucket (service_role key not yet available). Media URIs are not stored
+      // in the outbox payload until the bucket is provisioned.
+      await enqueueDpr({
         projectId: activeProject.id,
         submittedBy: profile.id,
         workType,
@@ -87,16 +89,17 @@ export default function DprScreen() {
         workDone,
       });
       setSubmitting(false);
-      Alert.alert('DPR Submitted', 'Your daily progress report has been submitted for review.');
+      Alert.alert('DPR Queued', 'Your daily progress report has been saved and will sync automatically.');
       // Reset
       setStep('info');
       setWorkType('');
       setLevelZone('');
       setWorkDone('');
       setMedia([]);
-    } catch (e: any) {
+    } catch (e: unknown) {
       setSubmitting(false);
-      Alert.alert('Error', e?.message || 'Failed to submit report. Please try again.');
+      const msg = e instanceof Error ? e.message : 'Failed to submit report. Please try again.';
+      Alert.alert('Error', msg);
     }
   };
 
@@ -104,7 +107,10 @@ export default function DprScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.lg }]}>
-      <Text style={styles.title}>{t('worker.uploadDpr')}</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>{t('worker.uploadDpr')}</Text>
+        <SyncStatusBadge />
+      </View>
 
       {/* Step indicator */}
       <View style={styles.stepRow}>
@@ -263,10 +269,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     paddingHorizontal: spacing.lg,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xl,
+  },
   title: {
     ...typography.h3,
     color: colors.ink,
-    marginBottom: spacing.xl,
   },
   stepRow: {
     flexDirection: 'row',

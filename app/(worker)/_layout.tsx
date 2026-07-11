@@ -3,9 +3,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { colors } from '../../src/theme/colors';
 import { fontFamily } from '../../src/theme/typography';
+import { useOutboxSync } from '../../src/hooks/useOutboxSync';
 
 export default function WorkerLayout() {
   const { t } = useTranslation();
+  useOutboxSync();
 
   return (
     <Tabs
@@ -24,6 +26,7 @@ export default function WorkerLayout() {
           fontFamily: fontFamily.medium,
           fontSize: 11,
         },
+        tabBarHideOnKeyboard: true,
       }}
     >
       <Tabs.Screen
@@ -71,6 +74,10 @@ export default function WorkerLayout() {
           ),
         }}
       />
+      {['my-site', 'documents', 'leave-request', 'safety-checklist', 'messages', 'profile', 'offline-sync'].map((name) => (
+        <Tabs.Screen key={name} name={name} options={{ href: null }} />
+      ))}
+      <Tabs.Screen name="punch-in/index" options={{ href: null }} />
     </Tabs>
   );
 }

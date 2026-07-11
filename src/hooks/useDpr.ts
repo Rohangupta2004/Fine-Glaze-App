@@ -6,6 +6,25 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** DPRs for a project (admin view), most recent first. */
+export function useProjectDprs(projectId: string | null | undefined, limit = 30) {
+  return useQuery({
+    queryKey: ['dprs', 'project', projectId, limit],
+    queryFn: async (): Promise<Dpr[]> => {
+      if (!projectId) return [];
+      const { data, error } = await supabase
+        .from('dprs')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('date', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data as Dpr[];
+    },
+    enabled: !!projectId,
+  });
+}
+
 /** DPRs submitted by the current user, most recent first. */
 export function useMyDprs(profileId: string | null | undefined, limit = 30) {
   return useQuery({
