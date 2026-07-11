@@ -13,9 +13,18 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Avatar, StatusChip, Button } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
+import { useMyTasks } from '../../src/hooks/useTasks';
+import { useProjects } from '../../src/hooks/useProjects';
+import { useTodayAttendance } from '../../src/hooks/useAttendance';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius, shadows } from '../../src/theme/spacing';
+
+const PRIORITY_COLOR: Record<string, string> = {
+  high: colors.error,
+  medium: colors.warning,
+  low: colors.success,
+};
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -31,6 +40,13 @@ export default function WorkerHomeScreen() {
   const profile = useAuthStore((s) => s.profile);
 
   const firstName = profile?.full_name?.split(' ')[0] || 'Worker';
+
+  const { data: tasks } = useMyTasks(profile?.id);
+  const { data: projects } = useProjects();
+  const { data: todayAttendance } = useTodayAttendance(profile?.id);
+  const activeProject = projects?.[0]; // Single active project per worker in M1
+  const pendingTasks = (tasks || []).filter((t) => t.status !== 'done').slice(0, 3);
+  const hasPunchedIn = !!todayAttendance?.check_in_at;
 
   return (
     <ScrollView
@@ -69,32 +85,35 @@ export default function WorkerHomeScreen() {
         <View style={styles.siteHeader}>
           <View style={styles.siteInfo}>
             <Text style={styles.siteLabel}>{t('worker.todaysSite')}</Text>
-            <Text style={styles.siteName}>Embassy Tower</Text>
-            <Text style={styles.siteDetail}>Level 4 – Zone B</Text>
+            <Text style={styles.siteName}>{activeProject?.name || '—'}</Text>
+            <Text style={styles.siteDetail}>{activeProject?.stage || ''}</Text>
           </View>
-          <StatusChip status="on_track" />
+          <StatusChip status={activeProject?.status || 'on_track'} />
         </View>
 
         <View style={styles.siteStats}>
           <View style={styles.statItem}>
-            <Ionicons name="time-outline" size={16} color={colors.neutral[500]} />
-            <Text style={styles.statText}>08:00 – 17:00</Text>
-          </View>
-          <View style={styles.statItem}>
             <Ionicons name="location-outline" size={16} color={colors.neutral[500]} />
-            <Text style={styles.statText}>Mumbai</Text>
+            <Text style={styles.statText}>{activeProject?.city || '—'}</Text>
           </View>
         </View>
 
         {/* Punch In Button */}
         <TouchableOpacity
-          style={styles.punchButton}
+          style={[styles.punchButton, hasPunchedIn && styles.punchButtonDone]}
           activeOpacity={0.8}
+          disabled={hasPunchedIn}
           onPress={() => router.push('/(worker)/punch-in' as any)}
         >
           <View style={styles.punchInner}>
-            <Ionicons name="finger-print" size={28} color={colors.white} />
-            <Text style={styles.punchText}>{t('worker.punchIn')}</Text>
+            <Ionicons
+              name={hasPunchedIn ? 'checkmark-circle' : 'finger-print'}
+              size={28}
+              color={colors.white}
+            />
+            <Text style={styles.punchText}>
+              {hasPunchedIn ? t('worker.punchedIn', 'Punched In') : t('worker.punchIn')}
+            </Text>
           </View>
         </TouchableOpacity>
       </Card>
@@ -107,39 +126,30 @@ export default function WorkerHomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Task cards (demo data) */}
-      <Card style={styles.taskCard} variant="interactive">
-        <View style={styles.taskRow}>
-          <View style={[styles.priorityDot, { backgroundColor: colors.error }]} />
-          <View style={styles.taskInfo}>
-            <Text style={styles.taskTitle}>Glass Panel Installation</Text>
-            <Text style={styles.taskMeta}>Level 4 – Zone B • High Priority</Text>
+      {pendingTasks.length === 0 && (
+        <Card style={styles.taskCard} variant="flat">
+          <Text style={styles.taskMeta}>{t('worker.noTasksToday', 'No tasks assigned yet')}</Text>
+        </Card>
+      )}
+      {pendingTasks.map((task) => (
+        <Card key={task.id} style={styles.taskCard} variant="interactive">
+          <View style={styles.taskRow}>
+            <View
+              style={[
+                styles.priorityDot,
+                { backgroundColor: PRIORITY_COLOR[task.priority] || colors.neutral[400] },
+              ]}
+            />
+            <View style={styles.taskInfo}>
+              <Text style={styles.taskTitle}>{task.title}</Text>
+              <Text style={styles.taskMeta}>
+                {[task.level_zone, `${task.priority} priority`].filter(Boolean).join(' • ')}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.neutral[400]} />
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.neutral[400]} />
-        </View>
-      </Card>
-
-      <Card style={styles.taskCard} variant="interactive">
-        <View style={styles.taskRow}>
-          <View style={[styles.priorityDot, { backgroundColor: colors.warning }]} />
-          <View style={styles.taskInfo}>
-            <Text style={styles.taskTitle}>Frame Alignment Check</Text>
-            <Text style={styles.taskMeta}>Level 4 – Zone A • Medium Priority</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.neutral[400]} />
-        </View>
-      </Card>
-
-      <Card style={styles.taskCard} variant="interactive">
-        <View style={styles.taskRow}>
-          <View style={[styles.priorityDot, { backgroundColor: colors.success }]} />
-          <View style={styles.taskInfo}>
-            <Text style={styles.taskTitle}>Site Cleanup</Text>
-            <Text style={styles.taskMeta}>Level 3 • Low Priority</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.neutral[400]} />
-        </View>
-      </Card>
+        </Card>
+      ))}
 
       {/* Safety Banner */}
       <Card style={styles.safetyBanner} variant="flat">
@@ -227,6 +237,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     ...shadows.md,
+  },
+  punchButtonDone: {
+    backgroundColor: colors.success,
   },
   punchInner: {
     flexDirection: 'row',

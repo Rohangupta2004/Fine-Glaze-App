@@ -70,15 +70,23 @@ INSERT INTO project_templates (company_id, name, payload) VALUES
   }');
 
 -- ═══════════════════════════════════════════════════════════════════════
--- NOTE: Profile inserts are commented out because they need auth user
--- UUIDs from Supabase Auth. Use the admin API to create users first,
--- then insert profiles with matching UUIDs.
+-- NOTE: Profile inserts require auth user UUIDs from Supabase Auth first.
+-- See supabase/create_auth_users.sql for a script that creates the 5 test
+-- accounts below directly (bypasses email-send rate limits — dev/demo only)
+-- along with their matching profile rows. Do not run this file's profile
+-- inserts on their own; they're just documentation of what was seeded on
+-- the live project (2026-07-11) via that script.
+--
+-- Test login accounts seeded on 2026-07-11 (password shared separately, not in git):
+--   Owner (Rohan):      9876543210
+--   Supervisor (Amit):  9876543211
+--   Worker (Rahul):     9876543212
+--   Worker (Suresh):    9876543213
+--   Client (Vikram):    9876500000
 -- ═══════════════════════════════════════════════════════════════════════
 
--- EXAMPLE (uncomment after creating auth users):
--- INSERT INTO profiles (id, company_id, full_name, phone, role, worker_id, daily_rate) VALUES
---   ('AUTH_USER_UUID_HERE', '00000000-0000-0000-0000-000000000001', 'Rohan Gupta', '9876543210', 'owner', NULL, NULL),
---   ('AUTH_USER_UUID_HERE', '00000000-0000-0000-0000-000000000001', 'Amit Singh', '9876543211', 'supervisor', 'W-1001', 800),
---   ('AUTH_USER_UUID_HERE', '00000000-0000-0000-0000-000000000001', 'Rahul Kumar', '9876543212', 'worker', 'W-1002', 600),
---   ('AUTH_USER_UUID_HERE', '00000000-0000-0000-0000-000000000001', 'Suresh Patil', '9876543213', 'worker', 'W-1003', 600),
---   ('AUTH_USER_UUID_HERE', '00000000-0000-0000-0000-000000000001', 'Vikram Mehta', '9876500000', 'client', NULL, NULL);
+-- Demo tasks assigned to the two test workers (Rahul, Suresh) on Embassy Tower
+-- INSERT INTO tasks (project_id, assigned_to, title, level_zone, priority, status, created_by) VALUES
+--   ('00000000-0000-0000-0000-000000000020', '<rahul_profile_id>', 'Glass Panel Installation', 'Level 4 - Zone B', 'high', 'pending', '<owner_profile_id>'),
+--   ('00000000-0000-0000-0000-000000000020', '<rahul_profile_id>', 'Frame Alignment Check', 'Level 4 - Zone A', 'medium', 'pending', '<owner_profile_id>'),
+--   ('00000000-0000-0000-0000-000000000020', '<suresh_profile_id>', 'Site Cleanup', 'Level 3', 'low', 'pending', '<owner_profile_id>');

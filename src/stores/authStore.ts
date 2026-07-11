@@ -39,10 +39,13 @@ interface AuthState {
   initialize: () => Promise<void>;
 }
 
-/** Map phone number to email: 9876543210 → 9876543210@fineglaze.app */
+/** Map phone number to email: 9876543210 → 9876543210@fineglazeapp.com
+ *  NOTE: must be a valid-format TLD accepted by Supabase Auth email validation —
+ *  `.app` domains are rejected by GoTrue's email validator ("email_address_invalid"),
+ *  even though the address is never actually emailed. Confirmed working: `.com`. */
 function phoneToEmail(phone: string): string {
   const digits = phone.replace(/\D/g, '');
-  return `${digits}@fineglaze.app`;
+  return `${digits}@fineglazeapp.com`;
 }
 
 /** Simple hash for PIN (not crypto-grade, but stored in SecureStore) */

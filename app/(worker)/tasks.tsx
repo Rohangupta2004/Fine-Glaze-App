@@ -5,21 +5,15 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '../../src/components';
+import { useAuthStore } from '../../src/stores/authStore';
+import { useMyTasks, useUpdateTaskStatus } from '../../src/hooks/useTasks';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
 
 type TabKey = 'today' | 'completed';
 
-// Demo tasks — will come from Supabase + TanStack Query
-const DEMO_TASKS = [
-  { id: '1', title: 'Glass Panel Installation', zone: 'Level 4 – Zone B', priority: 'high' as const, status: 'pending' },
-  { id: '2', title: 'Frame Alignment Check', zone: 'Level 4 – Zone A', priority: 'medium' as const, status: 'pending' },
-  { id: '3', title: 'Site Cleanup', zone: 'Level 3', priority: 'low' as const, status: 'pending' },
-  { id: '4', title: 'Silicone Sealing', zone: 'Level 3 – Zone B', priority: 'high' as const, status: 'pending' },
-];
-
-const PRIORITY_COLORS = {
+const PRIORITY_COLORS: Record<string, string> = {
   high: colors.error,
   medium: colors.warning,
   low: colors.success,
@@ -29,6 +23,13 @@ export default function TasksScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabKey>('today');
+  const profile = useAuthStore((s) => s.profile);
+  const { data: allTasks, isLoading } = useMyTasks(profile?.id);
+  const updateStatus = useUpdateTaskStatus();
+
+  const tasks = (allTasks || []).filter((task) =>
+    activeTab === 'today' ? task.status !== 'done' : task.status === 'done'
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.lg }]}>
@@ -51,21 +52,33 @@ export default function TasksScreen() {
 
       {/* Task list */}
       <FlatList
-        data={DEMO_TASKS}
+        data={tasks}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
           <Card style={styles.taskCard} variant="interactive">
             <View style={styles.taskRow}>
-              <TouchableOpacity style={styles.checkbox}>
-                <View style={[styles.checkboxInner, { borderColor: PRIORITY_COLORS[item.priority] }]} />
+              <TouchableOpacity
+                style={styles.checkbox}
+                onPress={() =>
+                  updateStatus.mutate({
+                    taskId: item.id,
+                    status: item.status === 'done' ? 'pending' : 'done',
+                  })
+                }
+              >
+                {item.status === 'done' ? (
+                  <Ionicons name="checkmark-circle" size={22} color={colors.success} />
+                ) : (
+                  <View style={[styles.checkboxInner, { borderColor: PRIORITY_COLORS[item.priority] }]} />
+                )}
               </TouchableOpacity>
               <View style={styles.taskInfo}>
                 <Text style={styles.taskTitle}>{item.title}</Text>
                 <View style={styles.taskMeta}>
                   <Ionicons name="location-outline" size={12} color={colors.neutral[400]} />
-                  <Text style={styles.taskZone}>{item.zone}</Text>
+                  <Text style={styles.taskZone}>{item.level_zone || '—'}</Text>
                   <View style={[styles.priorityPill, { backgroundColor: PRIORITY_COLORS[item.priority] + '18' }]}>
                     <Text style={[styles.priorityText, { color: PRIORITY_COLORS[item.priority] }]}>
                       {item.priority}
@@ -79,7 +92,7 @@ export default function TasksScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="checkmark-done-circle-outline" size={64} color={colors.neutral[300]} />
-            <Text style={styles.emptyText}>No tasks</Text>
+            <Text style={styles.emptyText}>{isLoading ? 'Loading…' : 'No tasks'}</Text>
           </View>
         }
       />
