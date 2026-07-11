@@ -29,7 +29,7 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: t('worker.home'),
+          title: 'Home',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
@@ -38,7 +38,7 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="projects"
         options={{
-          title: t('admin.projects'),
+          title: 'Projects',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="business-outline" size={size} color={color} />
           ),
@@ -48,7 +48,7 @@ export default function AdminLayout() {
         name="add"
         options={{
           title: '',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: () => (
             <Ionicons name="add-circle" size={32} color={colors.primary} />
           ),
         }}
@@ -56,7 +56,7 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="chat"
         options={{
-          title: t('admin.chat'),
+          title: 'Chat',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubbles-outline" size={size} color={color} />
           ),
@@ -65,12 +65,19 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="more"
         options={{
-          title: t('worker.more'),
+          title: 'More',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="menu-outline" size={size} color={color} />
           ),
         }}
       />
+      {/* Hidden detail screens — accessible via router.push, not shown in tab bar */}
+      <Tabs.Screen name="employees" options={{ href: null }} />
+      <Tabs.Screen name="employee-profile" options={{ href: null }} />
+      <Tabs.Screen name="add-employee" options={{ href: null }} />
+      <Tabs.Screen name="approvals" options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="project-workspace" options={{ href: null }} />
     </Tabs>
   );
 }

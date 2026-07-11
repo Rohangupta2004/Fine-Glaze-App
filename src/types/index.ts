@@ -189,6 +189,141 @@ export interface Message {
   created_at: string;
 }
 
+export interface LeaveRequest {
+  id: string;
+  profile_id: string;
+  company_id: string;
+  type: LeaveType;
+  from_date: string;
+  to_date: string;
+  reason: string | null;
+  attachment_path: string | null;
+  status: RequestStatus;
+  decided_by: string | null;
+  decided_at: string | null;
+}
+
+export interface AdvanceRequest {
+  id: string;
+  profile_id: string;
+  amount: number;
+  reason: string | null;
+  status: RequestStatus;
+  decided_by: string | null;
+  decided_at: string | null;
+}
+
+export interface Material {
+  id: string;
+  project_id: string;
+  name: string;
+  spec: string | null;
+  unit: string | null;
+  stock_qty: number;
+}
+
+export interface MaterialRequest {
+  id: string;
+  project_id: string;
+  requested_by: string;
+  material_name: string;
+  spec: string | null;
+  qty: number;
+  needed_by: string | null;
+  notes: string | null;
+  photo_path: string | null;
+  status: MaterialRequestStatus;
+}
+
+export interface Delivery {
+  id: string;
+  material_request_id: string;
+  delivery_code: string | null;
+  status: DeliveryStatus;
+  delivered_at: string | null;
+  photos: string[];
+}
+
+export interface DocumentRow {
+  id: string;
+  owner_type: 'profile' | 'project';
+  owner_id: string;
+  category: DocumentCategory;
+  title: string;
+  uploaded_by: string;
+}
+
+export interface DocumentVersion {
+  id: string;
+  document_id: string;
+  rev_no: number;
+  storage_path: string;
+  uploaded_by: string;
+  created_at: string;
+  is_current: boolean;
+}
+
+export interface Expense {
+  id: string;
+  project_id: string;
+  description: string;
+  amount: number;
+  category: string | null;
+  receipt_photo_path: string | null;
+  entered_by: string;
+  date: string;
+}
+
+export interface Payment {
+  id: string;
+  project_id: string;
+  milestone_name: string;
+  amount: number;
+  status: PaymentStatus;
+  due_date: string | null;
+  paid_at: string | null;
+}
+
+export interface ClientApproval {
+  id: string;
+  project_id: string;
+  request_code: string | null;
+  title: string;
+  details: Record<string, any> | null;
+  photos: string[];
+  requested_by: string;
+  status: RequestStatus;
+  decided_at: string | null;
+}
+
+export interface Conversation {
+  id: string;
+  company_id: string;
+  type: ConversationType;
+  project_id: string | null;
+  created_at: string;
+}
+
+export interface SafetyCheck {
+  id: string;
+  profile_id: string;
+  project_id: string;
+  date: string;
+  items: Record<string, boolean>;
+  concern_reported: string | null;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  company_id: string;
+  actor_id: string;
+  action: string;
+  ref_table: string;
+  ref_id: string;
+  detail: Record<string, any> | null;
+  created_at: string;
+}
+
 export interface Notification {
   id: string;
   recipient_id: string;
@@ -199,4 +334,5 @@ export interface Notification {
   ref_id: string | null;
   read_at: string | null;
   important: boolean;
+  created_at?: string;
 }
