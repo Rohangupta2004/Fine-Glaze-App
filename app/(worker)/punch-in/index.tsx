@@ -15,6 +15,9 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Button, Card } from '../../../src/components';
+import { useAuthStore } from '../../../src/stores/authStore';
+import { useProjects } from '../../../src/hooks/useProjects';
+import { usePunchIn } from '../../../src/hooks/useAttendance';
 import { colors } from '../../../src/theme/colors';
 import { typography, fontFamily } from '../../../src/theme/typography';
 import { spacing, radius, shadows } from '../../../src/theme/spacing';
@@ -45,6 +48,10 @@ export default function PunchInScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const cameraRef = useRef<CameraView>(null);
+  const profile = useAuthStore((s) => s.profile);
+  const { data: projects } = useProjects();
+  const activeProject = projects?.[0]; // Single active project per worker in M1
+  const punchIn = usePunchIn();
 
   const [permission, requestPermission] = useCameraPermissions();
   const [selfieUri, setSelfieUri] = useState<string | null>(null);
@@ -97,11 +104,22 @@ export default function PunchInScreen() {
   };
 
   const handleConfirm = async () => {
-    if (!selfieUri || !location) return;
+    if (!selfieUri || !location || !profile?.id) return;
 
     setSubmitting(true);
-    // TODO: Save to offline outbox (expo-sqlite) → sync to Supabase
-    setTimeout(() => {
+    try {
+      // NOTE: selfie is stored locally only for now — Supabase Storage bucket
+      // for attendance selfies not yet provisioned (needs service_role key to
+      // create; see TODO in expo_eas/supabase skill notes). Once a bucket
+      // exists, upload selfieUri here and pass the public/storage URL instead.
+      await punchIn.mutateAsync({
+        profileId: profile.id,
+        projectId: activeProject?.id || '',
+        lat: location.coords.latitude,
+        lng: location.coords.longitude,
+        selfieUrl: null,
+        locationVerified: !!locationVerified,
+      });
       setSubmitting(false);
       Alert.alert(
         'Punch In Recorded',
@@ -110,7 +128,10 @@ export default function PunchInScreen() {
           : 'Attendance recorded but location is outside the site radius. This will be flagged for admin review.',
         [{ text: 'OK', onPress: () => router.back() }]
       );
-    }, 1500);
+    } catch (e: any) {
+      setSubmitting(false);
+      Alert.alert('Error', e?.message || 'Failed to record attendance. Please try again.');
+    }
   };
 
   if (!permission?.granted) {
