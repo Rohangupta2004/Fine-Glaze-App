@@ -26,8 +26,9 @@ export interface PunchInPayload {
   projectId: string;
   lat: number;
   lng: number;
-  selfieUrl: string | null;
+  selfieUri: string;
   locationVerified: boolean;
+  capturedAt: string;
 }
 
 export interface DprPayload {
@@ -36,6 +37,14 @@ export interface DprPayload {
   workType: string;
   levelZone: string;
   workDone: string;
+  reportDate: string;
+  media: Array<{
+    uri: string;
+    type: 'photo' | 'video';
+    durationS?: number | null;
+    mimeType?: string | null;
+    fileName?: string | null;
+  }>;
 }
 
 export type OutboxPayload = PunchInPayload | DprPayload;

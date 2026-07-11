@@ -61,5 +61,5 @@ export function useDprTimeline(projectId: string | null | undefined) {
  */
 export function getDprMediaUrl(storagePath: string): string {
   const { data } = supabase.storage.from('dpr-media').getPublicUrl(storagePath);
-  return data?.publicUrl ?? storagePath;
+  return data.publicUrl;
 }

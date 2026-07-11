@@ -79,11 +79,11 @@ export default function PunchInScreen() {
     const dist = haversineDistance(
       loc.coords.latitude,
       loc.coords.longitude,
-      SITE_LAT,
-      SITE_LNG
+      activeProject?.lat ?? SITE_LAT,
+      activeProject?.lng ?? SITE_LNG
     );
     setDistance(Math.round(dist));
-    setLocationVerified(dist <= GEOFENCE_RADIUS);
+    setLocationVerified(dist <= (activeProject?.geofence_radius_m ?? GEOFENCE_RADIUS));
   };
 
   const takeSelfie = async () => {
@@ -109,17 +109,15 @@ export default function PunchInScreen() {
 
     setSubmitting(true);
     try {
-      // Enqueue into local outbox (local-first).
-      // The outbox will sync to Supabase as soon as connectivity is available.
-      // NOTE: selfie upload needs a Storage bucket (not yet provisioned — needs
-      // service_role key). selfieUrl is kept null until that bucket exists.
+      if (!activeProject?.id) throw new Error('No active project is assigned.');
       await enqueuePunchIn({
         profileId: profile.id,
-        projectId: activeProject?.id || '',
+        projectId: activeProject.id,
         lat: location.coords.latitude,
         lng: location.coords.longitude,
-        selfieUrl: null,
+        selfieUri,
         locationVerified: !!locationVerified,
+        capturedAt: new Date().toISOString(),
       });
       setSubmitting(false);
       Alert.alert(
@@ -189,7 +187,7 @@ export default function PunchInScreen() {
         <View style={styles.infoRow}>
           <Ionicons name="business-outline" size={18} color={colors.neutral[500]} />
           <Text style={styles.infoLabel}>Site</Text>
-          <Text style={styles.infoValue}>Embassy Tower</Text>
+          <Text style={styles.infoValue}>{activeProject?.name || 'No project assigned'}</Text>
         </View>
 
         {/* Location status */}

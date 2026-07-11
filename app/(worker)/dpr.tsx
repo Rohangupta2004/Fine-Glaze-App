@@ -40,7 +40,13 @@ export default function DprScreen() {
   const [workType, setWorkType] = useState('');
   const [levelZone, setLevelZone] = useState('');
   const [workDone, setWorkDone] = useState('');
-  const [media, setMedia] = useState<string[]>([]);
+  const [media, setMedia] = useState<Array<{
+    uri: string;
+    type: 'photo' | 'video';
+    durationS?: number | null;
+    mimeType?: string | null;
+    fileName?: string | null;
+  }>>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const stepIndex = STEPS.indexOf(step);
@@ -54,8 +60,14 @@ export default function DprScreen() {
     });
 
     if (!result.canceled) {
-      const uris = result.assets.map((a) => a.uri);
-      setMedia((prev) => [...prev, ...uris].slice(0, 10));
+      const selected = result.assets.map((asset) => ({
+        uri: asset.uri,
+        type: asset.type === 'video' ? 'video' as const : 'photo' as const,
+        durationS: asset.duration ? Math.round(asset.duration / 1000) : null,
+        mimeType: asset.mimeType,
+        fileName: asset.fileName,
+      }));
+      setMedia((prev) => [...prev, ...selected].slice(0, 12));
     }
   };
 
@@ -65,7 +77,13 @@ export default function DprScreen() {
     });
 
     if (!result.canceled) {
-      setMedia((prev) => [...prev, result.assets[0].uri].slice(0, 10));
+      const asset = result.assets[0];
+      setMedia((prev) => [...prev, {
+        uri: asset.uri,
+        type: 'photo' as const,
+        mimeType: asset.mimeType,
+        fileName: asset.fileName,
+      }].slice(0, 12));
     }
   };
 
@@ -77,16 +95,14 @@ export default function DprScreen() {
     if (!profile?.id || !activeProject?.id) return;
     setSubmitting(true);
     try {
-      // Enqueue into local outbox (local-first).
-      // NOTE: media stays local-only for now — dpr_media upload needs a Storage
-      // bucket (service_role key not yet available). Media URIs are not stored
-      // in the outbox payload until the bucket is provisioned.
       await enqueueDpr({
         projectId: activeProject.id,
         submittedBy: profile.id,
         workType,
         levelZone,
         workDone,
+        reportDate: new Date().toISOString().slice(0, 10),
+        media,
       });
       setSubmitting(false);
       Alert.alert('DPR Queued', 'Your daily progress report has been saved and will sync automatically.');
@@ -177,9 +193,14 @@ export default function DprScreen() {
             <Text style={styles.mediaHint}>Add up to 10 photos and 2 videos (max 60s each)</Text>
 
             <View style={styles.mediaGrid}>
-              {media.map((uri, index) => (
-                <View key={index} style={styles.mediaThumb}>
-                  <Image source={{ uri }} style={styles.thumbImage} />
+              {media.map((item, index) => (
+                <View key={`${item.uri}-${index}`} style={styles.mediaThumb}>
+                  <Image source={{ uri: item.uri }} style={styles.thumbImage} />
+                  {item.type === 'video' && (
+                    <View style={styles.videoBadge}>
+                      <Ionicons name="play" size={14} color={colors.white} />
+                    </View>
+                  )}
                   <TouchableOpacity
                     style={styles.removeBtn}
                     onPress={() => removeMedia(index)}
@@ -223,8 +244,8 @@ export default function DprScreen() {
 
               {media.length > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
-                  {media.map((uri, i) => (
-                    <Image key={i} source={{ uri }} style={styles.previewThumb} />
+                  {media.map((item, i) => (
+                    <Image key={`${item.uri}-${i}`} source={{ uri: item.uri }} style={styles.previewThumb} />
                   ))}
                 </ScrollView>
               )}
@@ -385,6 +406,17 @@ const styles = StyleSheet.create({
     right: 4,
     backgroundColor: colors.white,
     borderRadius: 11,
+  },
+  videoBadge: {
+    position: 'absolute',
+    left: 6,
+    bottom: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.overlay,
   },
   addMediaRow: {
     flexDirection: 'row',

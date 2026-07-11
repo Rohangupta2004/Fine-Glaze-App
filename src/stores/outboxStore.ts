@@ -14,6 +14,7 @@
 
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
+import { uploadLocalMedia } from '../lib/mediaStorage';
 import {
   enqueueOutboxItem,
   getPendingItems,
@@ -55,49 +56,75 @@ interface OutboxState {
 
 // ── Supabase sync handlers ───────────────────────────────────────────────────
 
-async function syncPunchIn(payload: PunchInPayload): Promise<void> {
-  function todayISO(): string {
-    return new Date().toISOString().slice(0, 10);
-  }
-  const { error } = await supabase.from('attendance').insert({
+async function syncPunchIn(payload: PunchInPayload, outboxId: string): Promise<void> {
+  const selfiePath = await uploadLocalMedia(
+    'attendance-selfies',
+    `${payload.profileId}/${payload.capturedAt.slice(0, 10)}/${outboxId}`,
+    { uri: payload.selfieUri, type: 'photo', mimeType: 'image/jpeg' },
+  );
+  const { error } = await supabase.from('attendance').upsert({
     profile_id: payload.profileId,
     project_id: payload.projectId,
-    date: todayISO(),
-    check_in_at: new Date().toISOString(),
+    date: payload.capturedAt.slice(0, 10),
+    check_in_at: payload.capturedAt,
     check_in_lat: payload.lat,
     check_in_lng: payload.lng,
-    check_in_selfie_url: payload.selfieUrl,
+    check_in_selfie_url: selfiePath,
     location_verified: payload.locationVerified,
     status: 'present',
     synced: true,
-  });
+  }, { onConflict: 'profile_id,date' });
   if (error) throw new Error(error.message);
 }
 
-async function syncDpr(payload: DprPayload): Promise<void> {
-  function todayISO(): string {
-    return new Date().toISOString().slice(0, 10);
+async function syncDpr(payload: DprPayload, outboxId: string): Promise<void> {
+  const { data: existing } = await supabase
+    .from('dprs')
+    .select('id')
+    .eq('offline_id', outboxId)
+    .maybeSingle();
+
+  let dprId = existing?.id as string | undefined;
+  if (!dprId) {
+    const { data, error } = await supabase.from('dprs').insert({
+      project_id: payload.projectId,
+      submitted_by: payload.submittedBy,
+      date: payload.reportDate,
+      work_type: payload.workType,
+      level_zone: payload.levelZone,
+      work_done: payload.workDone,
+      status: 'submitted',
+      synced: true,
+      offline_id: outboxId,
+    }).select('id').single();
+    if (error) throw new Error(error.message);
+    dprId = data.id;
   }
-  const { error } = await supabase.from('dprs').insert({
-    project_id: payload.projectId,
-    submitted_by: payload.submittedBy,
-    date: todayISO(),
-    work_type: payload.workType,
-    level_zone: payload.levelZone,
-    work_done: payload.workDone,
-    status: 'submitted',
-    synced: true,
-  });
-  if (error) throw new Error(error.message);
+
+  for (let index = 0; index < payload.media.length; index += 1) {
+    const file = payload.media[index];
+    const path = await uploadLocalMedia(
+      'dpr-media',
+      `${payload.projectId}/${dprId}/${index}`,
+      file,
+    );
+    const { error } = await supabase.from('dpr_media').upsert({
+      dpr_id: dprId,
+      type: file.type,
+      storage_path: path,
+      duration_s: file.durationS ?? null,
+    }, { onConflict: 'dpr_id,storage_path' });
+    if (error) throw new Error(error.message);
+  }
 }
 
 async function syncItem(item: OutboxItem): Promise<void> {
   switch (item.type) {
     case 'punch_in':
-      await syncPunchIn(item.payload as PunchInPayload);
+      await syncPunchIn(item.payload as PunchInPayload, item.id);
       break;
     case 'dpr':
-      await syncDpr(item.payload as DprPayload);
+      await syncDpr(item.payload as DprPayload, item.id);
       break;
     default: {
       const _exhaustive: never = item.type;
