@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '../../src/components';
+import { useAuthStore } from '../../src/stores/authStore';
+import { useAttendanceHistory } from '../../src/hooks/useAttendance';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
@@ -22,20 +24,15 @@ const STATUS_COLORS: Record<DayStatus, string> = {
   future: colors.transparent,
 };
 
-// Demo attendance for current month
-function getDemoStatus(day: number): DayStatus {
-  const today = new Date().getDate();
-  if (day > today) return 'future';
-  if (day === today) return 'present';
-  // Random demo data
-  const statuses: DayStatus[] = ['present', 'present', 'present', 'present', 'present', 'absent', 'leave', 'half_day'];
-  return statuses[(day * 7) % statuses.length];
+function dateKey(year: number, month: number, day: number): string {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 export default function AttendanceScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const profile = useAuthStore((s) => s.profile);
 
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -47,18 +44,29 @@ export default function AttendanceScreen() {
   const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
   const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
 
+  // Real attendance records for this worker (last ~13 months covers year nav)
+  const { data: history } = useAttendanceHistory(profile?.id, 400);
+  const byDate = new Map((history || []).map((a) => [a.date, a]));
+
+  function getStatus(day: number): DayStatus {
+    const key = dateKey(year, month, day);
+    const record = byDate.get(key);
+    if (record) return record.status;
+    const cellDate = new Date(year, month, day);
+    if (cellDate > today) return 'future';
+    return 'none'; // no record for a past day = not marked yet
+  }
+
   // Build calendar grid
   const days: (number | null)[] = [];
   for (let i = 0; i < firstDay; i++) days.push(null);
   for (let d = 1; d <= daysInMonth; d++) days.push(d);
 
   // Stats
-  const presentDays = Array.from({ length: daysInMonth }, (_, i) => getDemoStatus(i + 1))
-    .filter((s) => s === 'present').length;
-  const leaveDays = Array.from({ length: daysInMonth }, (_, i) => getDemoStatus(i + 1))
-    .filter((s) => s === 'leave').length;
-  const halfDays = Array.from({ length: daysInMonth }, (_, i) => getDemoStatus(i + 1))
-    .filter((s) => s === 'half_day').length;
+  const monthStatuses = Array.from({ length: daysInMonth }, (_, i) => getStatus(i + 1));
+  const presentDays = monthStatuses.filter((s) => s === 'present').length;
+  const leaveDays = monthStatuses.filter((s) => s === 'leave').length;
+  const halfDays = monthStatuses.filter((s) => s === 'half_day').length;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.lg }]}>
@@ -79,15 +87,15 @@ export default function AttendanceScreen() {
 
       {/* Summary cards */}
       <View style={styles.statsRow}>
-        <Card style={[styles.statCard, { backgroundColor: colors.successBg }]} variant="flat">
+        <Card style={{ ...styles.statCard, backgroundColor: colors.successBg }} variant="flat">
           <Text style={[styles.statNum, { color: colors.success }]}>{presentDays}</Text>
           <Text style={styles.statLabel}>{t('worker.present')}</Text>
         </Card>
-        <Card style={[styles.statCard, { backgroundColor: colors.warningBg }]} variant="flat">
+        <Card style={{ ...styles.statCard, backgroundColor: colors.warningBg }} variant="flat">
           <Text style={[styles.statNum, { color: colors.warning }]}>{leaveDays}</Text>
           <Text style={styles.statLabel}>{t('worker.leave')}</Text>
         </Card>
-        <Card style={[styles.statCard, { backgroundColor: colors.pendingBg }]} variant="flat">
+        <Card style={{ ...styles.statCard, backgroundColor: colors.pendingBg }} variant="flat">
           <Text style={[styles.statNum, { color: colors.pending }]}>{halfDays}</Text>
           <Text style={styles.statLabel}>{t('worker.halfDay')}</Text>
         </Card>
@@ -108,7 +116,7 @@ export default function AttendanceScreen() {
             if (day === null) {
               return <View key={`empty-${i}`} style={styles.dayCell} />;
             }
-            const status = getDemoStatus(day);
+            const status = getStatus(day);
             const isToday = isCurrentMonth && day === today.getDate();
 
             return (

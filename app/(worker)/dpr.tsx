@@ -15,6 +15,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { Button, Card, Input } from '../../src/components';
+import { useAuthStore } from '../../src/stores/authStore';
+import { useProjects } from '../../src/hooks/useProjects';
+import { useSubmitDpr } from '../../src/hooks/useDpr';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
@@ -27,6 +30,11 @@ const STEP_LABELS = { info: 'Report Info', media: 'Photos & Videos', preview: 'P
 export default function DprScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+
+  const profile = useAuthStore((s) => s.profile);
+  const { data: projects } = useProjects();
+  const activeProject = projects?.[0]; // Single active project per worker in M1
+  const submitDpr = useSubmitDpr();
 
   const [step, setStep] = useState<DprStep>('info');
   const [workType, setWorkType] = useState('');
@@ -66,9 +74,18 @@ export default function DprScreen() {
   };
 
   const handleSubmit = async () => {
+    if (!profile?.id || !activeProject?.id) return;
     setSubmitting(true);
-    // TODO: Save to offline queue (expo-sqlite) → sync to Supabase
-    setTimeout(() => {
+    try {
+      // NOTE: media stays local-only for now — dpr_media upload needs a Storage
+      // bucket, which needs a service_role key to provision (not yet available).
+      await submitDpr.mutateAsync({
+        projectId: activeProject.id,
+        submittedBy: profile.id,
+        workType,
+        levelZone,
+        workDone,
+      });
       setSubmitting(false);
       Alert.alert('DPR Submitted', 'Your daily progress report has been submitted for review.');
       // Reset
@@ -77,7 +94,10 @@ export default function DprScreen() {
       setLevelZone('');
       setWorkDone('');
       setMedia([]);
-    }, 1500);
+    } catch (e: any) {
+      setSubmitting(false);
+      Alert.alert('Error', e?.message || 'Failed to submit report. Please try again.');
+    }
   };
 
   const canProceed = step === 'info' ? (workType && workDone) : step === 'media' ? true : true;
