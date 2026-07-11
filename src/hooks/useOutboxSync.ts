@@ -4,23 +4,18 @@
  * A React hook that drives automatic outbox flushing by:
  *  1. Loading pending items from SQLite on mount.
  *  2. Flushing immediately on mount (best-effort).
- *  3. Re-flushing whenever the app comes back to the foreground
- *     (via AppState 'active' events).
- *  4. Polling on a 60-second interval while the component tree is mounted
- *     (handles cases where connectivity is restored without an AppState change).
+ *  3. Using @react-native-community/netinfo to detect offline→online
+ *     transitions and flush immediately.
+ *  4. Re-flushing whenever the app comes back to the foreground.
+ *  5. Polling on a 60-second interval as a safety net.
  *
- * Network detection
- * ─────────────────
- * expo-network is not installed.  We detect connectivity by whether a flush
- * attempt actually succeeds.  Items that fail are retried with back-off via
- * markError → next_retry_at.  This is sufficient for the M1 use-case.
- *
- * Mount this hook once near the root of the worker experience (e.g. the
- * worker tab layout) so it runs for the lifetime of that session.
+ * Mount this hook once near the root of any experience (e.g. the
+ * role tab layout) so it runs for the lifetime of that session.
  */
 
 import { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
+import NetInfo, { type NetInfoState } from '@react-native-community/netinfo';
 import { useOutboxStore } from '../stores/outboxStore';
 
 const POLL_INTERVAL_MS = 60_000; // 1 minute
@@ -31,6 +26,7 @@ export function useOutboxSync(): void {
 
   // Track whether the hook is still mounted to avoid state updates after unmount
   const mountedRef = useRef(true);
+  const wasOfflineRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -42,7 +38,16 @@ export function useOutboxSync(): void {
     };
     init();
 
-    // 2. AppState listener → flush when app returns to foreground
+    // 2. Real network listener — flush on offline→online transition
+    const netInfoUnsub = NetInfo.addEventListener((state: NetInfoState) => {
+      const isOnline = state.isConnected && state.isInternetReachable !== false;
+      if (isOnline && wasOfflineRef.current && mountedRef.current) {
+        flushOutbox();
+      }
+      wasOfflineRef.current = !isOnline;
+    });
+
+    // 3. AppState listener → flush when app returns to foreground
     const handleAppStateChange = (nextState: AppStateStatus) => {
       if (nextState === 'active' && mountedRef.current) {
         flushOutbox();
@@ -50,7 +55,7 @@ export function useOutboxSync(): void {
     };
     const appStateSub = AppState.addEventListener('change', handleAppStateChange);
 
-    // 3. Polling interval
+    // 4. Polling interval as safety net
     const pollTimer = setInterval(() => {
       if (mountedRef.current) {
         flushOutbox();
@@ -59,6 +64,7 @@ export function useOutboxSync(): void {
 
     return () => {
       mountedRef.current = false;
+      netInfoUnsub();
       appStateSub.remove();
       clearInterval(pollTimer);
     };

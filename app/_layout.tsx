@@ -14,6 +14,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import '../src/i18n';
 import { useAuthStore } from '../src/stores/authStore';
+import { setupInactivityTracking, recordLogin, type LockAction } from '../src/lib/inactivityLock';
 import { colors } from '../src/theme/colors';
 
 // Keep splash visible while loading
@@ -60,6 +61,21 @@ function RootLayoutInner() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, loading]);
+
+  // Inactivity lock — 30 min PIN, 7 day full re-auth
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const cleanup = setupInactivityTracking((action: LockAction) => {
+      if (action === 'full_reauth') {
+        useAuthStore.getState().signOut();
+        router.replace('/(auth)/welcome');
+      } else if (action === 'pin') {
+        useAuthStore.getState().setAuthenticated(false);
+        router.replace('/(auth)/pin-unlock');
+      }
+    });
+    return cleanup;
+  }, [isAuthenticated]);
 
   // Auth routing guard
   useEffect(() => {

@@ -65,6 +65,10 @@ export default function AdminHomeScreen() {
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
           </Text>
         </View>
+        <View style={styles.headerActions}>
+        <TouchableOpacity onPress={() => router.push('/(admin)/global-search' as any)} style={styles.searchWrap}>
+          <Ionicons name="search-outline" size={22} color={colors.ink} />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/(admin)/notifications' as any)} style={styles.bellWrap}>
           <Ionicons name="notifications-outline" size={24} color={colors.ink} />
           {(unreadCount || 0) > 0 && (
@@ -73,6 +77,7 @@ export default function AdminHomeScreen() {
             </View>
           )}
         </TouchableOpacity>
+        </View>
       </View>
 
       {/* Quick Stats */}
@@ -216,6 +221,8 @@ const styles = StyleSheet.create({
   headerLeft: { flex: 1 },
   greeting: { ...typography.h4, color: colors.ink },
   date: { ...typography.bodySmall, color: colors.neutral[500], marginTop: 2 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  searchWrap: { padding: spacing.sm },
   bellWrap: { position: 'relative', padding: spacing.sm },
   badge: { position: 'absolute', top: 2, right: 2, backgroundColor: colors.error, borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { ...typography.caption, color: colors.white, fontFamily: fontFamily.semiBold, fontSize: 10 },

@@ -1,103 +1,129 @@
+/**
+ * Admin More Menu — matches reference screenshot_8 panel 13
+ * All admin management, finance, settings links.
+ */
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Avatar, Card } from '../../src/components';
+import { Card, Avatar } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
-import { spacing } from '../../src/theme/spacing';
+import { spacing, radius } from '../../src/theme/spacing';
 
 interface MenuItem {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: string;
   label: string;
-  route?: string;
+  route: string;
   color?: string;
-  onPress?: () => void;
+  badge?: number;
 }
+
+const SECTIONS: { title: string; items: MenuItem[] }[] = [
+  {
+    title: 'Management',
+    items: [
+      { icon: 'document-text', label: 'DPR Management', route: '/(admin)/dpr-management', color: colors.info },
+      { icon: 'calendar', label: 'Calendar', route: '/(admin)/calendar', color: colors.primary },
+      { icon: 'people', label: 'Attendance Report', route: '/(admin)/attendance-report', color: colors.success },
+      { icon: 'search', label: 'Global Search', route: '/(admin)/global-search', color: colors.warning },
+    ],
+  },
+  {
+    title: 'Reports & Analytics',
+    items: [
+      { icon: 'bar-chart', label: 'Analytics', route: '/(admin)/analytics', color: colors.info },
+      { icon: 'list', label: 'Audit Log', route: '/(admin)/audit-log', color: colors.neutral[600] },
+    ],
+  },
+  {
+    title: 'Settings',
+    items: [
+      { icon: 'person-circle', label: 'My Profile', route: '/(admin)/employees', color: colors.primary },
+      { icon: 'business', label: 'Company Settings', route: '/(admin)/employees', color: colors.neutral[700] },
+      { icon: 'shield-checkmark', label: 'Roles & Permissions', route: '/(admin)/employees', color: colors.warning },
+      { icon: 'notifications', label: 'Notification Settings', route: '/(admin)/notifications', color: colors.info },
+      { icon: 'language', label: 'Language', route: '/(admin)/employees', color: colors.success },
+      { icon: 'cloud-download', label: 'Backup & Restore', route: '/(admin)/employees', color: colors.pending },
+      { icon: 'help-circle', label: 'Help & Support', route: '/(admin)/employees', color: colors.neutral[500] },
+      { icon: 'information-circle', label: 'About Fine Glaze COS', route: '/(admin)/employees', color: colors.primary },
+    ],
+  },
+];
 
 export default function AdminMoreScreen() {
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
   const router = useRouter();
-  const { profile, signOut } = useAuthStore();
-
-  const menuSections: { title: string; items: MenuItem[] }[] = [
-    {
-      title: 'Management',
-      items: [
-        { icon: 'people-outline', label: 'Employees', route: '/(admin)/employees' },
-        { icon: 'checkbox-outline', label: 'Approvals', route: '/(admin)/approvals' },
-        { icon: 'notifications-outline', label: 'Notifications', route: '/(admin)/notifications' },
-        { icon: 'analytics-outline', label: 'All Sites Overview', route: '/(admin)/projects' },
-      ],
-    },
-    {
-      title: 'Finance',
-      items: [
-        { icon: 'wallet-outline', label: 'Payments', route: '/(admin)/projects' },
-        { icon: 'document-text-outline', label: 'Muster & Salary Export', route: '/(admin)/projects' },
-      ],
-    },
-    {
-      title: 'Settings',
-      items: [
-        { icon: 'language-outline', label: t('settings.language') },
-        { icon: 'finger-print', label: t('settings.biometric') },
-        { icon: 'key-outline', label: t('settings.changePin') },
-        { icon: 'help-circle-outline', label: t('settings.help') },
-      ],
-    },
-  ];
-
-  const handleLogout = async () => {
-    await signOut();
-    router.replace('/(auth)/welcome');
-  };
+  const profile = useAuthStore((s) => s.profile);
+  const signOut = useAuthStore((s) => s.signOut);
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingTop: insets.top + spacing.lg, paddingBottom: spacing['6xl'] }}
+      showsVerticalScrollIndicator={false}
     >
-      {/* Profile header */}
+      {/* Profile card */}
       <Card style={styles.profileCard}>
         <View style={styles.profileRow}>
           <Avatar name={profile?.full_name || 'Admin'} uri={profile?.avatar_url} size={56} />
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{profile?.full_name || 'Admin'}</Text>
-            <Text style={styles.profileRole}>{profile?.role || 'Owner'}</Text>
+            <Text style={styles.profileRole}>{profile?.role?.replace('_', ' ') || 'Admin'}</Text>
+            <Text style={styles.profilePhone}>{profile?.phone || ''}</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.neutral[400]} />
         </View>
       </Card>
 
       {/* Menu sections */}
-      {menuSections.map((section) => (
+      {SECTIONS.map((section) => (
         <View key={section.title} style={styles.section}>
           <Text style={styles.sectionTitle}>{section.title}</Text>
           <Card style={styles.menuCard}>
-            {section.items.map((item, index) => (
-              <TouchableOpacity
-                key={item.label}
-                style={[styles.menuItem, index < section.items.length - 1 && styles.menuItemBorder]}
-                onPress={item.onPress || (item.route ? () => router.push(item.route as any) : undefined)}
-              >
-                <Ionicons name={item.icon} size={22} color={item.color || colors.neutral[600]} />
-                <Text style={[styles.menuLabel, item.color && { color: item.color }]}>{item.label}</Text>
-                <Ionicons name="chevron-forward" size={18} color={colors.neutral[300]} />
-              </TouchableOpacity>
+            {section.items.map((item, idx) => (
+              <React.Fragment key={item.label}>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => router.push(item.route as any)}
+                >
+                  <View style={[styles.menuIcon, { backgroundColor: (item.color || colors.primary) + '15' }]}>
+                    <Ionicons name={item.icon as any} size={20} color={item.color || colors.primary} />
+                  </View>
+                  <Text style={styles.menuLabel}>{item.label}</Text>
+                  {item.badge && item.badge > 0 && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{item.badge}</Text>
+                    </View>
+                  )}
+                  <Ionicons name="chevron-forward" size={18} color={colors.neutral[300]} />
+                </TouchableOpacity>
+                {idx < section.items.length - 1 && <View style={styles.divider} />}
+              </React.Fragment>
             ))}
           </Card>
         </View>
       ))}
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-        <Ionicons name="log-out-outline" size={22} color={colors.error} />
-        <Text style={styles.logoutText}>{t('settings.logout')}</Text>
+      {/* Logout */}
+      <TouchableOpacity
+        style={styles.logoutBtn}
+        onPress={() => {
+          signOut();
+          router.replace('/(auth)/welcome');
+        }}
+      >
+        <Ionicons name="log-out-outline" size={20} color={colors.error} />
+        <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -105,20 +131,24 @@ export default function AdminMoreScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg },
-  profileCard: { padding: spacing.lg, marginBottom: spacing.xl },
+  profileCard: { padding: spacing.xl, marginBottom: spacing.xl },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   profileInfo: { flex: 1 },
   profileName: { ...typography.h5, color: colors.ink },
-  profileRole: { ...typography.bodySmall, color: colors.neutral[500], textTransform: 'capitalize' },
+  profileRole: { ...typography.caption, color: colors.primary, textTransform: 'capitalize', marginTop: 2 },
+  profilePhone: { ...typography.caption, color: colors.neutral[500], marginTop: 2 },
   section: { marginBottom: spacing.xl },
-  sectionTitle: {
-    ...typography.caption, fontFamily: fontFamily.semiBold, color: colors.neutral[400],
-    textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.sm, paddingLeft: spacing.xs,
-  },
+  sectionTitle: { ...typography.caption, color: colors.neutral[500], textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.sm, marginLeft: spacing.xs },
   menuCard: { padding: 0, overflow: 'hidden' },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.lg, paddingHorizontal: spacing.lg, gap: spacing.md },
-  menuItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.neutral[100] },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.lg, gap: spacing.md },
+  menuIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   menuLabel: { flex: 1, ...typography.bodyMedium, fontFamily: fontFamily.medium, color: colors.ink },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.lg, marginTop: spacing.md },
-  logoutText: { ...typography.button, color: colors.error },
+  badge: { backgroundColor: colors.error, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
+  badgeText: { ...typography.caption, color: colors.white, fontFamily: fontFamily.semiBold, fontSize: 10 },
+  divider: { height: 1, backgroundColor: colors.neutral[100], marginLeft: spacing.lg + 36 + spacing.md },
+  logoutBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+    paddingVertical: spacing.lg, marginTop: spacing.md,
+  },
+  logoutText: { ...typography.bodyMedium, fontFamily: fontFamily.semiBold, color: colors.error },
 });

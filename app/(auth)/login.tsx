@@ -46,8 +46,9 @@ export default function LoginScreen() {
       if (result.error) {
         setError(result.error);
       } else {
-        // Auth store will check PIN state, root layout will route
-        router.replace('/(auth)/create-pin');
+        // Auth store has userId set — root layout's auth guard will
+        // check hasPin and route to create-pin or pin-unlock accordingly.
+        // We don't navigate here; the useEffect in _layout.tsx handles it.
       }
     } catch (e: any) {
       setError(e.message || 'Login failed');
