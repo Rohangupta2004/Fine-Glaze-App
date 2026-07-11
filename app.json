@@ -1,0 +1,90 @@
+{
+  "expo": {
+    "name": "Fine Glaze COS",
+    "slug": "fine-glaze-cos",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/logo.png",
+    "scheme": "fineglaze",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F9F9F8"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.fineglaze.cos"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundColor": "#F9F9F8"
+      },
+      "package": "com.fineglaze.cos",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/logo.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-splash-screen",
+      "expo-secure-store",
+      "expo-localization",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Fine Glaze COS uses your location to verify site attendance punch-in."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Fine Glaze COS uses your camera for attendance selfie and DPR photos."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Fine Glaze COS needs access to your photos for DPR uploads and documents."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/logo.png",
+          "color": "#695030"
+        }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "fine-glaze",
+          "project": "fine-glaze-cos"
+        }
+      ],
+      "expo-sqlite"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a37451d5-e433-4d64-b5bf-930111846d0b"
+      },
+      "router": {
+        "origin": false
+      }
+    }
+  }
+}
