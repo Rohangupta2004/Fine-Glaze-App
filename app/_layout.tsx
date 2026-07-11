@@ -83,6 +83,15 @@ function RootLayoutInner() {
 
     const inAuthGroup = segments[0] === '(auth)';
 
+    const currentSegment = (segments as string[])[1];
+    const pinScreens = ['create-pin', 'pin-unlock', 'enable-biometric'];
+    const onPinScreen = pinScreens.includes(currentSegment);
+    // Post-PIN onboarding screens navigate themselves (enable-biometric →
+    // permissions → role home); the guard must not race them to home the
+    // instant `isAuthenticated` flips true, or the user never sees them.
+    const onboardingScreens = ['enable-biometric', 'permissions'];
+    const onOnboardingScreen = onboardingScreens.includes(currentSegment);
+
     if (!userId) {
       // Not logged in → auth flow
       if (!inAuthGroup) {
@@ -90,14 +99,18 @@ function RootLayoutInner() {
       }
     } else if (!isAuthenticated) {
       // Logged in but hasn't passed PIN → PIN screen
-      if (!inAuthGroup) {
+      // Redirect whenever we're not already on the correct PIN screen —
+      // this also covers the case where the user just signed in from the
+      // login screen itself (still inside the (auth) group), which was
+      // previously being skipped because `!inAuthGroup` was false there.
+      if (!inAuthGroup || !onPinScreen) {
         if (hasPin) {
           router.replace('/(auth)/pin-unlock');
         } else {
           router.replace('/(auth)/create-pin');
         }
       }
-    } else if (inAuthGroup && profile) {
+    } else if (inAuthGroup && profile && !onOnboardingScreen) {
       // Authenticated → route to role-based home
       const experience = getRouteGroup(profile.role);
       router.replace(`/(${experience})/home` as any);
