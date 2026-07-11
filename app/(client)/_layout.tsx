@@ -85,6 +85,9 @@ export default function ClientLayout() {
           title: 'Project Chat',
         }}
       />
+      <Tabs.Screen name="materials" options={{ href: null }} />
+      <Tabs.Screen name="new-message" options={{ href: null }} />
+      <Tabs.Screen name="conversation" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -14,21 +14,11 @@ import { useAuthStore } from '../stores/authStore';
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 
-const ACCEPTED_TYPES = [
-  'application/pdf',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/msword',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'video/mp4',
-  'application/zip',
-];
+// Accept ALL document kinds — PDFs, office files, CAD, images, video, archives, etc.
+const ACCEPTED_TYPES = ['*/*'];
 
 export interface UploadDocumentParams {
-  ownerType: 'profile' | 'project';
+  ownerType: 'profile' | 'project' | 'company';
   ownerId: string;
   category: string;
   title?: string;

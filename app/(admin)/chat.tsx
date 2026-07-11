@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Avatar } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
-import { useMyConversations } from '../../src/hooks/useConversations';
+import { useMyConversations, useConversationMembers } from '../../src/hooks/useConversations';
 import { useProjects } from '../../src/hooks/useProjects';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
@@ -27,10 +27,21 @@ export default function AdminChatScreen() {
   const { data: projects } = useProjects();
 
   const projectMap = new Map((projects || []).map(p => [p.id, p.name]));
+  const directIds = (conversations || []).filter(c => c.type === 'direct').map(c => c.id);
+  const { data: membersByConv = {} } = useConversationMembers(directIds);
+  const directTitle = (convId: string) => {
+    const others = (membersByConv[convId] || []).filter(m => m.id !== profile?.id);
+    return others.map(m => m.full_name).join(', ') || 'Direct Message';
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.lg }]}>
-      <Text style={styles.title}>Messages</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Messages</Text>
+        <TouchableOpacity onPress={() => router.push('/(admin)/new-message' as any)} style={styles.newBtn}>
+          <Ionicons name="create-outline" size={26} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -65,12 +76,12 @@ export default function AdminChatScreen() {
           <>
             <Text style={styles.sectionLabel}>Direct Messages</Text>
             {(conversations || []).filter(c => c.type === 'direct').map((conv) => (
-              <TouchableOpacity key={conv.id} onPress={() => router.push({ pathname: '/(admin)/conversation', params: { conversationId: conv.id, title: 'Direct Message' } })}>
+              <TouchableOpacity key={conv.id} onPress={() => router.push({ pathname: '/(admin)/conversation', params: { conversationId: conv.id, title: directTitle(conv.id) } })}>
                 <Card style={styles.chatCard} variant="interactive">
                   <View style={styles.chatRow}>
                     <Avatar name="DM" size={44} />
                     <View style={styles.chatInfo}>
-                      <Text style={styles.chatName}>Direct Message</Text>
+                      <Text style={styles.chatName}>{directTitle(conv.id)}</Text>
                       <Text style={styles.chatPreview} numberOfLines={1}>Tap to open</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color={colors.neutral[300]} />
@@ -95,6 +106,8 @@ export default function AdminChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  newBtn: { width: 40, height: 40, alignItems: 'flex-end', justifyContent: 'center' },
   title: { ...typography.h3, color: colors.ink, marginBottom: spacing.xl },
   sectionLabel: {
     ...typography.caption, fontFamily: fontFamily.semiBold, color: colors.neutral[400],

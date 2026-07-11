@@ -51,7 +51,7 @@ export default function SupervisorMaterialsScreen() {
   const { data: deliveries, refetch: refetchDeliveries, isRefetching: r3 } = useDeliveries();
   const submitRequest = useSubmitMaterialRequest();
 
-  const [tab, setTab] = useState<Tab>('stock');
+  const [tab, setTab] = useState<Tab>('requests');
   const [requestView, setRequestView] = useState<RequestView>('list');
 
   // Request form state
@@ -80,8 +80,8 @@ export default function SupervisorMaterialsScreen() {
   };
 
   const TABS: { key: Tab; label: string; icon: string }[] = [
+    { key: 'requests', label: 'Requests', icon: 'clipboard-outline' },
     { key: 'stock', label: 'Site Stock', icon: 'archive-outline' },
-    { key: 'requests', label: 'Requests', icon: 'cube-outline' },
     { key: 'deliveries', label: 'Deliveries', icon: 'car-outline' },
   ];
 
@@ -224,6 +224,8 @@ export default function SupervisorMaterialsScreen() {
             <RefreshControl refreshing={r2} onRefresh={refetchRequests} tintColor={colors.primary} />
           }
         >
+          <Button title="+  Request Material" onPress={() => setRequestView('new')} fullWidth />
+          <View style={{ height: spacing.md }} />
           {(requests || []).map((r) => {
             const sc = STATUS_COLOR[r.status] || STATUS_COLOR.pending;
             return (

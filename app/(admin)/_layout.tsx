@@ -96,6 +96,12 @@ export default function AdminLayout() {
       <Tabs.Screen name="backup-restore" options={{ href: null }} />
       <Tabs.Screen name="legal" options={{ href: null }} />
       <Tabs.Screen name="help-about" options={{ href: null }} />
+      <Tabs.Screen name="materials" options={{ href: null }} />
+      <Tabs.Screen name="documents" options={{ href: null }} />
+      <Tabs.Screen name="clients" options={{ href: null }} />
+      <Tabs.Screen name="my-profile" options={{ href: null }} />
+      <Tabs.Screen name="company-settings" options={{ href: null }} />
+      <Tabs.Screen name="new-message" options={{ href: null }} />
     </Tabs>
   );
 }

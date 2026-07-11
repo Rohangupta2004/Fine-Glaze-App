@@ -235,7 +235,13 @@ export default function MessagesScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.ink} />
         </TouchableOpacity>
         <Text style={styles.title}>{headerTitle}</Text>
-        <View style={{ width: 36 }} />
+        {selected ? (
+          <View style={{ width: 36 }} />
+        ) : (
+          <TouchableOpacity onPress={() => router.push('/(worker)/new-message' as any)} hitSlop={12} style={{ width: 36, alignItems: 'flex-end' }}>
+            <Ionicons name="create-outline" size={24} color={colors.primary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {selected ? (

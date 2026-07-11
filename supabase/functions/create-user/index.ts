@@ -122,6 +122,7 @@ serve(async (req: Request) => {
     const role = body.role as string | undefined;
     const dailyRate = body.daily_rate as number | null | undefined;
     const address = (body.address as string | undefined)?.trim() || null;
+    const clientOrgId = (body.client_org_id as string | undefined) || null;
 
     if (!fullName) return jsonError(400, 'full_name is required');
     if (!phone || phone.replace(/\D/g, '').length < 10) {
@@ -129,6 +130,19 @@ serve(async (req: Request) => {
     }
     if (!role || !VALID_ROLES.has(role)) {
       return jsonError(400, `role must be one of: ${[...VALID_ROLES].join(', ')}`);
+    }
+
+    // Client accounts must be linked to a client org in the same company
+    if (role === 'client') {
+      if (!clientOrgId) return jsonError(400, 'client_org_id is required for client accounts');
+      const { data: org } = await serviceSupabase
+        .from('client_orgs')
+        .select('id, company_id')
+        .eq('id', clientOrgId)
+        .single();
+      if (!org || org.company_id !== companyId) {
+        return jsonError(400, 'client_org_id does not belong to your company');
+      }
     }
 
     const email = phoneToEmail(phone);
@@ -161,6 +175,7 @@ serve(async (req: Request) => {
       role: role,
       daily_rate: dailyRate ?? null,
       address: address,
+      client_org_id: role === 'client' ? clientOrgId : null,
       status: 'active',
     });
 

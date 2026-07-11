@@ -95,6 +95,8 @@ export interface Profile {
   reporting_to: string | null;
   daily_rate: number | null;
   bank_details: Record<string, any> | null;
+  client_org_id?: string | null;
+  push_token?: string | null;
 }
 
 export interface Project {
@@ -239,7 +241,8 @@ export interface MaterialRequest {
 
 export interface Delivery {
   id: string;
-  material_request_id: string;
+  project_id: string;
+  material_request_id: string | null;
   delivery_code: string | null;
   status: DeliveryStatus;
   delivered_at: string | null;
@@ -248,11 +251,12 @@ export interface Delivery {
 
 export interface DocumentRow {
   id: string;
-  owner_type: 'profile' | 'project';
+  owner_type: 'profile' | 'project' | 'company';
   owner_id: string;
   category: DocumentCategory;
   title: string;
   uploaded_by: string;
+  created_at?: string;
 }
 
 export interface DocumentVersion {

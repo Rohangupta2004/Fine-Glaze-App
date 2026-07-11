@@ -10,3 +10,4 @@ export { ProgressBar } from './ProgressBar';
 export { SearchBar } from './SearchBar';
 export { SegmentedControl } from './SegmentedControl';
 export { Banner } from './Banner';
+export { DatePickerField } from './DatePickerField';

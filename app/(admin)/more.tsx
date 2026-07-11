@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Avatar } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
+import { usePermissions } from '../../src/hooks/usePermissions';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
@@ -26,15 +27,20 @@ interface MenuItem {
   route: string;
   color?: string;
   badge?: number;
+  /** permission key required to see this item (owner sees all) */
+  perm?: string;
 }
 
 const SECTIONS: { title: string; items: MenuItem[] }[] = [
   {
     title: 'Management',
     items: [
-      { icon: 'document-text', label: 'DPR Management', route: '/(admin)/dpr-management', color: colors.info },
+      { icon: 'document-text', label: 'DPR Management', route: '/(admin)/dpr-management', color: colors.info, perm: 'dpr_approvals' },
+      { icon: 'folder', label: 'Documents Vault', route: '/(admin)/documents', color: colors.primary },
+      { icon: 'cube', label: 'Materials', route: '/(admin)/materials', color: colors.warning, perm: 'materials' },
+      { icon: 'business', label: 'Clients', route: '/(admin)/clients', color: colors.info, perm: 'clients' },
       { icon: 'calendar', label: 'Calendar', route: '/(admin)/calendar', color: colors.primary },
-      { icon: 'people', label: 'Attendance Report', route: '/(admin)/attendance-report', color: colors.success },
+      { icon: 'people', label: 'Attendance Report', route: '/(admin)/attendance-report', color: colors.success, perm: 'attendance' },
       { icon: 'search', label: 'Global Search', route: '/(admin)/global-search', color: colors.warning },
       { icon: 'people-circle', label: 'Assign Site & Workers', route: '/(admin)/assign-site', color: colors.info },
       { icon: 'repeat', label: 'Recurring Tasks', route: '/(admin)/recurring-tasks', color: colors.success },
@@ -51,9 +57,9 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
   {
     title: 'Settings',
     items: [
-      { icon: 'person-circle', label: 'My Profile', route: '/(admin)/employees', color: colors.primary },
-      { icon: 'business', label: 'Company Settings', route: '/(admin)/employees', color: colors.neutral[700] },
-      { icon: 'shield-checkmark', label: 'Roles & Permissions', route: '/(admin)/roles-permissions', color: colors.warning },
+      { icon: 'person-circle', label: 'My Profile', route: '/(admin)/my-profile', color: colors.primary },
+      { icon: 'business', label: 'Company Settings', route: '/(admin)/company-settings', color: colors.neutral[700], perm: 'settings' },
+      { icon: 'shield-checkmark', label: 'Roles & Permissions', route: '/(admin)/roles-permissions', color: colors.warning, perm: 'settings' },
       { icon: 'notifications', label: 'Notification Settings', route: '/(admin)/notification-settings', color: colors.info },
       { icon: 'language', label: 'Language', route: '/(admin)/language-settings', color: colors.success },
       { icon: 'cloud-download', label: 'Backup & Restore', route: '/(admin)/backup-restore', color: colors.pending },
@@ -68,6 +74,12 @@ export default function AdminMoreScreen() {
   const router = useRouter();
   const profile = useAuthStore((s) => s.profile);
   const signOut = useAuthStore((s) => s.signOut);
+  const { can } = usePermissions();
+
+  const visibleSections = SECTIONS.map((sec) => ({
+    ...sec,
+    items: sec.items.filter((item) => !item.perm || can(item.perm as any)),
+  })).filter((sec) => sec.items.length > 0);
 
   return (
     <ScrollView
@@ -89,7 +101,7 @@ export default function AdminMoreScreen() {
       </Card>
 
       {/* Menu sections */}
-      {SECTIONS.map((section) => (
+      {visibleSections.map((section) => (
         <View key={section.title} style={styles.section}>
           <Text style={styles.sectionTitle}>{section.title}</Text>
           <Card style={styles.menuCard}>
