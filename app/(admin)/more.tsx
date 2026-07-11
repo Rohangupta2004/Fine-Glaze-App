@@ -54,7 +54,7 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
       { icon: 'person-circle', label: 'My Profile', route: '/(admin)/employees', color: colors.primary },
       { icon: 'business', label: 'Company Settings', route: '/(admin)/employees', color: colors.neutral[700] },
       { icon: 'shield-checkmark', label: 'Roles & Permissions', route: '/(admin)/roles-permissions', color: colors.warning },
-      { icon: 'notifications', label: 'Notification Settings', route: '/(admin)/notifications', color: colors.info },
+      { icon: 'notifications', label: 'Notification Settings', route: '/(admin)/notification-settings', color: colors.info },
       { icon: 'language', label: 'Language', route: '/(admin)/language-settings', color: colors.success },
       { icon: 'cloud-download', label: 'Backup & Restore', route: '/(admin)/employees', color: colors.pending },
       { icon: 'help-circle', label: 'Help & Support', route: '/(admin)/employees', color: colors.neutral[500] },

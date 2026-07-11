@@ -91,6 +91,8 @@ export default function AdminLayout() {
       <Tabs.Screen name="all-sites" options={{ href: null }} />
       <Tabs.Screen name="roles-permissions" options={{ href: null }} />
       <Tabs.Screen name="language-settings" options={{ href: null }} />
+      <Tabs.Screen name="notification-settings" options={{ href: null }} />
+      <Tabs.Screen name="conversation" options={{ href: null }} />
     </Tabs>
   );
 }

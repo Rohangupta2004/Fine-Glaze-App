@@ -8,6 +8,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Avatar } from '../../src/components';
@@ -20,6 +21,7 @@ import { spacing, radius } from '../../src/theme/spacing';
 
 export default function AdminChatScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const profile = useAuthStore((s) => s.profile);
   const { data: conversations, refetch, isRefetching } = useMyConversations(profile?.id);
   const { data: projects } = useProjects();
@@ -40,7 +42,7 @@ export default function AdminChatScreen() {
           <>
             <Text style={styles.sectionLabel}>Project Chats</Text>
             {(conversations || []).filter(c => c.type === 'project').map((conv) => (
-              <TouchableOpacity key={conv.id}>
+              <TouchableOpacity key={conv.id} onPress={() => router.push({ pathname: '/(admin)/conversation', params: { conversationId: conv.id, title: conv.project_id ? projectMap.get(conv.project_id) || 'Project Chat' : 'Project Chat' } })}>
                 <Card style={styles.chatCard} variant="interactive">
                   <View style={styles.chatRow}>
                     <View style={styles.chatIcon}>
@@ -63,7 +65,7 @@ export default function AdminChatScreen() {
           <>
             <Text style={styles.sectionLabel}>Direct Messages</Text>
             {(conversations || []).filter(c => c.type === 'direct').map((conv) => (
-              <TouchableOpacity key={conv.id}>
+              <TouchableOpacity key={conv.id} onPress={() => router.push({ pathname: '/(admin)/conversation', params: { conversationId: conv.id, title: 'Direct Message' } })}>
                 <Card style={styles.chatCard} variant="interactive">
                   <View style={styles.chatRow}>
                     <Avatar name="DM" size={44} />
