@@ -16,6 +16,7 @@ import {
   TextInput,
   Alert,
   Image,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -129,6 +130,30 @@ export default function DprManagementScreen() {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | 'changes'>('approve');
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportRegister = async () => {
+    const projectId = filteredDprs[0]?.project_id;
+    if (!projectId) {
+      Alert.alert('Nothing to export', 'No DPRs found for the current filter.');
+      return;
+    }
+    setExporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('export-dpr-register', {
+        body: { projectId },
+      });
+      if (error) throw error;
+      Alert.alert('Register ready', `${data.count} records exported.`, [
+        { text: 'Download', onPress: () => Linking.openURL(data.downloadUrl) },
+        { text: 'Done' },
+      ]);
+    } catch (e: any) {
+      Alert.alert('Export failed', e.message || 'Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const filteredDprs = useMemo(() => {
     if (!dprs) return [];
@@ -338,8 +363,8 @@ export default function DprManagementScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.ink} />
         </TouchableOpacity>
         <Text style={styles.title}>DPR Management</Text>
-        <TouchableOpacity>
-          <Ionicons name="filter-outline" size={22} color={colors.ink} />
+        <TouchableOpacity onPress={handleExportRegister} disabled={exporting}>
+          <Ionicons name={exporting ? 'hourglass-outline' : 'download-outline'} size={22} color={colors.ink} />
         </TouchableOpacity>
       </View>
 

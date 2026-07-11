@@ -56,7 +56,7 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
       { icon: 'shield-checkmark', label: 'Roles & Permissions', route: '/(admin)/roles-permissions', color: colors.warning },
       { icon: 'notifications', label: 'Notification Settings', route: '/(admin)/notification-settings', color: colors.info },
       { icon: 'language', label: 'Language', route: '/(admin)/language-settings', color: colors.success },
-      { icon: 'cloud-download', label: 'Backup & Restore', route: '/(admin)/employees', color: colors.pending },
+      { icon: 'cloud-download', label: 'Backup & Restore', route: '/(admin)/backup-restore', color: colors.pending },
       { icon: 'help-circle', label: 'Help & Support', route: '/(admin)/employees', color: colors.neutral[500] },
       { icon: 'information-circle', label: 'About Fine Glaze COS', route: '/(admin)/employees', color: colors.primary },
     ],

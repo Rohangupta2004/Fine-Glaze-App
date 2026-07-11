@@ -93,6 +93,7 @@ export default function AdminLayout() {
       <Tabs.Screen name="language-settings" options={{ href: null }} />
       <Tabs.Screen name="notification-settings" options={{ href: null }} />
       <Tabs.Screen name="conversation" options={{ href: null }} />
+      <Tabs.Screen name="backup-restore" options={{ href: null }} />
     </Tabs>
   );
 }
