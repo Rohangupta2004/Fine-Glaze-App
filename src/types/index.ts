@@ -165,6 +165,8 @@ export interface Dpr {
   work_type: string | null;
   level_zone: string | null;
   work_done: string;
+  weather: string | null;
+  submission_id: string | null;
   status: DprStatus;
   review_note: string | null;
   reviewed_by: string | null;

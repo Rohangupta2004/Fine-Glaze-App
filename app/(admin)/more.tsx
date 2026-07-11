@@ -36,6 +36,9 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
       { icon: 'calendar', label: 'Calendar', route: '/(admin)/calendar', color: colors.primary },
       { icon: 'people', label: 'Attendance Report', route: '/(admin)/attendance-report', color: colors.success },
       { icon: 'search', label: 'Global Search', route: '/(admin)/global-search', color: colors.warning },
+      { icon: 'people-circle', label: 'Assign Site & Workers', route: '/(admin)/assign-site', color: colors.info },
+      { icon: 'repeat', label: 'Recurring Tasks', route: '/(admin)/recurring-tasks', color: colors.success },
+      { icon: 'qr-code', label: 'Project QR Codes', route: '/(admin)/project-qr', color: colors.primary },
     ],
   },
   {
@@ -50,9 +53,9 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
     items: [
       { icon: 'person-circle', label: 'My Profile', route: '/(admin)/employees', color: colors.primary },
       { icon: 'business', label: 'Company Settings', route: '/(admin)/employees', color: colors.neutral[700] },
-      { icon: 'shield-checkmark', label: 'Roles & Permissions', route: '/(admin)/employees', color: colors.warning },
+      { icon: 'shield-checkmark', label: 'Roles & Permissions', route: '/(admin)/roles-permissions', color: colors.warning },
       { icon: 'notifications', label: 'Notification Settings', route: '/(admin)/notifications', color: colors.info },
-      { icon: 'language', label: 'Language', route: '/(admin)/employees', color: colors.success },
+      { icon: 'language', label: 'Language', route: '/(admin)/language-settings', color: colors.success },
       { icon: 'cloud-download', label: 'Backup & Restore', route: '/(admin)/employees', color: colors.pending },
       { icon: 'help-circle', label: 'Help & Support', route: '/(admin)/employees', color: colors.neutral[500] },
       { icon: 'information-circle', label: 'About Fine Glaze COS', route: '/(admin)/employees', color: colors.primary },

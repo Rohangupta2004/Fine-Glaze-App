@@ -152,7 +152,7 @@ export default function AllSitesScreen() {
                   <Text style={styles.siteName}>{site.name}</Text>
                   <Text style={styles.siteCity}>{site.city}</Text>
                 </View>
-                <StatusChip status={site.status} />
+                <StatusChip status={site.status as any} />
               </View>
 
               {/* Progress bar */}

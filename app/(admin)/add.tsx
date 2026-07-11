@@ -17,7 +17,7 @@ import { spacing, radius } from '../../src/theme/spacing';
 
 const ACTIONS: { icon: string; label: string; description: string; route: string; color: string }[] = [
   { icon: 'person-add', label: 'Add Employee', description: 'Create a new team member account', route: '/(admin)/add-employee', color: colors.info },
-  { icon: 'business', label: 'New Project', description: 'Start a new project workspace', route: '/(admin)/projects', color: colors.primary },
+  { icon: 'business', label: 'New Project', description: 'Start a new project workspace', route: '/(admin)/create-project', color: colors.primary },
   { icon: 'list', label: 'Create Task', description: 'Assign a new task to a team member', route: '/(admin)/projects', color: colors.success },
   { icon: 'cube', label: 'Request Material', description: 'Submit a material request', route: '/(admin)/projects', color: colors.pending },
   { icon: 'document-text', label: 'Submit DPR', description: 'Create a daily progress report', route: '/(admin)/projects', color: colors.warning },
