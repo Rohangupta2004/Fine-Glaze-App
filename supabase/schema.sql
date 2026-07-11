@@ -399,32 +399,41 @@ CREATE TABLE project_templates (
 -- payable = present_days*daily_rate + half_days*0.5*daily_rate
 --         + ot_hours*(daily_rate/8) − approved advances in month
 CREATE OR REPLACE VIEW monthly_salary AS
+WITH attendance_agg AS (
+  SELECT
+    a.profile_id,
+    date_trunc('month', a.date) AS month,
+    COUNT(*) FILTER (WHERE a.status = 'present') AS present_days,
+    COUNT(*) FILTER (WHERE a.status = 'half_day') AS half_days,
+    COALESCE(SUM(a.ot_min) FILTER (WHERE a.status IN ('present','half_day')), 0) / 60.0 AS ot_hours
+  FROM attendance a
+  GROUP BY a.profile_id, date_trunc('month', a.date)
+),
+advances_agg AS (
+  SELECT
+    ar.profile_id,
+    date_trunc('month', ar.decided_at) AS month,
+    SUM(ar.amount) AS advances_taken
+  FROM advance_requests ar
+  WHERE ar.status = 'approved'
+  GROUP BY ar.profile_id, date_trunc('month', ar.decided_at)
+)
 SELECT
   p.id AS profile_id,
   p.company_id,
   p.full_name,
   p.daily_rate,
-  date_trunc('month', a.date) AS month,
-  COUNT(*) FILTER (WHERE a.status = 'present') AS present_days,
-  COUNT(*) FILTER (WHERE a.status = 'half_day') AS half_days,
-  COALESCE(SUM(a.ot_min) FILTER (WHERE a.status IN ('present','half_day')), 0) / 60.0 AS ot_hours,
-  COALESCE((
-    SELECT SUM(ar.amount) FROM advance_requests ar
-    WHERE ar.profile_id = p.id
-      AND ar.status = 'approved'
-      AND date_trunc('month', ar.decided_at) = date_trunc('month', a.date)
-  ), 0) AS advances_taken,
+  aa.month,
+  aa.present_days,
+  aa.half_days,
+  aa.ot_hours,
+  COALESCE(adv.advances_taken, 0) AS advances_taken,
   -- Computed payable
-  (COUNT(*) FILTER (WHERE a.status = 'present')) * p.daily_rate
-  + (COUNT(*) FILTER (WHERE a.status = 'half_day')) * 0.5 * p.daily_rate
-  + (COALESCE(SUM(a.ot_min) FILTER (WHERE a.status IN ('present','half_day')), 0) / 60.0) * (p.daily_rate / 8.0)
-  - COALESCE((
-    SELECT SUM(ar.amount) FROM advance_requests ar
-    WHERE ar.profile_id = p.id
-      AND ar.status = 'approved'
-      AND date_trunc('month', ar.decided_at) = date_trunc('month', a.date)
-  ), 0) AS payable
+  (aa.present_days * p.daily_rate)
+  + (aa.half_days * 0.5 * p.daily_rate)
+  + (aa.ot_hours * (p.daily_rate / 8.0))
+  - COALESCE(adv.advances_taken, 0) AS payable
 FROM profiles p
-JOIN attendance a ON a.profile_id = p.id
-WHERE p.daily_rate IS NOT NULL
-GROUP BY p.id, p.company_id, p.full_name, p.daily_rate, date_trunc('month', a.date);
+JOIN attendance_agg aa ON aa.profile_id = p.id
+LEFT JOIN advances_agg adv ON adv.profile_id = p.id AND adv.month = aa.month
+WHERE p.daily_rate IS NOT NULL;
