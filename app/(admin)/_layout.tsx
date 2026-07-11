@@ -94,6 +94,8 @@ export default function AdminLayout() {
       <Tabs.Screen name="notification-settings" options={{ href: null }} />
       <Tabs.Screen name="conversation" options={{ href: null }} />
       <Tabs.Screen name="backup-restore" options={{ href: null }} />
+      <Tabs.Screen name="legal" options={{ href: null }} />
+      <Tabs.Screen name="help-about" options={{ href: null }} />
     </Tabs>
   );
 }
