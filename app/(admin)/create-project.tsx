@@ -31,22 +31,17 @@ export default function CreateProjectScreen() {
   const [lng, setLng] = useState('');
   const [locating, setLocating] = useState(false);
 
-  const useMyLocation = async () => {
+  const locateSiteFromAddress = async () => {
+    if (!address.trim()) { Alert.alert('Site address needed', 'Enter the project site address first.'); return; }
     setLocating(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Location permission needed', 'Allow location access to auto-fill the site coordinates.');
-        return;
-      }
-      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      setLat(pos.coords.latitude.toFixed(6));
-      setLng(pos.coords.longitude.toFixed(6));
+      const results = await Location.geocodeAsync(`${address.trim()}, ${city.trim()}`);
+      if (!results.length) { Alert.alert('Site not found', 'Check the site address and city, then try again.'); return; }
+      setLat(results[0].latitude.toFixed(6));
+      setLng(results[0].longitude.toFixed(6));
     } catch (e: any) {
-      Alert.alert('Could not get location', e?.message || 'Try again near a window or outdoors.');
-    } finally {
-      setLocating(false);
-    }
+      Alert.alert('Could not locate site', e?.message || 'Check the address and try again.');
+    } finally { setLocating(false); }
   };
   const [radius, setRadius] = useState(100);
   const [startDate, setStartDate] = useState('');
@@ -135,7 +130,7 @@ export default function CreateProjectScreen() {
           {templates.map((item: any) => <TouchableOpacity key={item.id} onPress={() => setTemplateId(item.id)}><Card style={[styles.option, templateId === item.id && styles.selected]}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{item.name}</Text><Text style={styles.optionMeta}>{item.payload?.tasks?.length || 0} tasks • {item.payload?.recurring_tasks?.length || 0} recurring</Text></View><Ionicons name={templateId === item.id ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={colors.primary} /></Card></TouchableOpacity>)}
         </>}
         {step === 1 && <><Text style={styles.heading}>Project details</Text><Input label="Project Name *" value={name} onChangeText={setName} placeholder="e.g. Baner Commercial Tower" /><View style={styles.gap} /><Text style={styles.fieldLabel}>Project Type</Text><View style={styles.chips}>{TYPES.map((item) => <TouchableOpacity key={item} onPress={() => setType(item)} style={[styles.chip, type === item && styles.chipActive]}><Text style={[styles.chipText, type === item && styles.chipTextActive]}>{item}</Text></TouchableOpacity>)}</View><Input label="City" value={city} onChangeText={setCity} placeholder="Pune" /></>}
-        {step === 2 && <><Text style={styles.heading}>Site & geofence</Text><Input label="Full Site Address *" value={address} onChangeText={setAddress} placeholder="Building, road, area, city" multiline /><View style={styles.gap} /><Button title={locating ? 'Getting GPS location…' : '📍 Use My Current Location'} variant="secondary" onPress={useMyLocation} loading={locating} fullWidth /><Text style={styles.help}>{lat && lng ? '✓ Site location captured from this device.' : 'Capture the site location while you are standing at the project site.'}</Text><Text style={styles.fieldLabel}>Geofence radius</Text><View style={styles.chips}>{RADII.map((item) => <TouchableOpacity key={item} onPress={() => setRadius(item)} style={[styles.chip, radius === item && styles.chipActive]}><Text style={[styles.chipText, radius === item && styles.chipTextActive]}>{item} m</Text></TouchableOpacity>)}</View><Card style={styles.info}><Ionicons name="location" size={20} color={colors.primary} /><Text style={styles.infoText}>Workers must be within {radius} metres to punch in. Coordinates can be added later if unavailable.</Text></Card></>}
+        {step === 2 && <><Text style={styles.heading}>Site & geofence</Text><Input label="Full Site Address *" value={address} onChangeText={setAddress} placeholder="Building, road, area, city" multiline /><View style={styles.gap} /><Button title={locating ? 'Finding Site Location…' : '📍 Locate Site from Address'} variant="secondary" onPress={useMyLocation} loading={locating} fullWidth /><Text style={styles.help}>{lat && lng ? '✓ Site location captured from this device.' : 'Use the site address and city to find the project location.'}</Text><Text style={styles.fieldLabel}>Geofence radius</Text><View style={styles.chips}>{RADII.map((item) => <TouchableOpacity key={item} onPress={() => setRadius(item)} style={[styles.chip, radius === item && styles.chipActive]}><Text style={[styles.chipText, radius === item && styles.chipTextActive]}>{item} m</Text></TouchableOpacity>)}</View><Card style={styles.info}><Ionicons name="location" size={20} color={colors.primary} /><Text style={styles.infoText}>Workers must be within {radius} metres to punch in. Coordinates can be added later if unavailable.</Text></Card></>}
         {step === 3 && <><Text style={styles.heading}>Schedule & review</Text><DatePickerField label="Start Date" value={startDate} onChange={setStartDate} /><View style={styles.gap} /><DatePickerField label="Expected End Date" value={endDate} onChange={setEndDate} minDate={startDate || undefined} /><Text style={styles.fieldLabel}>Assign workers and supervisors</Text><Text style={styles.help}>Only assigned people will be shown for this site and use its geofence for punch-in.</Text><View style={styles.chips}>{assignablePeople.map((person: any) => { const active = assignedWorkerIds.includes(person.id); return <TouchableOpacity key={person.id} onPress={() => setAssignedWorkerIds((ids) => active ? ids.filter((id) => id !== person.id) : [...ids, person.id])} style={[styles.chip, active && styles.chipActive]}><Text style={[styles.chipText, active && styles.chipTextActive]}>{person.full_name} · {person.role}</Text></TouchableOpacity>; })}</View><Card style={styles.review}><Text style={styles.reviewTitle}>{name || 'Untitled project'}</Text><Text style={styles.reviewLine}>{type} • {city || 'No city'}</Text><Text style={styles.reviewLine}>{address || 'No address'}</Text><Text style={styles.reviewLine}>Geofence: {radius} m</Text><Text style={styles.reviewLine}>Template: {selectedTemplate?.name || 'None'}</Text><Text style={styles.reviewLine}>Assigned people: {assignedWorkerIds.length}</Text></Card></>}
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>{step > 0 && <Button title="Back" variant="secondary" onPress={() => setStep((s) => s - 1)} style={styles.footerButton} />}<Button title={step === 3 ? 'Create Project' : 'Continue'} onPress={step === 3 ? save : () => setStep((s) => s + 1)} loading={saving} style={styles.footerButton} /></View>
