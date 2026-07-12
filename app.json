@@ -7,6 +7,11 @@
     "icon": "./assets/images/logo.png",
     "scheme": "fineglaze",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F9F9F8"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fineglaze.cos"
@@ -32,7 +37,14 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#F9F9F8"
+        }
+      ],
       "expo-secure-store",
       "expo-localization",
       [
