@@ -77,6 +77,7 @@ export default function SupervisorLayout() {
       <Tabs.Screen name="messages" options={{ href: null }} />
       <Tabs.Screen name="new-message" options={{ href: null }} />
       <Tabs.Screen name="conversation" options={{ href: null }} />
+      <Tabs.Screen name="request-employee" options={{ href: null }} />
     </Tabs>
   );
 }

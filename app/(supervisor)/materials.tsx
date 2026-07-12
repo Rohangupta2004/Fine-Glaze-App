@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 
 import { Card, Button, Input } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -20,10 +21,13 @@ import {
   useMaterialRequests,
   useDeliveries,
   useSubmitMaterialRequest,
+  useAddDeliveryPhotos,
+  useDeliveryPhotoUrls,
 } from '../../src/hooks/useMaterials';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius, TOUCH_TARGET } from '../../src/theme/spacing';
+import type { Delivery } from '../../src/types';
 
 type Tab = 'stock' | 'requests' | 'deliveries';
 type RequestView = 'list' | 'new';
@@ -58,21 +62,38 @@ export default function SupervisorMaterialsScreen() {
   const [materialName, setMaterialName] = useState('');
   const [spec, setSpec] = useState('');
   const [qty, setQty] = useState('');
+  const [unit, setUnit] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Accept decimal quantities (e.g. 12.5 running metres, 2.5 litres of sealant).
+  // A trailing "." while typing is allowed so the field doesn't reject input mid-entry.
+  const qtyValue = qty.trim() === '' || qty.trim() === '.' ? NaN : parseFloat(qty);
+  const qtyIsValid = !isNaN(qtyValue) && qtyValue > 0;
+
+  const handleQtyChange = (val: string) => {
+    // Only allow digits and a single decimal point, matching the DB's NUMERIC(10,2) column.
+    const cleaned = val.replace(/[^0-9.]/g, '');
+    const parts = cleaned.split('.');
+    const normalized = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : cleaned;
+    setQty(normalized);
+  };
+
   const handleSubmitRequest = async () => {
-    if (!materialName.trim() || !qty.trim() || !profile?.id || !activeProject?.id) return;
+    if (!materialName.trim() || !qtyIsValid || !profile?.id || !activeProject?.id) {
+      Alert.alert('Check quantity', 'Enter a material name and a quantity greater than 0 (decimals like 2.5 are allowed).');
+      return;
+    }
     try {
       await submitRequest.mutateAsync({
         projectId: activeProject.id,
         requestedBy: profile.id,
         materialName: materialName.trim(),
-        spec: spec.trim() || undefined,
-        qty: parseInt(qty, 10),
+        spec: [spec.trim(), unit.trim() ? `Unit: ${unit.trim()}` : ''].filter(Boolean).join(' · ') || undefined,
+        qty: Math.round(qtyValue * 100) / 100,
         notes: notes.trim() || undefined,
       });
       Alert.alert('Submitted', 'Material request sent for approval.');
-      setMaterialName(''); setSpec(''); setQty(''); setNotes('');
+      setMaterialName(''); setSpec(''); setQty(''); setUnit(''); setNotes('');
       setRequestView('list');
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to submit request');
@@ -191,13 +212,28 @@ export default function SupervisorMaterialsScreen() {
             onChangeText={setSpec}
           />
           <View style={{ height: spacing.md }} />
-          <Input
-            label="Quantity *"
-            placeholder="e.g. 50"
-            value={qty}
-            onChangeText={setQty}
-            keyboardType="numeric"
-          />
+          <View style={styles.qtyUnitRow}>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Quantity *"
+                placeholder="e.g. 12.5"
+                value={qty}
+                onChangeText={handleQtyChange}
+                keyboardType="decimal-pad"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Unit"
+                placeholder="e.g. nos, kg, sq.m, litres"
+                value={unit}
+                onChangeText={setUnit}
+              />
+            </View>
+          </View>
+          {qty.trim() !== '' && !qtyIsValid && (
+            <Text style={styles.qtyError}>Enter a quantity greater than 0</Text>
+          )}
           <View style={{ height: spacing.md }} />
           <Input
             label="Notes (optional)"
@@ -211,7 +247,7 @@ export default function SupervisorMaterialsScreen() {
             title="Submit Request"
             onPress={handleSubmitRequest}
             loading={submitRequest.isPending}
-            disabled={!materialName.trim() || !qty.trim()}
+            disabled={!materialName.trim() || !qtyIsValid}
           />
         </ScrollView>
       )}
@@ -270,58 +306,13 @@ export default function SupervisorMaterialsScreen() {
             <RefreshControl refreshing={r3} onRefresh={refetchDeliveries} tintColor={colors.primary} />
           }
         >
-          {(deliveries || []).map((d) => {
-            const meta = DELIVERY_STATUS[d.status] || DELIVERY_STATUS.in_transit;
-            // Find linked request name
-            const linkedRequest = (requests || []).find(
-              (r) => r.id === d.material_request_id,
-            );
-            return (
-              <Card key={d.id} style={styles.itemCard} padding={spacing.md}>
-                <View style={styles.itemRow}>
-                  <View style={[styles.iconBox, { backgroundColor: meta.bg }]}>
-                    <Ionicons name="car" size={20} color={meta.color} />
-                  </View>
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>
-                      {linkedRequest?.material_name || 'Delivery'}
-                    </Text>
-                    {d.delivery_code && (
-                      <Text style={styles.itemMeta}>Code: {d.delivery_code}</Text>
-                    )}
-                    {d.delivered_at && (
-                      <Text style={styles.itemMeta}>
-                        Delivered: {new Date(d.delivered_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </Text>
-                    )}
-                    {/* Photo placeholders */}
-                    {d.photos && d.photos.length > 0 ? (
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={styles.photoRow}
-                        contentContainerStyle={{ gap: spacing.sm }}
-                      >
-                        {d.photos.map((uri, i) => (
-                          <View key={i} style={styles.photoPlaceholder}>
-                            <Ionicons name="image" size={24} color={colors.neutral[400]} />
-                          </View>
-                        ))}
-                      </ScrollView>
-                    ) : (
-                      <View style={styles.noPhotoRow}>
-                        <Ionicons name="camera-outline" size={14} color={colors.neutral[300]} />
-                        <Text style={styles.noPhotoText}>No delivery photos</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={[styles.statusBadge, { backgroundColor: meta.bg }]}>
-                    <Text style={[styles.statusText, { color: meta.color }]}>{meta.label}</Text>
-                  </View>
-                </View>
-              </Card>
-            );
-          })}
+          {(deliveries || []).map((d) => (
+            <DeliveryCard
+              key={d.id}
+              delivery={d}
+              materialName={(requests || []).find((r) => r.id === d.material_request_id)?.material_name}
+            />
+          ))}
           {(!deliveries || deliveries.length === 0) && (
             <View style={styles.empty}>
               <Ionicons name="car-outline" size={48} color={colors.neutral[300]} />
@@ -331,6 +322,96 @@ export default function SupervisorMaterialsScreen() {
         </ScrollView>
       )}
     </View>
+  );
+}
+
+function DeliveryCard({ delivery, materialName }: { delivery: Delivery; materialName?: string }) {
+  const meta = DELIVERY_STATUS[delivery.status] || DELIVERY_STATUS.in_transit;
+  const addPhotos = useAddDeliveryPhotos();
+  const { data: photoUrls } = useDeliveryPhotoUrls(delivery.photos || []);
+
+  const handleAddPhotos = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Photo library access is required to attach a challan photo.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.7,
+      selectionLimit: 6,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    try {
+      await addPhotos.mutateAsync({
+        deliveryId: delivery.id,
+        localUris: result.assets.map((a) => a.uri),
+      });
+    } catch (e: any) {
+      Alert.alert('Upload failed', e?.message || 'Could not upload the photo. Please try again.');
+    }
+  };
+
+  return (
+    <Card style={styles.itemCard} padding={spacing.md}>
+      <View style={styles.itemRow}>
+        <View style={[styles.iconBox, { backgroundColor: meta.bg }]}>
+          <Ionicons name="car" size={20} color={meta.color} />
+        </View>
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemName}>{materialName || 'Delivery'}</Text>
+          {delivery.delivery_code && (
+            <Text style={styles.itemMeta}>Code: {delivery.delivery_code}</Text>
+          )}
+          {delivery.delivered_at && (
+            <Text style={styles.itemMeta}>
+              Delivered: {new Date(delivery.delivered_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </Text>
+          )}
+
+          {/* Challan / material / truck photos */}
+          {delivery.photos && delivery.photos.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.photoRow}
+              contentContainerStyle={{ gap: spacing.sm }}
+            >
+              {delivery.photos.map((path, i) => (
+                photoUrls?.[path] ? (
+                  <Image key={i} source={{ uri: photoUrls[path] }} style={styles.photoThumb} />
+                ) : (
+                  <View key={i} style={styles.photoPlaceholder}>
+                    <Ionicons name="image" size={24} color={colors.neutral[400]} />
+                  </View>
+                )
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.noPhotoRow}>
+              <Ionicons name="camera-outline" size={14} color={colors.neutral[300]} />
+              <Text style={styles.noPhotoText}>No delivery challan photos yet</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={styles.addPhotoBtn}
+            onPress={handleAddPhotos}
+            disabled={addPhotos.isPending}
+            accessibilityLabel="Add challan photo"
+          >
+            <Ionicons name="camera" size={16} color={colors.primary} />
+            <Text style={styles.addPhotoText}>
+              {addPhotos.isPending ? 'Uploading…' : 'Add Challan Photo'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: meta.bg }]}>
+          <Text style={[styles.statusText, { color: meta.color }]}>{meta.label}</Text>
+        </View>
+      </View>
+    </Card>
   );
 }
 
@@ -371,6 +452,8 @@ const styles = StyleSheet.create({
   tabLabelActive: { color: colors.primary },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing['6xl'] },
   subtitle: { ...typography.h5, color: colors.ink, marginBottom: spacing.xl },
+  qtyUnitRow: { flexDirection: 'row', gap: spacing.md },
+  qtyError: { ...typography.caption, color: colors.error, marginTop: spacing.xs },
   itemCard: { marginBottom: spacing.sm },
   itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   iconBox: {
@@ -407,6 +490,9 @@ const styles = StyleSheet.create({
     borderColor: colors.neutral[200],
   },
   noPhotoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
+  photoThumb: { width: 56, height: 56, borderRadius: radius.sm, backgroundColor: colors.neutral[100] },
+  addPhotoBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
+  addPhotoText: { ...typography.caption, fontFamily: fontFamily.medium, color: colors.primary },
   noPhotoText: { ...typography.caption, color: colors.neutral[300] },
   empty: { alignItems: 'center', paddingVertical: spacing['5xl'], gap: spacing.md },
   emptyText: { ...typography.bodyMedium, color: colors.neutral[400] },

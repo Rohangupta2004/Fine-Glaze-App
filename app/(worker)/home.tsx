@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -184,7 +185,41 @@ export default function WorkerHomeScreen() {
           <Ionicons name="chevron-forward" size={20} color={colors.neutral[400]} />
         </View>
       </Card>
+
+      {/* Emergency Contacts */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Emergency Contacts</Text>
+      </View>
+      <Card style={styles.emergencyCard} variant="flat">
+        <EmergencyRow icon="shield" label="Site Safety Officer" phone="100" />
+        <View style={styles.emergencyDivider} />
+        <EmergencyRow icon="medkit" label="Ambulance" phone="108" />
+        <View style={styles.emergencyDivider} />
+        <EmergencyRow icon="alert-circle" label="National Emergency" phone="112" />
+      </Card>
     </ScrollView>
+  );
+}
+
+function EmergencyRow({ icon, label, phone }: { icon: string; label: string; phone: string }) {
+  return (
+    <View style={styles.emergencyRow}>
+      <View style={styles.emergencyIconWrap}>
+        <Ionicons name={icon as any} size={18} color={colors.error} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.emergencyLabel}>{label}</Text>
+        <Text style={styles.emergencyPhone}>{phone}</Text>
+      </View>
+      <TouchableOpacity
+        style={styles.emergencyCallBtn}
+        onPress={() => Linking.openURL(`tel:${phone}`)}
+        accessibilityLabel={`Call ${label}`}
+        hitSlop={8}
+      >
+        <Ionicons name="call" size={18} color={colors.white} />
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -334,5 +369,44 @@ const styles = StyleSheet.create({
   safetyDesc: {
     ...typography.caption,
     color: colors.neutral[600],
+  },
+  emergencyCard: {
+    padding: spacing.md,
+    marginBottom: spacing['2xl'],
+  },
+  emergencyDivider: {
+    height: 1,
+    backgroundColor: colors.neutral[100],
+    marginVertical: spacing.sm,
+  },
+  emergencyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  emergencyIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: colors.errorBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emergencyLabel: {
+    ...typography.bodySmall,
+    fontFamily: fontFamily.medium,
+    color: colors.ink,
+  },
+  emergencyPhone: {
+    ...typography.caption,
+    color: colors.neutral[500],
+  },
+  emergencyCallBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

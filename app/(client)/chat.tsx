@@ -21,8 +21,10 @@ import {
   useMyConversations,
   useMessages,
   useSendMessage,
+  useJoinProjectConversation,
 } from '../../src/hooks/useConversations';
 import { supabase } from '../../src/lib/supabase';
+import { Button } from '../../src/components';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
@@ -47,16 +49,28 @@ function MessageBubble({ msg, isMine }: { msg: Message; isMine: boolean }) {
   );
 }
 
-// ── Empty state ───────────────────────────────────────────────────────
+// ── Empty state (client can start the project chat themselves) ────────
 
-function EmptyState() {
+function EmptyState({
+  onStart,
+  starting,
+}: {
+  onStart: () => void;
+  starting: boolean;
+}) {
   return (
     <View style={styles.emptyState}>
       <Ionicons name="chatbubbles-outline" size={56} color={colors.neutral[300]} />
-      <Text style={styles.emptyTitle}>No conversations yet</Text>
+      <Text style={styles.emptyTitle}>No conversation yet</Text>
       <Text style={styles.emptyText}>
-        Your project team will set up a chat. Check back soon or send the first message.
+        Start a chat with the Fine Glaze project team any time — no need to wait for them.
       </Text>
+      <Button
+        title="Start Project Chat"
+        onPress={onStart}
+        loading={starting}
+        style={{ marginTop: spacing.lg }}
+      />
     </View>
   );
 }
@@ -71,13 +85,26 @@ export default function ClientChatScreen() {
   const project = (projects || [])[0];
 
   const { data: conversations, refetch: refetchConversations } = useMyConversations(profile?.id);
+  const joinProjectConversation = useJoinProjectConversation();
+  const [pendingConversationId, setPendingConversationId] = useState<string | null>(null);
 
   // Find the project conversation for client's project
   const projectConv = (conversations || []).find(
     (c) => c.type === 'project' && c.project_id === project?.id
   ) ?? (conversations || []).find((c) => c.type === 'project') ?? null;
 
-  const conversationId = projectConv?.id ?? null;
+  const conversationId = projectConv?.id ?? pendingConversationId ?? null;
+
+  const handleStartChat = useCallback(async () => {
+    if (!project?.id) return;
+    try {
+      const id = await joinProjectConversation.mutateAsync({ projectId: project.id });
+      setPendingConversationId(id);
+      refetchConversations();
+    } catch (e: any) {
+      // Surface nothing intrusive — user can just tap again
+    }
+  }, [project?.id, joinProjectConversation, refetchConversations]);
 
   const {
     data: messages,
@@ -138,7 +165,7 @@ export default function ClientChatScreen() {
       <View style={[styles.container, { paddingTop: insets.top + spacing.lg }]}>
         <Text style={styles.screenTitle}>Project Chat</Text>
         {project && <Text style={styles.projectName}>{project.name}</Text>}
-        <EmptyState />
+        <EmptyState onStart={handleStartChat} starting={joinProjectConversation.isPending} />
       </View>
     );
   }

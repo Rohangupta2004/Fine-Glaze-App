@@ -4,7 +4,7 @@
  * Site stock (add/edit), Deliveries (create/mark delivered).
  */
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, RefreshControl, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,13 +13,14 @@ import { Card, Button, Input, StatusChip, SegmentedControl } from '../../src/com
 import {
   useAllMaterials, useMaterialRequests, useDeliveries,
   useUpsertMaterial, useDecideMaterialRequest, useCreateDelivery, useMarkDelivered,
+  useDeliveryPhotoUrls,
 } from '../../src/hooks/useMaterials';
 import { useProjects } from '../../src/hooks/useProjects';
 import { useAuthStore } from '../../src/stores/authStore';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
-import type { Material, MaterialRequest } from '../../src/types';
+import type { Material, MaterialRequest, Delivery } from '../../src/types';
 
 type Tab = 'requests' | 'stock' | 'deliveries';
 
@@ -217,27 +218,12 @@ export default function AdminMaterialsScreen() {
               <EmptyState icon="car-outline" text="No deliveries yet. Create one from an ordered request." />
             )}
             {deliveries.map((d) => (
-              <Card key={d.id} style={styles.itemCard}>
-                <View style={styles.itemHead}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.itemTitle}>{d.delivery_code || 'Delivery'}</Text>
-                    <Text style={styles.itemMeta}>
-                      {projectName.get((d as any).project_id) || 'Site'}
-                      {d.delivered_at ? ` • ${new Date(d.delivered_at).toLocaleDateString('en-IN')}` : ''}
-                    </Text>
-                  </View>
-                  <StatusChip
-                    status={d.status === 'delivered' ? 'completed' : 'in_progress'}
-                    label={d.status === 'delivered' ? 'Delivered' : 'In Transit'}
-                    size="sm"
-                  />
-                </View>
-                {d.status !== 'delivered' && (
-                  <View style={styles.actions}>
-                    <ActionBtn label="Mark Delivered" color={colors.success} icon="checkmark-done" onPress={() => markDelivered.mutate({ id: d.id })} filled />
-                  </View>
-                )}
-              </Card>
+              <AdminDeliveryCard
+                key={d.id}
+                delivery={d}
+                siteName={projectName.get((d as any).project_id) || 'Site'}
+                onMarkDelivered={() => markDelivered.mutate({ id: d.id })}
+              />
             ))}
           </>
         )}
@@ -260,7 +246,7 @@ export default function AdminMaterialsScreen() {
               <View style={styles.gap} />
               <View style={styles.inline}>
                 <View style={{ flex: 1 }}>
-                  <Input label="Quantity" value={mQty} onChangeText={setMQty} keyboardType="numeric" placeholder="0" />
+                  <Input label="Quantity" value={mQty} onChangeText={setMQty} keyboardType="decimal-pad" placeholder="0" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Input label="Unit" value={mUnit} onChangeText={setMUnit} placeholder="nos / kg / m" />
@@ -284,6 +270,60 @@ export default function AdminMaterialsScreen() {
         </View>
       </Modal>
     </View>
+  );
+}
+
+function AdminDeliveryCard({
+  delivery,
+  siteName,
+  onMarkDelivered,
+}: {
+  delivery: Delivery;
+  siteName: string;
+  onMarkDelivered: () => void;
+}) {
+  const { data: photoUrls } = useDeliveryPhotoUrls(delivery.photos || []);
+
+  return (
+    <Card style={styles.itemCard}>
+      <View style={styles.itemHead}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.itemTitle}>{delivery.delivery_code || 'Delivery'}</Text>
+          <Text style={styles.itemMeta}>
+            {siteName}
+            {delivery.delivered_at ? ` • ${new Date(delivery.delivered_at).toLocaleDateString('en-IN')}` : ''}
+          </Text>
+        </View>
+        <StatusChip
+          status={delivery.status === 'delivered' ? 'completed' : 'in_progress'}
+          label={delivery.status === 'delivered' ? 'Delivered' : 'In Transit'}
+          size="sm"
+        />
+      </View>
+
+      {/* Challan / material photos captured by the supervisor on site */}
+      {delivery.photos && delivery.photos.length > 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.deliveryPhotoRow} contentContainerStyle={{ gap: spacing.sm }}>
+          {delivery.photos.map((path, i) => (
+            photoUrls?.[path] ? (
+              <Image key={i} source={{ uri: photoUrls[path] }} style={styles.deliveryPhotoThumb} />
+            ) : (
+              <View key={i} style={[styles.deliveryPhotoThumb, styles.deliveryPhotoLoading]}>
+                <Ionicons name="image" size={18} color={colors.neutral[400]} />
+              </View>
+            )
+          ))}
+        </ScrollView>
+      ) : (
+        <Text style={styles.noDeliveryPhotoText}>No challan photos uploaded yet</Text>
+      )}
+
+      {delivery.status !== 'delivered' && (
+        <View style={styles.actions}>
+          <ActionBtn label="Mark Delivered" color={colors.success} icon="checkmark-done" onPress={onMarkDelivered} filled />
+        </View>
+      )}
+    </Card>
   );
 }
 
@@ -332,6 +372,10 @@ const styles = StyleSheet.create({
   flowNum: { ...typography.h4 },
   flowLabel: { ...typography.caption, color: colors.neutral[400], fontSize: 10 },
   itemCard: { padding: spacing.md, marginBottom: spacing.sm },
+  deliveryPhotoRow: { marginTop: spacing.sm, flexGrow: 0 },
+  deliveryPhotoThumb: { width: 56, height: 56, borderRadius: radius.sm, backgroundColor: colors.neutral[100] },
+  deliveryPhotoLoading: { alignItems: 'center', justifyContent: 'center' },
+  noDeliveryPhotoText: { ...typography.caption, color: colors.neutral[300], marginTop: spacing.sm },
   itemHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   itemTitle: { ...typography.bodyMedium, fontFamily: fontFamily.medium, color: colors.ink },
   itemMeta: { ...typography.caption, color: colors.neutral[400], marginTop: 2 },
