@@ -1,14 +1,38 @@
 # Fine Glaze COS — Coding Handover Report
 
-**Prepared:** 11 July 2026  
-**Overall PRD completion:** approximately **70%**  
+**Prepared:** 11 July 2026 · **Updated: 12 July 2026 (see §0 below first)**  
+**Overall PRD completion:** approximately **70%** (as of 11 July; higher now, see §0)  
 **UI/screens:** approximately **85%**  
 **Repository:** `github.com/Rohangupta2004/Fine-Glaze-App`  
 **Current branch:** `main`  
-**Current commit:** `9fd1ba8` — selfie and DPR media Storage sync  
+**Current commit:** `d55dac4` — splash screen with full building illustration behind logo  
 **App ID:** `com.fineglaze.cos`
 
 > This report is the source of truth for switching coder/model without losing context. The PRD is a single complete delivery; there is no v2/v3 scope.
+
+---
+
+## 0. 12 July 2026 update — read this first
+
+Everything below §1-10 is the 11 July snapshot and is now **partially stale**. Since then, this "focused operations round" shipped and merged to `main`:
+
+**Completed and merged (commits `03c3120`→`b430de5`, then `d55dac4`):**
+- Materials quantity field: decimal (`NUMERIC(10,2)`) input + Unit field, both supervisor and admin `materials.tsx`
+- Client can initiate project chat (wired to existing `useJoinProjectConversation` hook)
+- Safety checklist (6 PPE items) now required inline in the punch-in flow before Confirm (skips if already done today)
+- Emergency contacts (Site Safety Officer, Ambulance 108, National Emergency 112) on worker + supervisor dashboards, tap-to-call
+- Delivery challan photos now visible to supervisor and admin (new `useAddDeliveryPhotos`/`useDeliveryPhotoUrls` hooks, real thumbnails, "Add Challan Photo" picker)
+- Supervisor → Admin "Request Employee" flow: new `employee_requests` table + RLS (migration `20260712000008_employee_requests.sql`, **deployed live** to Supabase, verified via advisors — no new lints), new hook, two new screens, wired into both More menus
+- Splash screen: owner's building-sketch illustration composited behind the Fine Glaze logo, configured via `expo-splash-screen` plugin in `app.json`
+
+**Still NOT done (do these next):**
+- **DPR UI polish** — the one item from this round's checklist not started. PRD §4 items 25/25a/25b/29c: step-flow/cards/status/upload-review presentation needs to match owner's reference images. This is the top priority for the next coding session.
+- **"Tomorrow's site reminder" cron** (PRD §6.8/§29f/notifications matrix) — no scheduled Edge Function found in `supabase/functions/` (only `backup-export`, `create-user`, `export-dpr-register`, `export-muster`, `send-notification` exist — none are cron-triggered). Recurring-task materialization is meant to piggyback on this same cron per PRD §29f — also missing.
+- All "Remaining Work" items in §6 below that are not listed as done in this §0 are still genuinely open (Priority A/C/D/E items — media compression/signed URLs, document version history UX, project QR/scanner, global search, analytics, audit log viewer, templates, backup/restore UI, roles/permissions editor, PWA deploy, Play Store/legal launch prep, etc.) — re-verify each against current `main` before assuming complete, this report was not fully re-audited line-by-line this round, only the round's own checklist items were confirmed.
+
+**Build status:** a new **preview APK build was triggered** on 12 July (commit `d55dac4`) — check `eas build:list --platform android --limit 1` (needs `EXPO_TOKEN`) or ask Rohan for the artifact link if it's not in this chat thread already. Owner is low on Viktor credits — he asked to pause new coding until he says go again; only the build was left running (EAS builds run on Expo's infra, not Viktor credits).
+
+**Environment gotcha for local verification:** the `fine-glaze-app` repo dir occasionally has stale `node_modules` if you worked in a git worktree elsewhere last session — if `tsc --noEmit` reports "Cannot find module" for packages that ARE in `package.json`, just re-run `npm ci --include=dev` in this exact directory before debugging further.
 
 ---
 
