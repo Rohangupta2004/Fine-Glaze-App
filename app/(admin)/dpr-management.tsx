@@ -23,9 +23,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { Card, Button, StatusChip, Avatar } from '../../src/components';
+import { Card, Button, StatusChip, Avatar, DatePickerField } from '../../src/components';
 import { supabase } from '../../src/lib/supabase';
 import { useAuthStore } from '../../src/stores/authStore';
+import { useProjects } from '../../src/hooks/useProjects';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
@@ -118,6 +119,33 @@ function useDprReview() {
   };
 }
 
+function useSubmitDpr() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      projectId, submittedBy, date, workDone, workType, levelZone, weather,
+    }: {
+      projectId: string; submittedBy: string; date: string;
+      workDone: string; workType?: string; levelZone?: string; weather?: string;
+    }) => {
+      const { error } = await supabase.from('dprs').insert({
+        project_id: projectId,
+        submitted_by: submittedBy,
+        date,
+        work_done: workDone,
+        work_type: workType || null,
+        level_zone: levelZone || null,
+        weather: weather || null,
+        status: 'submitted',
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-dprs-all'] });
+    },
+  });
+}
+
 export default function DprManagementScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -125,12 +153,46 @@ export default function DprManagementScreen() {
   const { data: dprs, refetch, isRefetching } = useAllDprs();
   const { approve, reject } = useDprReview();
 
+  const submitDpr = useSubmitDpr();
+
   const [filter, setFilter] = useState<DprFilter>('all');
   const [selectedDpr, setSelectedDpr] = useState<DprWithDetails | null>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | 'changes'>('approve');
   const [exporting, setExporting] = useState(false);
+
+  // DPR Submit modal state
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [submitProjectId, setSubmitProjectId] = useState('');
+  const [submitDate, setSubmitDate] = useState(new Date().toISOString().slice(0, 10));
+  const [submitWorkDone, setSubmitWorkDone] = useState('');
+  const [submitWorkType, setSubmitWorkType] = useState('');
+  const [submitZone, setSubmitZone] = useState('');
+  const [submitWeather, setSubmitWeather] = useState('');
+  const { data: allProjects = [] } = useProjects();
+
+  const handleSubmitDpr = () => {
+    if (!submitProjectId) { Alert.alert('Select Project', 'Please select a project for this DPR.'); return; }
+    if (!submitWorkDone.trim()) { Alert.alert('Work Done', 'Please describe the work done today.'); return; }
+    if (!profile) return;
+    submitDpr.mutate({
+      projectId: submitProjectId,
+      submittedBy: profile.id,
+      date: submitDate,
+      workDone: submitWorkDone.trim(),
+      workType: submitWorkType || undefined,
+      levelZone: submitZone || undefined,
+      weather: submitWeather || undefined,
+    }, {
+      onSuccess: () => {
+        Alert.alert('DPR Submitted', 'Your daily progress report has been submitted.');
+        setShowSubmitModal(false);
+        setSubmitWorkDone(''); setSubmitWorkType(''); setSubmitZone(''); setSubmitWeather('');
+      },
+      onError: (e: any) => Alert.alert('Error', e?.message || 'Failed to submit DPR.'),
+    });
+  };
 
   const handleExportRegister = async () => {
     const projectId = filteredDprs[0]?.project_id;
@@ -363,9 +425,15 @@ export default function DprManagementScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.ink} />
         </TouchableOpacity>
         <Text style={styles.title}>DPR Management</Text>
-        <TouchableOpacity onPress={handleExportRegister} disabled={exporting}>
-          <Ionicons name={exporting ? 'hourglass-outline' : 'download-outline'} size={22} color={colors.ink} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <TouchableOpacity onPress={() => setShowSubmitModal(true)} style={styles.submitDprBtn}>
+            <Ionicons name="add-circle-outline" size={16} color={colors.white} />
+            <Text style={styles.submitDprText}>Submit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleExportRegister} disabled={exporting}>
+            <Ionicons name={exporting ? 'hourglass-outline' : 'download-outline'} size={22} color={colors.ink} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Overview Stats — matches reference panel 1 */}
@@ -470,6 +538,88 @@ export default function DprManagementScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* Submit DPR Modal */}
+      <Modal visible={showSubmitModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + spacing.xl }]}>
+            <Text style={styles.modalTitle}>Submit DPR</Text>
+            <Text style={styles.modalSubtitle}>Create a daily progress report</Text>
+
+            {/* Project picker */}
+            <Text style={styles.fieldLabel}>Project *</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md, flexGrow: 0 }}>
+              {allProjects.filter(p => p.status !== 'completed').map(p => (
+                <TouchableOpacity
+                  key={p.id}
+                  style={[styles.filterChip, submitProjectId === p.id && styles.filterChipActive]}
+                  onPress={() => setSubmitProjectId(p.id)}
+                >
+                  <Text style={[styles.filterText, submitProjectId === p.id && styles.filterTextActive]}>{p.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.fieldLabel}>Work Done *</Text>
+            <TextInput
+              style={styles.reviewInput}
+              placeholder="Describe the work completed today..."
+              placeholderTextColor={colors.neutral[400]}
+              value={submitWorkDone}
+              onChangeText={setSubmitWorkDone}
+              multiline
+              numberOfLines={4}
+            />
+
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Work Type</Text>
+                <TextInput
+                  style={[styles.reviewInput, { minHeight: 40 }]}
+                  placeholder="e.g. Glazing, Cladding"
+                  placeholderTextColor={colors.neutral[400]}
+                  value={submitWorkType}
+                  onChangeText={setSubmitWorkType}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Zone/Level</Text>
+                <TextInput
+                  style={[styles.reviewInput, { minHeight: 40 }]}
+                  placeholder="e.g. Floor 3, Zone A"
+                  placeholderTextColor={colors.neutral[400]}
+                  value={submitZone}
+                  onChangeText={setSubmitZone}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.fieldLabel}>Weather</Text>
+            <TextInput
+              style={[styles.reviewInput, { minHeight: 40 }]}
+              placeholder="e.g. Sunny, Rainy"
+              placeholderTextColor={colors.neutral[400]}
+              value={submitWeather}
+              onChangeText={setSubmitWeather}
+            />
+
+            <View style={styles.modalActions}>
+              <Button
+                title="Cancel"
+                variant="secondary"
+                onPress={() => setShowSubmitModal(false)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title="Submit DPR"
+                onPress={handleSubmitDpr}
+                loading={submitDpr.isPending}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -478,6 +628,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xl },
   title: { ...typography.h4, color: colors.ink },
+  submitDprBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: colors.primary, borderRadius: radius.md,
+    paddingHorizontal: spacing.md, paddingVertical: 6,
+  },
+  submitDprText: { ...typography.caption, fontFamily: fontFamily.semiBold, color: colors.white },
+  fieldLabel: { ...typography.caption, fontFamily: fontFamily.semiBold, color: colors.neutral[500], textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.xs, marginTop: spacing.sm },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl },
   statCard: { flex: 1, padding: spacing.md, alignItems: 'center' },
   statNum: { ...typography.h3, fontFamily: fontFamily.bold },

@@ -18,6 +18,7 @@ import { useAuthStore } from '../../src/stores/authStore';
 import { useProjects } from '../../src/hooks/useProjects';
 import { useEmployees } from '../../src/hooks/useEmployees';
 import { usePendingDprs, usePendingLeave, usePendingMaterialRequests } from '../../src/hooks/useApprovals';
+import { useMyTasks } from '../../src/hooks/useTasks';
 import { useUnreadCount } from '../../src/hooks/useNotifications';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
@@ -105,6 +106,8 @@ export default function AdminHomeScreen() {
   const { data: pendingDprs } = usePendingDprs();
   const { data: pendingLeave } = usePendingLeave();
   const { data: pendingMaterials } = usePendingMaterialRequests();
+  const { data: myTasks = [] } = useMyTasks(profile?.id);
+  const pendingTasks = myTasks.filter((t: any) => t.status === 'pending' || t.status === 'in_progress');
   const { data: unreadCount } = useUnreadCount(profile?.id);
 
   const activeProjects = (projects || []).filter((p) => p.status !== 'completed');
@@ -299,6 +302,58 @@ export default function AdminHomeScreen() {
           ))
         )}
       </View>
+
+      {/* ── Management Cards ──────────────────────────────── */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Manage</Text>
+        </View>
+        <View style={styles.manageGrid}>
+          {[
+            { icon: 'people', label: 'Employees', route: '/(admin)/employees', color: '#6366F1', bg: '#EEF2FF' },
+            { icon: 'business', label: 'Clients', route: '/(admin)/clients', color: '#0EA5E9', bg: '#E0F2FE' },
+            { icon: 'folder', label: 'Documents', route: '/(admin)/documents', color: colors.primary, bg: colors.primary + '15' },
+            { icon: 'chatbubbles', label: 'Messages', route: '/(admin)/chat', color: '#10B981', bg: '#DCFCE7' },
+          ].map((item) => (
+            <TouchableOpacity
+              key={item.label}
+              style={styles.manageCard}
+              onPress={() => router.push(item.route as any)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.manageIconWrap, { backgroundColor: item.bg }]}>
+                <Ionicons name={item.icon as any} size={22} color={item.color} />
+              </View>
+              <Text style={styles.manageLabel}>{item.label}</Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.neutral[300]} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* ── My Tasks ───────────────────────────────────────── */}
+      {pendingTasks.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>My Tasks</Text>
+            <Text style={styles.taskCount}>{pendingTasks.length} pending</Text>
+          </View>
+          {pendingTasks.slice(0, 3).map((task: any) => (
+            <View key={task.id} style={styles.taskCard}>
+              <View style={[styles.taskDot, { backgroundColor: task.priority === 'high' ? colors.error : task.priority === 'medium' ? colors.warning : colors.info }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.taskTitle} numberOfLines={1}>{task.title}</Text>
+                <Text style={styles.taskMeta}>{task.priority} priority</Text>
+              </View>
+              <View style={[styles.taskStatus, { backgroundColor: task.status === 'in_progress' ? colors.info + '15' : colors.warning + '15' }]}>
+                <Text style={[styles.taskStatusText, { color: task.status === 'in_progress' ? colors.info : colors.warning }]}>
+                  {task.status === 'in_progress' ? 'In Progress' : 'Pending'}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* ── Pending Approvals ───────────────────────────────── */}
       {((pendingDprs?.length || 0) + (pendingLeave?.length || 0) + (pendingMaterials?.length || 0)) > 0 && (
@@ -547,6 +602,41 @@ const styles = StyleSheet.create({
   progressTrack: { flex: 1, height: 5, backgroundColor: colors.neutral[100], borderRadius: 3 },
   progressFill: { height: 5, backgroundColor: colors.primary, borderRadius: 3 },
   progressText: { ...typography.caption, fontFamily: fontFamily.semiBold, color: colors.primary, width: 32, textAlign: 'right' },
+
+  /* Manage Grid */
+  manageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  manageCard: {
+    width: '48%' as any,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.neutral[100],
+  },
+  manageIconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  manageLabel: { ...typography.bodySmall, fontFamily: fontFamily.medium, color: colors.ink, flex: 1 },
+
+  /* Tasks */
+  taskCount: { ...typography.caption, color: colors.neutral[500] },
+  taskCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.xs,
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.neutral[100],
+  },
+  taskDot: { width: 8, height: 8, borderRadius: 4 },
+  taskTitle: { ...typography.bodySmall, fontFamily: fontFamily.medium, color: colors.ink },
+  taskMeta: { ...typography.caption, color: colors.neutral[400], marginTop: 1 },
+  taskStatus: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.md },
+  taskStatusText: { ...typography.caption, fontFamily: fontFamily.medium, fontSize: 10 },
 
   /* Approvals */
   approvalsRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },

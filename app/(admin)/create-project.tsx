@@ -16,6 +16,26 @@ import { typography, fontFamily } from '../../src/theme/typography';
 const TYPES = ['Commercial Building', 'Residential Facade', 'Curtain Wall', 'Structural Glazing', 'Maintenance'];
 const RADII = [50, 100, 150, 200];
 
+/** Geocode an address string to lat/lng using expo-location */
+async function searchAddress(query: string): Promise<{ lat: number; lng: number; display: string } | null> {
+  try {
+    const results = await Location.geocodeAsync(query);
+    if (results.length > 0) {
+      const { latitude, longitude } = results[0];
+      // Reverse geocode to get a nice display name
+      const reverseResults = await Location.reverseGeocodeAsync({ latitude, longitude });
+      const place = reverseResults[0];
+      const display = place
+        ? [place.name, place.street, place.city, place.region].filter(Boolean).join(', ')
+        : query;
+      return { lat: latitude, lng: longitude, display };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default function CreateProjectScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -30,6 +50,25 @@ export default function CreateProjectScreen() {
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
   const [locating, setLocating] = useState(false);
+  const [searching, setSearching] = useState(false);
+
+  const searchSiteAddress = async () => {
+    if (!address.trim()) { Alert.alert('Enter Address', 'Type the site address to search on map.'); return; }
+    setSearching(true);
+    try {
+      const result = await searchAddress(address.trim());
+      if (result) {
+        setLat(result.lat.toFixed(6));
+        setLng(result.lng.toFixed(6));
+        if (result.display) setCity(result.display.split(',').pop()?.trim() || city);
+        Alert.alert('Location Found', `${result.display}\n\nLat: ${result.lat.toFixed(6)}\nLng: ${result.lng.toFixed(6)}`);
+      } else {
+        Alert.alert('Not Found', 'Could not find this address. Try a more specific address or use GPS.');
+      }
+    } catch (e: any) {
+      Alert.alert('Search Failed', e?.message || 'Try again.');
+    } finally { setSearching(false); }
+  };
 
   const useMyLocation = async () => {
     setLocating(true);
@@ -122,7 +161,7 @@ export default function CreateProjectScreen() {
           {templates.map((item: any) => <TouchableOpacity key={item.id} onPress={() => setTemplateId(item.id)}><Card style={[styles.option, templateId === item.id && styles.selected]}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{item.name}</Text><Text style={styles.optionMeta}>{item.payload?.tasks?.length || 0} tasks • {item.payload?.recurring_tasks?.length || 0} recurring</Text></View><Ionicons name={templateId === item.id ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={colors.primary} /></Card></TouchableOpacity>)}
         </>}
         {step === 1 && <><Text style={styles.heading}>Project details</Text><Input label="Project Name *" value={name} onChangeText={setName} placeholder="e.g. Baner Commercial Tower" /><View style={styles.gap} /><Text style={styles.fieldLabel}>Project Type</Text><View style={styles.chips}>{TYPES.map((item) => <TouchableOpacity key={item} onPress={() => setType(item)} style={[styles.chip, type === item && styles.chipActive]}><Text style={[styles.chipText, type === item && styles.chipTextActive]}>{item}</Text></TouchableOpacity>)}</View><Input label="City" value={city} onChangeText={setCity} placeholder="Pune" /></>}
-        {step === 2 && <><Text style={styles.heading}>Site & geofence</Text><Input label="Full Site Address *" value={address} onChangeText={setAddress} placeholder="Building, road, area, city" multiline /><View style={styles.gap} /><Button title={locating ? 'Getting GPS location…' : '📍 Use My Current Location'} variant="secondary" onPress={useMyLocation} loading={locating} fullWidth /><View style={styles.gap} /><View style={styles.inline}><View style={styles.flex}><Input label="Latitude" value={lat} onChangeText={setLat} keyboardType="decimal-pad" placeholder="Auto-filled from GPS" /></View><View style={styles.flex}><Input label="Longitude" value={lng} onChangeText={setLng} keyboardType="decimal-pad" placeholder="Auto-filled from GPS" /></View></View><Text style={styles.fieldLabel}>Geofence radius</Text><View style={styles.chips}>{RADII.map((item) => <TouchableOpacity key={item} onPress={() => setRadius(item)} style={[styles.chip, radius === item && styles.chipActive]}><Text style={[styles.chipText, radius === item && styles.chipTextActive]}>{item} m</Text></TouchableOpacity>)}</View><Card style={styles.info}><Ionicons name="location" size={20} color={colors.primary} /><Text style={styles.infoText}>Workers must be within {radius} metres to punch in. Coordinates can be added later if unavailable.</Text></Card></>}
+        {step === 2 && <><Text style={styles.heading}>Site & geofence</Text><Input label="Full Site Address *" value={address} onChangeText={setAddress} placeholder="Building, road, area, city" multiline /><View style={styles.gap} /><View style={styles.inline}><View style={styles.flex}><Button title={searching ? 'Searching…' : '🔍 Search Address'} variant="secondary" onPress={searchSiteAddress} loading={searching} fullWidth /></View><View style={styles.flex}><Button title={locating ? 'Getting GPS…' : '📍 Use GPS'} variant="secondary" onPress={useMyLocation} loading={locating} fullWidth /></View></View><View style={styles.gap} /><View style={styles.inline}><View style={styles.flex}><Input label="Latitude" value={lat} onChangeText={setLat} keyboardType="decimal-pad" placeholder="Auto-filled from GPS" /></View><View style={styles.flex}><Input label="Longitude" value={lng} onChangeText={setLng} keyboardType="decimal-pad" placeholder="Auto-filled from GPS" /></View></View><Text style={styles.fieldLabel}>Geofence radius</Text><View style={styles.chips}>{RADII.map((item) => <TouchableOpacity key={item} onPress={() => setRadius(item)} style={[styles.chip, radius === item && styles.chipActive]}><Text style={[styles.chipText, radius === item && styles.chipTextActive]}>{item} m</Text></TouchableOpacity>)}</View><Card style={styles.info}><Ionicons name="location" size={20} color={colors.primary} /><Text style={styles.infoText}>Workers must be within {radius} metres to punch in. Coordinates can be added later if unavailable.</Text></Card></>}
         {step === 3 && <><Text style={styles.heading}>Schedule & review</Text><DatePickerField label="Start Date" value={startDate} onChange={setStartDate} /><View style={styles.gap} /><DatePickerField label="Expected End Date" value={endDate} onChange={setEndDate} minDate={startDate || undefined} /><Card style={styles.review}><Text style={styles.reviewTitle}>{name || 'Untitled project'}</Text><Text style={styles.reviewLine}>{type} • {city || 'No city'}</Text><Text style={styles.reviewLine}>{address || 'No address'}</Text><Text style={styles.reviewLine}>Geofence: {radius} m</Text><Text style={styles.reviewLine}>Template: {selectedTemplate?.name || 'None'}</Text></Card></>}
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>{step > 0 && <Button title="Back" variant="secondary" onPress={() => setStep((s) => s - 1)} style={styles.footerButton} />}<Button title={step === 3 ? 'Create Project' : 'Continue'} onPress={step === 3 ? save : () => setStep((s) => s + 1)} loading={saving} style={styles.footerButton} /></View>

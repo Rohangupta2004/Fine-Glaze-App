@@ -126,98 +126,34 @@ export function useConversationMembers(conversationIds: string[]) {
 
 /**
  * Find or create a direct conversation with another person.
+ * Uses SECURITY DEFINER RPC to avoid RLS race condition.
  * Returns the conversation id.
  */
 export function useStartDirectConversation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ otherProfileId }: { otherProfileId: string }): Promise<string> => {
-      const me = useAuthStore.getState().profile;
-      if (!me) throw new Error('Not authenticated');
-
-      // 1. Look for an existing direct conversation with exactly the two of us
-      const { data: myMemberships, error: memErr } = await supabase
-        .from('conversation_members')
-        .select('conversation_id')
-        .eq('profile_id', me.id);
-      if (memErr) throw memErr;
-      const myConvIds = (myMemberships || []).map((m: any) => m.conversation_id);
-
-      if (myConvIds.length) {
-        const { data: directConvs } = await supabase
-          .from('conversations')
-          .select('id')
-          .eq('type', 'direct')
-          .in('id', myConvIds);
-        const directIds = (directConvs || []).map((c: any) => c.id);
-        if (directIds.length) {
-          const { data: allMembers } = await supabase
-            .from('conversation_members')
-            .select('conversation_id, profile_id')
-            .in('conversation_id', directIds);
-          const byConv: Record<string, string[]> = {};
-          for (const m of allMembers || []) {
-            (byConv[(m as any).conversation_id] ||= []).push((m as any).profile_id);
-          }
-          for (const [convId, members] of Object.entries(byConv)) {
-            if (members.length === 2 && members.includes(otherProfileId)) return convId;
-          }
-        }
-      }
-
-      // 2. Create a new direct conversation
-      const { data: conv, error: convErr } = await supabase
-        .from('conversations')
-        .insert({ company_id: me.company_id, type: 'direct' })
-        .select()
-        .single();
-      if (convErr) throw convErr;
-
-      const { error: addErr } = await supabase.from('conversation_members').insert([
-        { conversation_id: conv.id, profile_id: me.id },
-        { conversation_id: conv.id, profile_id: otherProfileId },
-      ]);
-      if (addErr) throw addErr;
-      return conv.id as string;
+      const { data, error } = await supabase.rpc('start_direct_chat', {
+        other_profile_id: otherProfileId,
+      });
+      if (error) throw error;
+      return data as string;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['conversations'] }),
   });
 }
 
-/** Create (or return existing) project conversation and join it. */
+/** Create (or return existing) project conversation and join it.
+ * Uses SECURITY DEFINER RPC to avoid RLS race condition. */
 export function useJoinProjectConversation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ projectId }: { projectId: string }): Promise<string> => {
-      const me = useAuthStore.getState().profile;
-      if (!me) throw new Error('Not authenticated');
-      // Existing project conversation I'm a member of?
-      const { data: myMemberships } = await supabase
-        .from('conversation_members')
-        .select('conversation_id')
-        .eq('profile_id', me.id);
-      const ids = (myMemberships || []).map((m: any) => m.conversation_id);
-      if (ids.length) {
-        const { data: existing } = await supabase
-          .from('conversations')
-          .select('id')
-          .eq('type', 'project')
-          .eq('project_id', projectId)
-          .in('id', ids)
-          .limit(1);
-        if (existing?.length) return existing[0].id;
-      }
-      const { data: conv, error } = await supabase
-        .from('conversations')
-        .insert({ company_id: me.company_id, type: 'project', project_id: projectId })
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc('join_project_chat', {
+        p_project_id: projectId,
+      });
       if (error) throw error;
-      const { error: addErr } = await supabase
-        .from('conversation_members')
-        .insert({ conversation_id: conv.id, profile_id: me.id });
-      if (addErr) throw addErr;
-      return conv.id as string;
+      return data as string;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['conversations'] }),
   });

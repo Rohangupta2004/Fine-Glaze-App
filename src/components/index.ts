@@ -16,3 +16,4 @@ export { Skeleton, CardSkeleton, ListSkeleton, StatsSkeleton, ScreenSkeleton } f
 export { EmptyState, emptyStates } from './EmptyState';
 export { RetryBanner, QueryGuard } from './RetryBanner';
 export { OfflineBanner } from './OfflineBanner';
+export { ImageViewer, PhotoGrid } from './ImageViewer';
