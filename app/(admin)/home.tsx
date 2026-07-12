@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card, Avatar, StatusChip } from '../../src/components';
+import { Card, Avatar, StatusChip, StatsSkeleton, CardSkeleton, ListSkeleton, EmptyState, emptyStates, RetryBanner } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useProjects } from '../../src/hooks/useProjects';
 import { useEmployees } from '../../src/hooks/useEmployees';
@@ -36,8 +36,8 @@ export default function AdminHomeScreen() {
   const profile = useAuthStore((s) => s.profile);
   const firstName = profile?.full_name?.split(' ')[0] || 'Admin';
 
-  const { data: projects, refetch: rProjects, isRefetching: r1 } = useProjects();
-  const { data: employees, refetch: rEmployees, isRefetching: r2 } = useEmployees();
+  const { data: projects, refetch: rProjects, isRefetching: r1, isLoading: l1, isError: e1 } = useProjects();
+  const { data: employees, refetch: rEmployees, isRefetching: r2, isLoading: l2, isError: e2 } = useEmployees();
   const { data: pendingDprs } = usePendingDprs();
   const { data: pendingLeave } = usePendingLeave();
   const { data: pendingMaterials } = usePendingMaterialRequests();
@@ -81,11 +81,17 @@ export default function AdminHomeScreen() {
       </View>
 
       {/* Quick Stats */}
-      <View style={styles.statsRow}>
-        <StatCard icon="business" value={activeProjects.length} label="Active Projects" color={colors.primary} onPress={() => router.push('/(admin)/projects')} />
-        <StatCard icon="people" value={activeEmployees.length} label="Employees" color={colors.info} onPress={() => router.push('/(admin)/employees' as any)} />
-        <StatCard icon="checkmark-circle" value={totalPending} label="Pending" color={colors.warning} onPress={() => router.push('/(admin)/approvals' as any)} />
-      </View>
+      {(l1 || l2) ? (
+        <StatsSkeleton style={{ marginBottom: spacing['2xl'] }} />
+      ) : (e1 || e2) ? (
+        <RetryBanner onRetry={() => { rProjects(); rEmployees(); }} style={{ marginBottom: spacing['2xl'], marginHorizontal: 0 }} />
+      ) : (
+        <View style={styles.statsRow}>
+          <StatCard icon="business" value={activeProjects.length} label="Active Projects" color={colors.primary} onPress={() => router.push('/(admin)/projects')} />
+          <StatCard icon="people" value={activeEmployees.length} label="Employees" color={colors.info} onPress={() => router.push('/(admin)/employees' as any)} />
+          <StatCard icon="checkmark-circle" value={totalPending} label="Pending" color={colors.warning} onPress={() => router.push('/(admin)/approvals' as any)} />
+        </View>
+      )}
 
       {/* Management cards */}
       <Text style={styles.sectionTitle}>Manage</Text>
@@ -122,11 +128,11 @@ export default function AdminHomeScreen() {
           </Card>
         </TouchableOpacity>
       ))}
-      {activeProjects.length === 0 && (
-        <Card style={styles.emptyCard} variant="flat">
-          <Text style={styles.emptyText}>No active projects</Text>
-        </Card>
-      )}
+      {l1 ? (
+        <CardSkeleton count={2} />
+      ) : activeProjects.length === 0 ? (
+        <EmptyState {...emptyStates.projects} compact actionLabel="Create Project" onAction={() => router.push('/(admin)/add' as any)} />
+      ) : null}
 
       {/* Approvals Summary */}
       {totalPending > 0 && (

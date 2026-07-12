@@ -3,13 +3,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { colors } from '../../src/theme/colors';
 import { fontFamily } from '../../src/theme/typography';
+import { ErrorBoundary } from '../../src/components/ErrorBoundary';
+import { usePushNotifications } from '../../src/hooks/usePushNotifications';
 import { useOutboxSync } from '../../src/hooks/useOutboxSync';
 
 export default function WorkerLayout() {
   const { t } = useTranslation();
+  usePushNotifications();
   useOutboxSync();
 
   return (
+    <ErrorBoundary label="Worker">
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -79,5 +83,6 @@ export default function WorkerLayout() {
       ))}
       <Tabs.Screen name="punch-in/index" options={{ href: null }} />
     </Tabs>
+    </ErrorBoundary>
   );
 }

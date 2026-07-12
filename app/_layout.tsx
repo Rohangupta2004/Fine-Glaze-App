@@ -16,6 +16,8 @@ import '../src/i18n';
 import { useAuthStore } from '../src/stores/authStore';
 import { setupInactivityTracking, recordLogin, type LockAction } from '../src/lib/inactivityLock';
 import { colors } from '../src/theme/colors';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { OfflineBanner } from '../src/components/OfflineBanner';
 
 // Keep splash visible while loading
 SplashScreen.preventAutoHideAsync();
@@ -121,7 +123,12 @@ function RootLayoutInner() {
     return <View style={styles.loading} />;
   }
 
-  return <Slot />;
+  return (
+    <View style={{ flex: 1 }}>
+      <OfflineBanner />
+      <Slot />
+    </View>
+  );
 }
 
 function getRouteGroup(role: string): string {
@@ -142,9 +149,11 @@ function getRouteGroup(role: string): string {
 
 export default function RootLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <RootLayoutInner />
-    </QueryClientProvider>
+    <ErrorBoundary label="App">
+      <QueryClientProvider client={queryClient}>
+        <RootLayoutInner />
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

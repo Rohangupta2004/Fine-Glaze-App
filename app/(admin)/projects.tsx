@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card, StatusChip } from '../../src/components';
+import { Card, StatusChip, CardSkeleton, EmptyState, emptyStates } from '../../src/components';
 import { useProjects } from '../../src/hooks/useProjects';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
@@ -30,7 +30,7 @@ const FILTERS: { label: string; value: ProjectStatus | 'all' }[] = [
 export default function AdminProjectsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { data: projects, refetch, isRefetching } = useProjects();
+  const { data: projects, refetch, isRefetching, isLoading } = useProjects();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ProjectStatus | 'all'>('all');
 
@@ -116,12 +116,11 @@ export default function AdminProjectsScreen() {
             </Card>
           </TouchableOpacity>
         ))}
-        {filtered.length === 0 && (
-          <View style={styles.empty}>
-            <Ionicons name="business-outline" size={48} color={colors.neutral[300]} />
-            <Text style={styles.emptyText}>{search ? 'No projects match your search' : 'No projects yet'}</Text>
-          </View>
-        )}
+        {isLoading ? (
+          <CardSkeleton count={4} />
+        ) : filtered.length === 0 ? (
+          <EmptyState {...(search ? emptyStates.search : emptyStates.projects)} />
+        ) : null}
       </ScrollView>
     </View>
   );

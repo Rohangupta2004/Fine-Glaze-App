@@ -89,7 +89,42 @@ export function usePushNotifications() {
       (response) => {
         const data = response.notification.request.content.data;
         console.log('Notification tapped:', data);
-        // TODO: Navigate based on data.kind, data.refTable, data.refId
+        // Navigate based on notification kind
+        try {
+          const kind = data?.kind as string | undefined;
+          const role = profile?.role || 'worker';
+          const group = ['owner','project_manager','hr','accounts'].includes(role)
+            ? 'admin' : role === 'supervisor' ? 'supervisor' : role === 'client' ? 'client' : 'worker';
+
+          if (kind === 'chat' || kind === 'message') {
+            const { router } = require('expo-router');
+            if (data?.conversationId) {
+              router.push({ pathname: `/(${group})/conversation`, params: { id: data.conversationId } });
+            } else {
+              router.push(`/(${group})/chat`);
+            }
+          } else if (kind === 'material_request' || kind === 'material_approve') {
+            const { router } = require('expo-router');
+            router.push(`/(${group})/materials`);
+          } else if (kind === 'dpr_submit' || kind === 'dpr_approve' || kind === 'dpr_reject') {
+            const { router } = require('expo-router');
+            if (group === 'admin') router.push('/(admin)/dpr-management');
+            else router.push(`/(${group})/dpr`);
+          } else if (kind === 'leave_request' || kind === 'leave_approve') {
+            const { router } = require('expo-router');
+            if (group === 'admin') router.push('/(admin)/approvals');
+            else router.push(`/(${group})/more`);
+          } else if (kind === 'attendance') {
+            const { router } = require('expo-router');
+            if (group === 'admin') router.push('/(admin)/attendance-report');
+            else router.push(`/(${group})/attendance`);
+          } else if (kind === 'document') {
+            const { router } = require('expo-router');
+            router.push(`/(${group})/documents`);
+          }
+        } catch (navError) {
+          console.error('Notification navigation error:', navError);
+        }
       }
     );
 

@@ -2,9 +2,14 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../src/theme/colors';
 import { fontFamily } from '../../src/theme/typography';
+import { ErrorBoundary } from '../../src/components/ErrorBoundary';
+import { usePushNotifications } from '../../src/hooks/usePushNotifications';
 
 export default function ClientLayout() {
+  usePushNotifications();
+
   return (
+    <ErrorBoundary label="Client">
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -89,5 +94,6 @@ export default function ClientLayout() {
       <Tabs.Screen name="new-message" options={{ href: null }} />
       <Tabs.Screen name="conversation" options={{ href: null }} />
     </Tabs>
+    </ErrorBoundary>
   );
 }

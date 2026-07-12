@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 
-import { Card } from '../../src/components';
+import { Card, ScreenSkeleton, RetryBanner } from '../../src/components';
 import { supabase } from '../../src/lib/supabase';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
@@ -144,7 +144,7 @@ function fmtINR(amount: number): string {
 export default function AnalyticsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { data } = useAnalytics();
+  const { data, isLoading, isError, refetch } = useAnalytics();
 
   return (
     <ScrollView
@@ -159,6 +159,9 @@ export default function AnalyticsScreen() {
         <Text style={styles.title}>Analytics</Text>
         <View style={{ width: 24 }} />
       </View>
+
+      {isLoading && <ScreenSkeleton />}
+      {isError && <RetryBanner onRetry={refetch} />}
 
       {/* 1. Attendance Trend (30 days) */}
       <Card style={styles.chartCard}>

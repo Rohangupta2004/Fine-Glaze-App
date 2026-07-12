@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card, Avatar, StatusChip } from '../../src/components';
+import { Card, Avatar, StatusChip, ListSkeleton, EmptyState, emptyStates } from '../../src/components';
 import { useEmployees } from '../../src/hooks/useEmployees';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
@@ -39,7 +39,7 @@ const ROLE_LABELS: Record<string, string> = {
 export default function EmployeesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { data: employees, refetch, isRefetching } = useEmployees();
+  const { data: employees, refetch, isRefetching, isLoading } = useEmployees();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ProfileStatus | 'all'>('all');
 
@@ -144,12 +144,15 @@ export default function EmployeesScreen() {
             ))}
           </View>
         ))}
-        {filtered.length === 0 && (
-          <View style={styles.empty}>
-            <Ionicons name="people-outline" size={48} color={colors.neutral[300]} />
-            <Text style={styles.emptyText}>No employees found</Text>
-          </View>
-        )}
+        {isLoading ? (
+          <ListSkeleton count={6} />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            {...(search ? emptyStates.search : emptyStates.employees)}
+            actionLabel={!search ? 'Add Employee' : undefined}
+            onAction={!search ? () => router.push('/(admin)/add-employee' as any) : undefined}
+          />
+        ) : null}
       </ScrollView>
     </View>
   );

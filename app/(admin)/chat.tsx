@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card, Avatar } from '../../src/components';
+import { Card, Avatar, ListSkeleton, EmptyState, emptyStates } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useMyConversations, useConversationMembers } from '../../src/hooks/useConversations';
 import { useProjects } from '../../src/hooks/useProjects';
@@ -23,7 +23,7 @@ export default function AdminChatScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const profile = useAuthStore((s) => s.profile);
-  const { data: conversations, refetch, isRefetching } = useMyConversations(profile?.id);
+  const { data: conversations, refetch, isRefetching, isLoading } = useMyConversations(profile?.id);
   const { data: projects } = useProjects();
 
   const projectMap = new Map((projects || []).map(p => [p.id, p.name]));
@@ -92,13 +92,15 @@ export default function AdminChatScreen() {
           </>
         )}
 
-        {(!conversations || conversations.length === 0) && (
-          <View style={styles.empty}>
-            <Ionicons name="chatbubbles-outline" size={56} color={colors.neutral[300]} />
-            <Text style={styles.emptyTitle}>No conversations yet</Text>
-            <Text style={styles.emptyText}>Messages from project chats and direct messages will appear here</Text>
-          </View>
-        )}
+        {isLoading ? (
+          <ListSkeleton count={5} style={{ paddingTop: spacing.lg }} />
+        ) : (!conversations || conversations.length === 0) ? (
+          <EmptyState
+            {...emptyStates.messages}
+            actionLabel="Start Chat"
+            onAction={() => router.push('/(admin)/new-message' as any)}
+          />
+        ) : null}
       </ScrollView>
     </View>
   );

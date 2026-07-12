@@ -13,7 +13,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card, Avatar } from '../../src/components';
+import { Card, Avatar, ListSkeleton, EmptyState, emptyStates } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import {
   useMyConversations,
@@ -109,13 +109,11 @@ function ConversationList({
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons name="chatbubbles-outline" size={64} color={colors.neutral[300]} />
-            <Text style={styles.emptyTitle}>No messages</Text>
-            <Text style={styles.emptyBody}>
-              Messages from your site and admin will appear here.
-            </Text>
-          </View>
+          <EmptyState
+            {...emptyStates.messages}
+            actionLabel="Start Chat"
+            onAction={() => require('expo-router').router.push('/(worker)/new-message')}
+          />
         }
       />
     </View>

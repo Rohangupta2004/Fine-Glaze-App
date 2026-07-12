@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card } from '../../src/components';
+import { Card, ListSkeleton, EmptyState, emptyStates } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useNotifications, useMarkRead, useMarkAllRead } from '../../src/hooks/useNotifications';
 import type { Notification as AppNotification } from '../../src/types';
@@ -35,7 +35,7 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const profile = useAuthStore((s) => s.profile);
-  const { data: notifications, refetch, isRefetching } = useNotifications(profile?.id);
+  const { data: notifications, refetch, isRefetching, isLoading } = useNotifications(profile?.id);
   const markRead = useMarkRead();
   const markAllRead = useMarkAllRead();
 
@@ -101,12 +101,11 @@ export default function NotificationsScreen() {
             })}
           </View>
         ))}
-        {(!notifications || notifications.length === 0) && (
-          <View style={styles.empty}>
-            <Ionicons name="notifications-off-outline" size={48} color={colors.neutral[300]} />
-            <Text style={styles.emptyText}>No notifications yet</Text>
-          </View>
-        )}
+        {isLoading ? (
+          <ListSkeleton count={6} style={{ paddingHorizontal: spacing.sm }} />
+        ) : (!notifications || notifications.length === 0) ? (
+          <EmptyState {...emptyStates.notifications} />
+        ) : null}
       </ScrollView>
     </View>
   );
