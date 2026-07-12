@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Card, Avatar, StatusChip, Button } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useMyTasks } from '../../src/hooks/useTasks';
-import { useProjects } from '../../src/hooks/useProjects';
+import { useMyAssignedProjects } from '../../src/hooks/useAssignedProjects';
 import { useTodayAttendance, usePunchOut } from '../../src/hooks/useAttendance';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
@@ -43,10 +43,10 @@ export default function WorkerHomeScreen() {
   const firstName = profile?.full_name?.split(' ')[0] || 'Worker';
 
   const { data: tasks } = useMyTasks(profile?.id);
-  const { data: projects } = useProjects();
+  const { data: projects } = useMyAssignedProjects(profile?.id);
   const { data: todayAttendance } = useTodayAttendance(profile?.id);
   const punchOut = usePunchOut();
-  const activeProject = projects?.[0]; // Single active project per worker in M1
+  const activeProject = projects?.[0]; // Always use the worker's assigned site for geofence attendance.
   const pendingTasks = (tasks || []).filter((t) => t.status !== 'done').slice(0, 3);
   const hasPunchedIn = !!todayAttendance?.check_in_at;
   const hasPunchedOut = !!todayAttendance?.check_out_at;

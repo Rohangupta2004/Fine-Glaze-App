@@ -27,7 +27,7 @@ const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
 interface CalendarEvent {
   id: string;
-  type: 'task' | 'dpr' | 'delivery' | 'leave';
+  type: 'task' | 'dpr' | 'delivery' | 'leave' | 'attendance';
   title: string;
   time?: string;
   color: string;
@@ -66,7 +66,7 @@ function useMonthEvents(year: number, month: number) {
   return useQuery({
     queryKey: ['calendar-events', year, month],
     queryFn: async () => {
-      const [tasks, dprs, deliveries, leaves] = await Promise.all([
+      const [tasks, dprs, deliveries, leaves, attendance] = await Promise.all([
         supabase.from('tasks').select('id,title,window_start,window_end,status,priority')
           .gte('window_start', startDate).lte('window_start', endDate + 'T23:59:59')
           .then(r => r.data || []),
@@ -79,6 +79,9 @@ function useMonthEvents(year: number, month: number) {
         supabase.from('leave_requests').select('id,from_date,to_date,type,status')
           .gte('from_date', startDate).lte('from_date', endDate)
           .eq('status', 'approved')
+          .then(r => r.data || []),
+        supabase.from('attendance').select('id,date,check_in_at,profiles(full_name),projects(name)')
+          .gte('date', startDate).lte('date', endDate)
           .then(r => r.data || []),
       ]);
 
@@ -127,6 +130,12 @@ function useMonthEvents(year: number, month: number) {
           title: `${l.type} Leave`,
           color: colors.pending,
         });
+      });
+
+      attendance.forEach((row: any) => {
+        const worker = row.profiles?.full_name || 'Worker';
+        const site = row.projects?.name || 'Unknown project';
+        addEvent(row.date, { id: `attendance-${row.id}`, type: 'attendance', title: `${worker} → ${site}`, time: row.check_in_at?.slice(11, 16), color: colors.primary });
       });
 
       return eventsMap;
@@ -277,7 +286,7 @@ export default function CalendarScreen() {
                     name={
                       evt.type === 'task' ? 'checkmark-circle' :
                       evt.type === 'dpr' ? 'document-text' :
-                      evt.type === 'delivery' ? 'cube' : 'calendar'
+                      evt.type === 'delivery' ? 'cube' : evt.type === 'attendance' ? 'people' : 'calendar'
                     }
                     size={14}
                     color={evt.color}

@@ -4,7 +4,7 @@
  * upload (any file type), version history, and share/download links.
  */
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, RefreshControl, Share, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, RefreshControl, Share, ActivityIndicator, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -236,6 +236,11 @@ function DocumentDetailModal({ doc, projectName, onClose, onNewVersion }: {
   const { data: versions = [], isLoading } = useDocumentVersions(doc?.id);
   const [sharing, setSharing] = useState(false);
 
+  const openVersion = async (path: string) => {
+    try { await Linking.openURL(await createSignedMediaUrl('documents', path, 3600)); }
+    catch (e: any) { Alert.alert('Could not open document', e?.message || 'Try again.'); }
+  };
+
   const shareVersion = async (path: string) => {
     setSharing(true);
     try {
@@ -273,6 +278,9 @@ function DocumentDetailModal({ doc, projectName, onClose, onNewVersion }: {
                   </Text>
                   <Text style={styles.docMeta}>{v.created_at ? new Date(v.created_at).toLocaleString('en-IN') : ''}</Text>
                 </View>
+                <TouchableOpacity onPress={() => openVersion(v.storage_path)} style={styles.versionShare}>
+                  <Ionicons name="open-outline" size={20} color={colors.primary} />
+                </TouchableOpacity>
                 <TouchableOpacity onPress={() => shareVersion(v.storage_path)} disabled={sharing} style={styles.versionShare}>
                   <Ionicons name="share-outline" size={20} color={colors.primary} />
                 </TouchableOpacity>

@@ -16,6 +16,7 @@ import { Card, Avatar, Button, Input } from '../../src/components';
 import { useEmployee, useUpdateEmployee } from '../../src/hooks/useEmployees';
 import { useAttendanceHistory } from '../../src/hooks/useAttendance';
 import { useMyTasks } from '../../src/hooks/useTasks';
+import { useProjects } from '../../src/hooks/useProjects';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
@@ -35,6 +36,7 @@ export default function EmployeeProfileScreen() {
   const { data: emp } = useEmployee(id);
   const { data: attendance } = useAttendanceHistory(id, 31);
   const { data: tasks } = useMyTasks(id);
+  const { data: projects = [] } = useProjects();
   const [tab, setTab] = useState<Tab>('Overview');
   const updateEmployee = useUpdateEmployee();
 
@@ -103,6 +105,7 @@ export default function EmployeeProfileScreen() {
     );
   }
 
+  const projectNameById = new Map(projects.map((project) => [project.id, project.name]));
   const presentDays = (attendance || []).filter(a => a.status === 'present').length;
   const leaveDays = (attendance || []).filter(a => a.status === 'leave').length;
   const pendingTasks = (tasks || []).filter(t => t.status === 'pending').length;
@@ -202,6 +205,7 @@ export default function EmployeeProfileScreen() {
                     <Text style={styles.attendanceDate}>
                       {new Date(a.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
                     </Text>
+                    <Text style={styles.attendanceTime}>Site: {projectNameById.get(a.project_id) || 'Unassigned / legacy record'}</Text>
                     <Text style={styles.attendanceTime}>
                       {a.check_in_at ? new Date(a.check_in_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}
                       {a.check_out_at ? ` → ${new Date(a.check_out_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : ''}

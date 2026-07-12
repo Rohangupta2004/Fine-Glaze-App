@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import type { Project } from '../types';
 
@@ -25,5 +25,17 @@ export function useProject(projectId: string | null | undefined) {
       return data as Project;
     },
     enabled: !!projectId,
+  });
+}
+
+/** Admin-controlled project progress and status. */
+export function useUpdateProject() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Pick<Project, 'progress_pct' | 'status' | 'stage' | 'expected_end_date'>> }) => {
+      const { error } = await supabase.from('projects').update(updates).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: ['projects'] }),
   });
 }

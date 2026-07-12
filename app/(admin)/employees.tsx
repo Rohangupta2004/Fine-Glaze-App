@@ -1,192 +1,44 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  RefreshControl,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-
 import { Card, Avatar, StatusChip } from '../../src/components';
-import { useEmployees } from '../../src/hooks/useEmployees';
+import { useEmployees, useEmployeeAssignments } from '../../src/hooks/useEmployees';
+import { useProjects } from '../../src/hooks/useProjects';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
 import type { ProfileStatus } from '../../src/types';
 
-const FILTERS: { label: string; value: ProfileStatus | 'all' }[] = [
-  { label: 'All', value: 'all' },
-  { label: 'Active', value: 'active' },
-  { label: 'On Leave', value: 'on_leave' },
-  { label: 'Inactive', value: 'inactive' },
-];
-
-const ROLE_LABELS: Record<string, string> = {
-  owner: 'Owner',
-  project_manager: 'Project Manager',
-  hr: 'HR',
-  accounts: 'Accounts',
-  supervisor: 'Supervisor',
-  worker: 'Worker',
-  client: 'Client',
-};
+const FILTERS: { label: string; value: ProfileStatus | 'all' }[] = [{ label: 'All people', value: 'all' }, { label: 'Active', value: 'active' }, { label: 'On leave', value: 'on_leave' }];
+const roleLabel: Record<string, string> = { owner: 'Owner', project_manager: 'Project Manager', hr: 'HR', accounts: 'Accounts', supervisor: 'Supervisor', worker: 'Worker' };
 
 export default function EmployeesScreen() {
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const { data: employees, refetch, isRefetching } = useEmployees();
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<ProfileStatus | 'all'>('all');
-
-  const filtered = (employees || []).filter((e) => {
-    if (e.role === 'client') return false; // Clients shown separately
-    if (filter !== 'all' && e.status !== filter) return false;
-    if (search && !e.full_name.toLowerCase().includes(search.toLowerCase()) && !e.phone.includes(search)) return false;
-    return true;
-  });
-
-  const grouped = filtered.reduce((acc, emp) => {
-    const role = ROLE_LABELS[emp.role] || emp.role;
-    if (!acc[role]) acc[role] = [];
-    acc[role].push(emp);
-    return acc;
-  }, {} as Record<string, typeof filtered>);
-
-  return (
-    <View style={[styles.container, { paddingTop: insets.top + spacing.lg }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Employees</Text>
-        <TouchableOpacity onPress={() => router.push('/(admin)/add-employee' as any)}>
-          <Ionicons name="person-add" size={24} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Stats */}
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statNum}>{(employees || []).filter(e => e.role !== 'client').length}</Text>
-          <Text style={styles.statLabel}>Total</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={[styles.statNum, { color: colors.success }]}>{(employees || []).filter(e => e.status === 'active' && e.role !== 'client').length}</Text>
-          <Text style={styles.statLabel}>Active</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={[styles.statNum, { color: colors.warning }]}>{(employees || []).filter(e => e.status === 'on_leave').length}</Text>
-          <Text style={styles.statLabel}>On Leave</Text>
-        </View>
-      </View>
-
-      {/* Search */}
-      <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color={colors.neutral[400]} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by name or phone..."
-          placeholderTextColor={colors.neutral[400]}
-          value={search}
-          onChangeText={setSearch}
-        />
-      </View>
-
-      {/* Filter chips */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={{ gap: spacing.sm }}>
-        {FILTERS.map((f) => (
-          <TouchableOpacity
-            key={f.value}
-            style={[styles.filterChip, filter === f.value && styles.filterChipActive]}
-            onPress={() => setFilter(f.value)}
-          >
-            <Text style={[styles.filterText, filter === f.value && styles.filterTextActive]}>{f.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Employee List grouped by role */}
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: spacing['6xl'] }}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
-      >
-        {Object.entries(grouped).map(([role, emps]) => (
-          <View key={role}>
-            <Text style={styles.groupTitle}>{role} ({emps.length})</Text>
-            {emps.map((emp) => (
-              <TouchableOpacity
-                key={emp.id}
-                onPress={() => router.push({ pathname: '/(admin)/employee-profile' as any, params: { id: emp.id } })}
-              >
-                <Card style={styles.empCard} variant="interactive">
-                  <View style={styles.empRow}>
-                    <Avatar name={emp.full_name} uri={emp.avatar_url} size={44} />
-                    <View style={styles.empInfo}>
-                      <Text style={styles.empName}>{emp.full_name}</Text>
-                      <Text style={styles.empDetail}>
-                        {emp.worker_id ? `${emp.worker_id} · ` : ''}{emp.phone}
-                      </Text>
-                    </View>
-                    <View style={[
-                      styles.statusDot,
-                      { backgroundColor: emp.status === 'active' ? colors.success : emp.status === 'on_leave' ? colors.warning : colors.neutral[300] }
-                    ]} />
-                  </View>
-                </Card>
-              </TouchableOpacity>
-            ))}
-          </View>
-        ))}
-        {filtered.length === 0 && (
-          <View style={styles.empty}>
-            <Ionicons name="people-outline" size={48} color={colors.neutral[300]} />
-            <Text style={styles.emptyText}>No employees found</Text>
-          </View>
-        )}
-      </ScrollView>
-    </View>
-  );
+  const insets = useSafeAreaInsets(); const router = useRouter();
+  const { data: employees = [], refetch: refetchEmployees, isRefetching: loadingPeople } = useEmployees();
+  const { data: assignments = [], refetch: refetchAssignments, isRefetching: loadingAssignments } = useEmployeeAssignments();
+  const { data: projects = [] } = useProjects();
+  const [search, setSearch] = useState(''); const [filter, setFilter] = useState<ProfileStatus | 'all'>('all'); const [menuOpen, setMenuOpen] = useState(false);
+  const roster = useMemo(() => {
+    const people = employees.filter((p) => p.role !== 'client' && (filter === 'all' || p.status === filter) && (!search || p.full_name.toLowerCase().includes(search.toLowerCase()) || p.phone.includes(search)));
+    const person = new Map(people.map((p) => [p.id, p])); const assigned = new Set(assignments.map((a) => a.profile_id));
+    return { groups: projects.map((project) => ({ project, entries: assignments.filter((a) => a.project_id === project.id).map((a) => ({ person: person.get(a.profile_id), role: a.role_on_site })).filter((x) => !!x.person) })).filter((g) => g.entries.length), unassigned: people.filter((p) => !assigned.has(p.id)), count: people.length };
+  }, [employees, assignments, projects, filter, search]);
+  return <View style={[styles.container, { paddingTop: insets.top + spacing.lg }]}>
+    <View style={styles.header}><TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={24} color={colors.ink} /></TouchableOpacity><View style={{ flex: 1 }}><Text style={styles.title}>People by project</Text><Text style={styles.subtitle}>Site roster and staff assignments</Text></View><TouchableOpacity style={styles.add} onPress={() => setMenuOpen(true)}><Ionicons name="add" size={24} color={colors.white} /></TouchableOpacity></View>
+    <View style={styles.stats}><Stat value={roster.count} label="People" /><Stat value={roster.groups.length} label="Sites" /><Stat value={roster.unassigned.length} label="Unassigned" /></View>
+    <View style={styles.search}><Ionicons name="search" size={18} color={colors.neutral[400]} /><TextInput style={styles.input} placeholder="Search a person or phone" placeholderTextColor={colors.neutral[400]} value={search} onChangeText={setSearch} /></View>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>{FILTERS.map((f) => <TouchableOpacity key={f.value} style={[styles.chip, filter === f.value && styles.chipSelected]} onPress={() => setFilter(f.value)}><Text style={[styles.chipText, filter === f.value && styles.chipTextSelected]}>{f.label}</Text></TouchableOpacity>)}</ScrollView>
+    <ScrollView refreshControl={<RefreshControl refreshing={loadingPeople || loadingAssignments} onRefresh={() => { refetchEmployees(); refetchAssignments(); }} tintColor={colors.primary} />} contentContainerStyle={{ paddingBottom: spacing['6xl'] }}>
+      {roster.groups.map(({ project, entries }) => <View key={project.id} style={styles.section}><View style={styles.sectionTitle}><Ionicons name="business-outline" size={18} color={colors.primary} /><View style={{ flex: 1 }}><Text style={styles.projectName}>{project.name}</Text><Text style={styles.projectMeta}>{entries.length} assigned</Text></View><StatusChip status={project.status} size="sm" /></View>{entries.map(({ person, role }: any) => <Person key={person.id} person={person} siteRole={role} onPress={() => router.push({ pathname: '/(admin)/employee-profile' as any, params: { id: person.id } })} />)}</View>)}
+      {!!roster.unassigned.length && <View style={styles.section}><Text style={styles.unassigned}>Not assigned to a project</Text>{roster.unassigned.map((person) => <Person key={person.id} person={person} onPress={() => router.push({ pathname: '/(admin)/employee-profile' as any, params: { id: person.id } })} />)}</View>}
+      {!roster.count && <View style={styles.empty}><Ionicons name="people-outline" size={48} color={colors.neutral[300]} /><Text style={styles.subtitle}>No people match this view</Text></View>}
+    </ScrollView>
+    <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}><TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setMenuOpen(false)}><View style={[styles.menu, { paddingBottom: insets.bottom + spacing.md }]}><Text style={styles.menuTitle}>People actions</Text><MenuItem icon="person-add-outline" title="Add employee" detail="Create a worker, supervisor or manager account" onPress={() => { setMenuOpen(false); router.push('/(admin)/add-employee' as any); }} /><MenuItem icon="people-outline" title="Assign people to a project" detail="Manage the roster from a project workspace" onPress={() => { setMenuOpen(false); router.push('/(admin)/projects' as any); }} /></View></TouchableOpacity></Modal>
+  </View>;
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg },
-  title: { ...typography.h4, color: colors.ink },
-  statsRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg },
-  statItem: { flex: 1, alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, paddingVertical: spacing.md },
-  statNum: { ...typography.h4, color: colors.ink },
-  statLabel: { ...typography.caption, color: colors.neutral[500] },
-  searchBar: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md,
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm, marginBottom: spacing.md,
-    borderWidth: 1, borderColor: colors.neutral[200],
-  },
-  searchInput: { flex: 1, ...typography.bodyMedium, color: colors.ink, padding: 0 },
-  filterRow: { marginBottom: spacing.lg, flexGrow: 0 },
-  filterChip: {
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.full,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.neutral[200],
-  },
-  filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterText: { ...typography.bodySmall, fontFamily: fontFamily.medium, color: colors.neutral[600] },
-  filterTextActive: { color: colors.white },
-  groupTitle: {
-    ...typography.caption, fontFamily: fontFamily.semiBold, color: colors.neutral[400],
-    textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.sm, marginTop: spacing.md,
-  },
-  empCard: { padding: spacing.md, marginBottom: spacing.sm },
-  empRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  empInfo: { flex: 1 },
-  empName: { ...typography.h6, color: colors.ink },
-  empDetail: { ...typography.caption, color: colors.neutral[500], marginTop: 2 },
-  statusDot: { width: 10, height: 10, borderRadius: 5 },
-  empty: { alignItems: 'center', paddingVertical: spacing['5xl'], gap: spacing.md },
-  emptyText: { ...typography.bodyMedium, color: colors.neutral[400] },
-});
+function Stat({ value, label }: { value: number; label: string }) { return <View style={styles.stat}><Text style={styles.value}>{value}</Text><Text style={styles.subtitle}>{label}</Text></View>; }
+function Person({ person, siteRole, onPress }: any) { return <TouchableOpacity onPress={onPress}><Card style={styles.person} variant="interactive"><Avatar name={person.full_name} uri={person.avatar_url} size={42} /><View style={{ flex: 1 }}><Text style={styles.name}>{person.full_name}</Text><Text style={styles.subtitle}>{siteRole || roleLabel[person.role] || person.role}</Text></View><StatusChip status={person.status} size="sm" /><Ionicons name="chevron-forward" size={17} color={colors.neutral[300]} /></Card></TouchableOpacity>; }
+function MenuItem({ icon, title, detail, onPress }: any) { return <TouchableOpacity style={styles.menuItem} onPress={onPress}><Ionicons name={icon} size={22} color={colors.primary} /><View style={{ flex: 1 }}><Text style={styles.name}>{title}</Text><Text style={styles.subtitle}>{detail}</Text></View><Ionicons name="chevron-forward" size={18} color={colors.neutral[400]} /></TouchableOpacity>; }
+const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg }, header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg }, title: { ...typography.h4, color: colors.ink }, subtitle: { ...typography.caption, color: colors.neutral[500], marginTop: 2 }, add: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }, stats: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }, stat: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md }, value: { ...typography.h4, color: colors.ink }, search: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm }, input: { flex: 1, ...typography.bodyMedium, color: colors.ink, padding: 0 }, chips: { gap: spacing.sm, paddingVertical: spacing.sm, marginBottom: spacing.md }, chip: { borderWidth: 1, borderColor: colors.neutral[200], borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }, chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary }, chipText: { ...typography.bodySmall, color: colors.neutral[600] }, chipTextSelected: { color: colors.white }, section: { marginBottom: spacing.lg }, sectionTitle: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }, projectName: { ...typography.h6, color: colors.ink }, person: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, marginBottom: spacing.sm }, name: { ...typography.bodyMedium, fontFamily: fontFamily.semiBold, color: colors.ink }, unassigned: { ...typography.bodyMedium, fontFamily: fontFamily.semiBold, color: colors.warning, marginBottom: spacing.sm }, empty: { alignItems: 'center', paddingVertical: spacing['5xl'], gap: spacing.md }, backdrop: { flex: 1, backgroundColor: 'rgba(20,16,12,.35)', justifyContent: 'flex-end' }, menu: { backgroundColor: colors.white, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg }, menuTitle: { ...typography.h5, color: colors.ink, marginBottom: spacing.md }, menuItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md } });

@@ -179,7 +179,7 @@ export default function AdminHomeScreen() {
       <Text style={[styles.sectionTitle, { marginTop: spacing.xl, marginBottom: spacing.md }]}>⚡ Quick Actions</Text>
       <View style={styles.quickActions}>
         <QuickAction icon="person-add" label="Add Employee" onPress={() => router.push('/(admin)/add-employee' as any)} />
-        <QuickAction icon="add-circle" label="New Task" onPress={() => router.push('/(admin)/add' as any)} />
+        <QuickAction icon="checkbox-outline" label="Quick Tools" onPress={() => router.push('/(admin)/quick-tools' as any)} />
         <QuickAction icon="business" label="New Project" onPress={() => router.push('/(admin)/add' as any)} />
         <QuickAction icon="cube" label="Materials" onPress={() => router.push('/(admin)/projects')} />
       </View>
