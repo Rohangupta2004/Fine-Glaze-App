@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Button, Card } from '../../../src/components';
 import { useAuthStore } from '../../../src/stores/authStore';
-import { useProjects } from '../../../src/hooks/useProjects';
+import { useMyAssignedProjects } from '../../../src/hooks/useAssignedProjects';
 import { useOutboxStore } from '../../../src/stores/outboxStore';
 import { SyncStatusBadge } from '../../../src/components/SyncStatusBadge';
 import { checkGeofence, formatDistance, type GeofenceResult } from '../../../src/lib/geofence';
@@ -41,7 +41,8 @@ export default function PunchInScreen() {
   const { t } = useTranslation();
   const cameraRef = useRef<CameraView>(null);
   const profile = useAuthStore((s) => s.profile);
-  const { data: projects } = useProjects();
+  const { data: projects } = useMyAssignedProjects(profile?.id);
+  // Punch-in checks the location saved on the worker's assigned project.
   const activeProject = projects?.[0];
   const enqueuePunchIn = useOutboxStore((s) => s.enqueuePunchIn);
 
