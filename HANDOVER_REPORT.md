@@ -30,7 +30,9 @@ Everything below §1-10 is the 11 July snapshot and is now **partially stale**. 
 - **"Tomorrow's site reminder" cron** (PRD §6.8/§29f/notifications matrix) — no scheduled Edge Function found in `supabase/functions/` (only `backup-export`, `create-user`, `export-dpr-register`, `export-muster`, `send-notification` exist — none are cron-triggered). Recurring-task materialization is meant to piggyback on this same cron per PRD §29f — also missing.
 - All "Remaining Work" items in §6 below that are not listed as done in this §0 are still genuinely open (Priority A/C/D/E items — media compression/signed URLs, document version history UX, project QR/scanner, global search, analytics, audit log viewer, templates, backup/restore UI, roles/permissions editor, PWA deploy, Play Store/legal launch prep, etc.) — re-verify each against current `main` before assuming complete, this report was not fully re-audited line-by-line this round, only the round's own checklist items were confirmed.
 
-**Build status:** a new **preview APK build was triggered** on 12 July (commit `d55dac4`) — check `eas build:list --platform android --limit 1` (needs `EXPO_TOKEN`) or ask Rohan for the artifact link if it's not in this chat thread already. Owner is low on Viktor credits — he asked to pause new coding until he says go again; only the build was left running (EAS builds run on Expo's infra, not Viktor credits).
+**Build status:** preview APK build finished 12 July on commit `d55dac4`:
+`https://expo.dev/artifacts/eas/9tnAglOisx3UJw9bRUkYAM1PxMhuPrvWxI6DBR-Tts8.apk`
+(build id `b95ed65c-9240-4e6b-8880-64cca15fca6f`). Owner is low on Viktor credits — he asked to pause new coding until he says go again; the build itself ran on Expo's infra, not Viktor credits.
 
 **Environment gotcha for local verification:** the `fine-glaze-app` repo dir occasionally has stale `node_modules` if you worked in a git worktree elsewhere last session — if `tsc --noEmit` reports "Cannot find module" for packages that ARE in `package.json`, just re-run `npm ci --include=dev` in this exact directory before debugging further.
 
