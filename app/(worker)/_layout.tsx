@@ -74,7 +74,7 @@ export default function WorkerLayout() {
           ),
         }}
       />
-      {['my-site', 'documents', 'leave-request', 'safety-checklist', 'messages', 'profile', 'offline-sync'].map((name) => (
+      {['my-site', 'documents', 'leave-request', 'safety-checklist', 'messages', 'profile', 'offline-sync', 'new-message', 'conversation'].map((name) => (
         <Tabs.Screen key={name} name={name} options={{ href: null }} />
       ))}
       <Tabs.Screen name="punch-in/index" options={{ href: null }} />

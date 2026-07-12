@@ -66,3 +66,159 @@ export function useSendMessage() {
     },
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Round 4 — start conversations (direct chats for every role)
+// ═══════════════════════════════════════════════════════════════════════
+
+import { useAuthStore } from '../stores/authStore';
+import type { Profile } from '../types';
+
+/** Everyone in my company I can start a chat with (excludes myself). */
+export function useChatContacts() {
+  const me = useAuthStore((s) => s.profile);
+  return useQuery({
+    queryKey: ['chat_contacts', me?.id],
+    queryFn: async (): Promise<Profile[]> => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .neq('id', me!.id)
+        .eq('status', 'active')
+        .order('full_name');
+      if (error) throw error;
+      return data as Profile[];
+    },
+    enabled: !!me?.id,
+  });
+}
+
+/** Members (profiles) per conversation id — for naming direct chats. */
+export function useConversationMembers(conversationIds: string[]) {
+  return useQuery({
+    queryKey: ['conversation_members', conversationIds],
+    queryFn: async (): Promise<Record<string, Profile[]>> => {
+      if (!conversationIds.length) return {};
+      const { data: members, error } = await supabase
+        .from('conversation_members')
+        .select('conversation_id, profile_id')
+        .in('conversation_id', conversationIds);
+      if (error) throw error;
+      const profileIds = [...new Set((members || []).map((m: any) => m.profile_id))];
+      if (!profileIds.length) return {};
+      const { data: profiles, error: pErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', profileIds);
+      if (pErr) throw pErr;
+      const byId = new Map((profiles || []).map((p: any) => [p.id, p as Profile]));
+      const result: Record<string, Profile[]> = {};
+      for (const m of members || []) {
+        const prof = byId.get((m as any).profile_id);
+        if (!prof) continue;
+        (result[(m as any).conversation_id] ||= []).push(prof);
+      }
+      return result;
+    },
+    enabled: conversationIds.length > 0,
+  });
+}
+
+/**
+ * Find or create a direct conversation with another person.
+ * Returns the conversation id.
+ */
+export function useStartDirectConversation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ otherProfileId }: { otherProfileId: string }): Promise<string> => {
+      const me = useAuthStore.getState().profile;
+      if (!me) throw new Error('Not authenticated');
+
+      // 1. Look for an existing direct conversation with exactly the two of us
+      const { data: myMemberships, error: memErr } = await supabase
+        .from('conversation_members')
+        .select('conversation_id')
+        .eq('profile_id', me.id);
+      if (memErr) throw memErr;
+      const myConvIds = (myMemberships || []).map((m: any) => m.conversation_id);
+
+      if (myConvIds.length) {
+        const { data: directConvs } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('type', 'direct')
+          .in('id', myConvIds);
+        const directIds = (directConvs || []).map((c: any) => c.id);
+        if (directIds.length) {
+          const { data: allMembers } = await supabase
+            .from('conversation_members')
+            .select('conversation_id, profile_id')
+            .in('conversation_id', directIds);
+          const byConv: Record<string, string[]> = {};
+          for (const m of allMembers || []) {
+            (byConv[(m as any).conversation_id] ||= []).push((m as any).profile_id);
+          }
+          for (const [convId, members] of Object.entries(byConv)) {
+            if (members.length === 2 && members.includes(otherProfileId)) return convId;
+          }
+        }
+      }
+
+      // 2. Create a new direct conversation
+      const { data: conv, error: convErr } = await supabase
+        .from('conversations')
+        .insert({ company_id: me.company_id, type: 'direct' })
+        .select()
+        .single();
+      if (convErr) throw convErr;
+
+      const { error: addErr } = await supabase.from('conversation_members').insert([
+        { conversation_id: conv.id, profile_id: me.id },
+        { conversation_id: conv.id, profile_id: otherProfileId },
+      ]);
+      if (addErr) throw addErr;
+      return conv.id as string;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['conversations'] }),
+  });
+}
+
+/** Create (or return existing) project conversation and join it. */
+export function useJoinProjectConversation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ projectId }: { projectId: string }): Promise<string> => {
+      const me = useAuthStore.getState().profile;
+      if (!me) throw new Error('Not authenticated');
+      // Existing project conversation I'm a member of?
+      const { data: myMemberships } = await supabase
+        .from('conversation_members')
+        .select('conversation_id')
+        .eq('profile_id', me.id);
+      const ids = (myMemberships || []).map((m: any) => m.conversation_id);
+      if (ids.length) {
+        const { data: existing } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('type', 'project')
+          .eq('project_id', projectId)
+          .in('id', ids)
+          .limit(1);
+        if (existing?.length) return existing[0].id;
+      }
+      const { data: conv, error } = await supabase
+        .from('conversations')
+        .insert({ company_id: me.company_id, type: 'project', project_id: projectId })
+        .select()
+        .single();
+      if (error) throw error;
+      const { error: addErr } = await supabase
+        .from('conversation_members')
+        .insert({ conversation_id: conv.id, profile_id: me.id });
+      if (addErr) throw addErr;
+      return conv.id as string;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['conversations'] }),
+  });
+}

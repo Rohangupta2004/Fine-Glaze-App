@@ -35,6 +35,11 @@ export default function SupervisorMoreScreen() {
       label: 'Team Attendance',
       route: '/(supervisor)/team-attendance',
     },
+    {
+      icon: 'chatbubbles-outline',
+      label: 'Messages',
+      route: '/(supervisor)/messages',
+    },
     { icon: 'person-outline', label: 'Profile' },
     { icon: 'wallet-outline', label: 'Salary' },
     { icon: 'language-outline', label: t('settings.language') },

@@ -67,6 +67,19 @@ export default function ClientMoreScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.neutral[300]} />
         </TouchableOpacity>
 
+        {/* Materials */}
+        <TouchableOpacity
+          style={[styles.menuItem, styles.menuItemBorder]}
+          onPress={() => router.push('/(client)/materials' as any)}
+          accessibilityLabel="Open Materials"
+        >
+          <View style={styles.menuIconWrap}>
+            <Ionicons name="cube-outline" size={22} color={colors.primary} />
+          </View>
+          <Text style={styles.menuLabel}>Materials</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.neutral[300]} />
+        </TouchableOpacity>
+
         {/* Project Chat */}
         <TouchableOpacity
           style={[styles.menuItem, styles.menuItemBorder]}

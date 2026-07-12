@@ -18,7 +18,11 @@ type ChipStatus =
   | 'leave'
   | 'half_day'
   | 'at_risk'
-  | 'completed';
+  | 'completed'
+  | 'active'
+  | 'on_leave'
+  | 'on_hold'
+  | 'inactive';
 
 interface StatusChipProps {
   status: ChipStatus;
@@ -41,6 +45,10 @@ const STATUS_CONFIG: Record<ChipStatus, { bg: string; text: string; label: strin
   half_day: { bg: colors.pendingBg, text: colors.pending, label: 'Half Day' },
   at_risk: { bg: colors.warningBg, text: colors.warning, label: 'At Risk' },
   completed: { bg: colors.successBg, text: colors.success, label: 'Completed' },
+  active: { bg: colors.successBg, text: colors.success, label: 'Active' },
+  on_leave: { bg: colors.warningBg, text: colors.warning, label: 'On Leave' },
+  on_hold: { bg: colors.pendingBg, text: colors.pending, label: 'On Hold' },
+  inactive: { bg: colors.neutral[100], text: colors.neutral[600], label: 'Inactive' },
 };
 
 export function StatusChip({ status, label, size = 'md' }: StatusChipProps) {

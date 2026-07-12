@@ -12,6 +12,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuthStore } from '../../src/stores/authStore';
@@ -63,6 +64,7 @@ function EmptyState() {
 // ── Main screen ───────────────────────────────────────────────────────
 
 export default function ClientChatScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const profile = useAuthStore((s) => s.profile);
   const { data: projects } = useProjects();
@@ -157,6 +159,9 @@ export default function ClientChatScreen() {
             <Text style={styles.headerTitle}>{project?.name ?? 'Project Chat'}</Text>
             <Text style={styles.headerSub}>Project Team</Text>
           </View>
+          <TouchableOpacity onPress={() => router.push('/(client)/new-message' as any)} hitSlop={12}>
+            <Ionicons name="create-outline" size={24} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
         {/* Message list */}

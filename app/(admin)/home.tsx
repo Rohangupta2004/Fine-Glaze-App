@@ -65,6 +65,10 @@ export default function AdminHomeScreen() {
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
           </Text>
         </View>
+        <View style={styles.headerActions}>
+        <TouchableOpacity onPress={() => router.push('/(admin)/global-search' as any)} style={styles.searchWrap}>
+          <Ionicons name="search-outline" size={22} color={colors.ink} />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/(admin)/notifications' as any)} style={styles.bellWrap}>
           <Ionicons name="notifications-outline" size={24} color={colors.ink} />
           {(unreadCount || 0) > 0 && (
@@ -73,6 +77,7 @@ export default function AdminHomeScreen() {
             </View>
           )}
         </TouchableOpacity>
+        </View>
       </View>
 
       {/* Quick Stats */}
@@ -80,6 +85,15 @@ export default function AdminHomeScreen() {
         <StatCard icon="business" value={activeProjects.length} label="Active Projects" color={colors.primary} onPress={() => router.push('/(admin)/projects')} />
         <StatCard icon="people" value={activeEmployees.length} label="Employees" color={colors.info} onPress={() => router.push('/(admin)/employees' as any)} />
         <StatCard icon="checkmark-circle" value={totalPending} label="Pending" color={colors.warning} onPress={() => router.push('/(admin)/approvals' as any)} />
+      </View>
+
+      {/* Management cards */}
+      <Text style={styles.sectionTitle}>Manage</Text>
+      <View style={styles.manageGrid}>
+        <ManageCard icon="people" label="Employees" sub="Team & roles" onPress={() => router.push('/(admin)/employees' as any)} />
+        <ManageCard icon="business" label="Clients" sub="Orgs & logins" onPress={() => router.push('/(admin)/clients' as any)} />
+        <ManageCard icon="cube" label="Materials" sub="Stock & requests" onPress={() => router.push('/(admin)/materials' as any)} />
+        <ManageCard icon="folder" label="Documents" sub="Vault & uploads" onPress={() => router.push('/(admin)/documents' as any)} />
       </View>
 
       {/* Active Projects */}
@@ -173,6 +187,20 @@ export default function AdminHomeScreen() {
   );
 }
 
+function ManageCard({ icon, label, sub, onPress }: { icon: string; label: string; sub: string; onPress: () => void }) {
+  return (
+    <TouchableOpacity onPress={onPress} style={styles.manageCardWrap}>
+      <Card style={styles.manageCard}>
+        <View style={styles.manageIcon}>
+          <Ionicons name={icon as any} size={22} color={colors.primary} />
+        </View>
+        <Text style={styles.manageLabel}>{label}</Text>
+        <Text style={styles.manageSub}>{sub}</Text>
+      </Card>
+    </TouchableOpacity>
+  );
+}
+
 function StatCard({ icon, value, label, color, onPress }: { icon: string; value: number; label: string; color: string; onPress: () => void }) {
   return (
     <TouchableOpacity onPress={onPress} style={styles.statCardWrap}>
@@ -216,11 +244,19 @@ const styles = StyleSheet.create({
   headerLeft: { flex: 1 },
   greeting: { ...typography.h4, color: colors.ink },
   date: { ...typography.bodySmall, color: colors.neutral[500], marginTop: 2 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  searchWrap: { padding: spacing.sm },
   bellWrap: { position: 'relative', padding: spacing.sm },
   badge: { position: 'absolute', top: 2, right: 2, backgroundColor: colors.error, borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { ...typography.caption, color: colors.white, fontFamily: fontFamily.semiBold, fontSize: 10 },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing['2xl'] },
   statCardWrap: { flex: 1 },
+  manageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+  manageCardWrap: { width: '48.5%' },
+  manageCard: { padding: spacing.md, gap: 4 },
+  manageIcon: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.primary + '12', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  manageLabel: { ...typography.bodyMedium, fontFamily: fontFamily.semiBold, color: colors.ink },
+  manageSub: { ...typography.caption, color: colors.neutral[400] },
   statCard: { padding: spacing.md, alignItems: 'center', gap: spacing.xs },
   statValue: { ...typography.h3, fontFamily: fontFamily.bold },
   statLabel: { ...typography.caption, color: colors.neutral[500], textAlign: 'center' },

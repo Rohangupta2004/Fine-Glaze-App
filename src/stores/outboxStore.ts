@@ -15,6 +15,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { uploadLocalMedia } from '../lib/mediaStorage';
+import { compressImage, compressSelfie } from '../lib/imageCompression';
 import {
   enqueueOutboxItem,
   getPendingItems,
@@ -57,10 +58,12 @@ interface OutboxState {
 // ── Supabase sync handlers ───────────────────────────────────────────────────
 
 async function syncPunchIn(payload: PunchInPayload, outboxId: string): Promise<void> {
+  // Compress selfie before upload (640px, ~200KB)
+  const compressed = await compressSelfie(payload.selfieUri);
   const selfiePath = await uploadLocalMedia(
     'attendance-selfies',
     `${payload.profileId}/${payload.capturedAt.slice(0, 10)}/${outboxId}`,
-    { uri: payload.selfieUri, type: 'photo', mimeType: 'image/jpeg' },
+    { uri: compressed.uri, type: 'photo', mimeType: 'image/jpeg' },
   );
   const { error } = await supabase.from('attendance').upsert({
     profile_id: payload.profileId,
@@ -103,10 +106,16 @@ async function syncDpr(payload: DprPayload, outboxId: string): Promise<void> {
 
   for (let index = 0; index < payload.media.length; index += 1) {
     const file = payload.media[index];
+    // Compress images before upload (1280px max, ~200KB per PRD spec)
+    let uploadUri = file.uri;
+    if (file.type === 'photo') {
+      const compressed = await compressImage(file.uri);
+      uploadUri = compressed.uri;
+    }
     const path = await uploadLocalMedia(
       'dpr-media',
       `${payload.projectId}/${dprId}/${index}`,
-      file,
+      { ...file, uri: uploadUri },
     );
     const { error } = await supabase.from('dpr_media').upsert({
       dpr_id: dprId,

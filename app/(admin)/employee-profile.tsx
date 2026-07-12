@@ -5,13 +5,15 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Modal,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card, Avatar } from '../../src/components';
-import { useEmployee } from '../../src/hooks/useEmployees';
+import { Card, Avatar, Button, Input } from '../../src/components';
+import { useEmployee, useUpdateEmployee } from '../../src/hooks/useEmployees';
 import { useAttendanceHistory } from '../../src/hooks/useAttendance';
 import { useMyTasks } from '../../src/hooks/useTasks';
 import { colors } from '../../src/theme/colors';
@@ -34,6 +36,64 @@ export default function EmployeeProfileScreen() {
   const { data: attendance } = useAttendanceHistory(id, 31);
   const { data: tasks } = useMyTasks(id);
   const [tab, setTab] = useState<Tab>('Overview');
+  const updateEmployee = useUpdateEmployee();
+
+  // ── Edit state ──
+  const [editOpen, setEditOpen] = useState(false);
+  const [ePhone, setEPhone] = useState('');
+  const [eAddress, setEAddress] = useState('');
+  const [eRate, setERate] = useState('');
+  const [eRole, setERole] = useState('worker');
+
+  const openEdit = () => {
+    if (!emp) return;
+    setEPhone(emp.phone || '');
+    setEAddress(emp.address || '');
+    setERate(emp.daily_rate != null ? String(emp.daily_rate) : '');
+    setERole(emp.role);
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    if (!emp) return;
+    try {
+      await updateEmployee.mutateAsync({
+        id: emp.id,
+        updates: {
+          phone: ePhone.trim(),
+          address: eAddress.trim() || null,
+          daily_rate: eRate ? Number(eRate) : null,
+          role: eRole as any,
+        } as any,
+      });
+      setEditOpen(false);
+    } catch (e: any) {
+      Alert.alert('Could not save', e?.message || 'Try again.');
+    }
+  };
+
+  const toggleActive = () => {
+    if (!emp) return;
+    const deactivating = emp.status === 'active';
+    Alert.alert(
+      deactivating ? 'Deactivate employee?' : 'Reactivate employee?',
+      deactivating
+        ? `${emp.full_name} will no longer be able to use the app.`
+        : `${emp.full_name} will regain app access.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: deactivating ? 'Deactivate' : 'Reactivate',
+          style: deactivating ? 'destructive' : 'default',
+          onPress: () =>
+            updateEmployee.mutate(
+              { id: emp.id, updates: { status: deactivating ? 'inactive' : 'active' } as any },
+              { onError: (e: any) => Alert.alert('Failed', e?.message || 'Try again.') },
+            ),
+        },
+      ],
+    );
+  };
 
   if (!emp) {
     return (
@@ -56,7 +116,9 @@ export default function EmployeeProfileScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.ink} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Employee Profile</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity onPress={openEdit} hitSlop={12}>
+          <Ionicons name="create-outline" size={24} color={colors.primary} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['6xl'] }}>
@@ -196,6 +258,47 @@ export default function EmployeeProfileScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* ── Edit modal ── */}
+      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + spacing.lg }]}>
+            <View style={styles.modalHead}>
+              <Text style={styles.modalTitle}>Edit {emp.full_name}</Text>
+              <TouchableOpacity onPress={() => setEditOpen(false)}>
+                <Ionicons name="close" size={24} color={colors.ink} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <Input label="Phone" value={ePhone} onChangeText={setEPhone} keyboardType="phone-pad" />
+              <View style={styles.editGap} />
+              <Input label="Address" value={eAddress} onChangeText={setEAddress} multiline />
+              <View style={styles.editGap} />
+              <Input label="Daily Rate (₹)" value={eRate} onChangeText={setERate} keyboardType="numeric" placeholder="e.g. 800" />
+              <Text style={styles.editLabel}>Role</Text>
+              <View style={styles.roleChips}>
+                {Object.entries(ROLE_LABELS).filter(([k]) => k !== 'client' && k !== 'owner').map(([value, label]) => (
+                  <TouchableOpacity
+                    key={value}
+                    style={[styles.roleChip, eRole === value && styles.roleChipActive]}
+                    onPress={() => setERole(value)}
+                  >
+                    <Text style={[styles.roleChipText, eRole === value && styles.roleChipTextActive]}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Button title="Save Changes" onPress={saveEdit} loading={updateEmployee.isPending} fullWidth />
+              <View style={styles.editGap} />
+              <Button
+                title={emp.status === 'active' ? 'Deactivate Employee' : 'Reactivate Employee'}
+                variant="secondary"
+                onPress={() => { setEditOpen(false); setTimeout(toggleActive, 350); }}
+                fullWidth
+              />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -211,6 +314,17 @@ function QuickStat({ icon, label, value, color }: { icon: string; label: string;
 }
 
 const styles = StyleSheet.create({
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(26,22,17,0.4)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: colors.white, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg, maxHeight: '88%' },
+  modalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md, gap: spacing.md },
+  modalTitle: { ...typography.h4, color: colors.ink, flex: 1 },
+  editGap: { height: spacing.md },
+  editLabel: { ...typography.caption, fontFamily: fontFamily.medium, color: colors.neutral[600], marginTop: spacing.md, marginBottom: spacing.xs },
+  roleChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+  roleChip: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.neutral[200], backgroundColor: colors.white },
+  roleChipActive: { borderColor: colors.primary, backgroundColor: colors.primary + '10' },
+  roleChipText: { ...typography.bodySmall, color: colors.neutral[600] },
+  roleChipTextActive: { color: colors.primary, fontFamily: fontFamily.semiBold },
   container: { flex: 1, backgroundColor: colors.background },
   center: { justifyContent: 'center', alignItems: 'center' },
   loadingText: { ...typography.bodyMedium, color: colors.neutral[400] },

@@ -6,12 +6,12 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Button, Card } from '../../../src/components';
@@ -19,30 +19,10 @@ import { useAuthStore } from '../../../src/stores/authStore';
 import { useProjects } from '../../../src/hooks/useProjects';
 import { useOutboxStore } from '../../../src/stores/outboxStore';
 import { SyncStatusBadge } from '../../../src/components/SyncStatusBadge';
+import { checkGeofence, formatDistance, type GeofenceResult } from '../../../src/lib/geofence';
 import { colors } from '../../../src/theme/colors';
 import { typography, fontFamily } from '../../../src/theme/typography';
 import { spacing, radius, shadows } from '../../../src/theme/spacing';
-
-/** Haversine distance in meters */
-function haversineDistance(
-  lat1: number, lon1: number,
-  lat2: number, lon2: number
-): number {
-  const R = 6371e3;
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-// Demo site coordinates (Embassy Tower, Mumbai)
-const SITE_LAT = 19.076;
-const SITE_LNG = 72.8777;
-const GEOFENCE_RADIUS = 100; // meters
 
 export default function PunchInScreen() {
   const insets = useSafeAreaInsets();
@@ -51,39 +31,40 @@ export default function PunchInScreen() {
   const cameraRef = useRef<CameraView>(null);
   const profile = useAuthStore((s) => s.profile);
   const { data: projects } = useProjects();
-  const activeProject = projects?.[0]; // Single active project per worker in M1
+  const activeProject = projects?.[0];
   const enqueuePunchIn = useOutboxStore((s) => s.enqueuePunchIn);
 
   const [permission, requestPermission] = useCameraPermissions();
   const [selfieUri, setSelfieUri] = useState<string | null>(null);
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
-  const [locationVerified, setLocationVerified] = useState<boolean | null>(null);
-  const [distance, setDistance] = useState<number | null>(null);
+  const [geoResult, setGeoResult] = useState<GeofenceResult | null>(null);
+  const [geoLoading, setGeoLoading] = useState(true);
+  const [geoError, setGeoError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     getLocation();
-  }, []);
+  }, [activeProject]);
 
   const getLocation = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Location Required', 'Location access is needed for attendance verification.');
-      return;
+    setGeoLoading(true);
+    setGeoError(null);
+    try {
+      if (!activeProject?.lat || !activeProject?.lng) {
+        setGeoError('No site coordinates configured for this project.');
+        setGeoLoading(false);
+        return;
+      }
+      const result = await checkGeofence(
+        activeProject.lat,
+        activeProject.lng,
+        activeProject.geofence_radius_m ?? 100,
+      );
+      setGeoResult(result);
+    } catch (e: any) {
+      setGeoError(e.message || 'Failed to get location');
+    } finally {
+      setGeoLoading(false);
     }
-    const loc = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
-    });
-    setLocation(loc);
-
-    const dist = haversineDistance(
-      loc.coords.latitude,
-      loc.coords.longitude,
-      activeProject?.lat ?? SITE_LAT,
-      activeProject?.lng ?? SITE_LNG
-    );
-    setDistance(Math.round(dist));
-    setLocationVerified(dist <= (activeProject?.geofence_radius_m ?? GEOFENCE_RADIUS));
   };
 
   const takeSelfie = async () => {
@@ -105,31 +86,30 @@ export default function PunchInScreen() {
   };
 
   const handleConfirm = async () => {
-    if (!selfieUri || !location || !profile?.id) return;
+    if (!selfieUri || !geoResult || !profile?.id || !activeProject?.id) return;
 
     setSubmitting(true);
     try {
-      if (!activeProject?.id) throw new Error('No active project is assigned.');
       await enqueuePunchIn({
         profileId: profile.id,
         projectId: activeProject.id,
-        lat: location.coords.latitude,
-        lng: location.coords.longitude,
+        lat: geoResult.latitude,
+        lng: geoResult.longitude,
         selfieUri,
-        locationVerified: !!locationVerified,
+        locationVerified: geoResult.isWithinRadius,
         capturedAt: new Date().toISOString(),
       });
       setSubmitting(false);
       Alert.alert(
-        'Punch In Queued',
-        locationVerified
+        'Punch In Recorded',
+        geoResult.isWithinRadius
           ? 'Your attendance has been saved and will sync automatically.'
-          : 'Attendance saved but location is outside the site radius. It will sync and be flagged for admin review.',
-        [{ text: 'OK', onPress: () => router.back() }]
+          : `Attendance saved but you are ${formatDistance(geoResult.distance)} from the site. It will be flagged for admin review.`,
+        [{ text: 'OK', onPress: () => router.back() }],
       );
     } catch (e: unknown) {
       setSubmitting(false);
-      const msg = e instanceof Error ? e.message : 'Failed to record attendance. Please try again.';
+      const msg = e instanceof Error ? e.message : 'Failed to record attendance.';
       Alert.alert('Error', msg);
     }
   };
@@ -167,6 +147,7 @@ export default function PunchInScreen() {
           >
             <View style={styles.cameraOverlay}>
               <View style={styles.faceGuide} />
+              <Text style={styles.faceGuideText}>Position your face within the circle</Text>
             </View>
           </CameraView>
         )}
@@ -193,37 +174,61 @@ export default function PunchInScreen() {
         {/* Location status */}
         <View style={styles.infoRow}>
           <Ionicons
-            name={locationVerified ? 'checkmark-circle' : location ? 'warning' : 'navigate-outline'}
+            name={
+              geoLoading
+                ? 'navigate-outline'
+                : geoError
+                ? 'alert-circle'
+                : geoResult?.isWithinRadius
+                ? 'checkmark-circle'
+                : 'warning'
+            }
             size={18}
             color={
-              locationVerified === null
+              geoLoading
                 ? colors.neutral[400]
-                : locationVerified
+                : geoError
+                ? colors.error
+                : geoResult?.isWithinRadius
                 ? colors.success
                 : colors.warning
             }
           />
           <Text style={styles.infoLabel}>Location</Text>
-          <Text
-            style={[
-              styles.infoValue,
-              {
-                color:
-                  locationVerified === null
-                    ? colors.neutral[400]
-                    : locationVerified
-                    ? colors.success
-                    : colors.warning,
-              },
-            ]}
-          >
-            {locationVerified === null
-              ? 'Checking...'
-              : locationVerified
-              ? t('worker.locationVerified')
-              : `${t('worker.locationNotVerified')} (${distance}m away)`}
-          </Text>
+          {geoLoading ? (
+            <View style={styles.locationLoading}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.infoValue, { color: colors.neutral[400] }]}>Verifying...</Text>
+            </View>
+          ) : geoError ? (
+            <TouchableOpacity onPress={getLocation} style={{ flex: 1 }}>
+              <Text style={[styles.infoValue, { color: colors.error }]}>{geoError}</Text>
+              <Text style={[styles.retryText]}>Tap to retry</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text
+              style={[
+                styles.infoValue,
+                { color: geoResult?.isWithinRadius ? colors.success : colors.warning },
+              ]}
+            >
+              {geoResult?.isWithinRadius
+                ? `${t('worker.locationVerified')} (${formatDistance(geoResult.distance)})`
+                : `${t('worker.locationNotVerified')} (${formatDistance(geoResult?.distance ?? 0)} away)`}
+            </Text>
+          )}
         </View>
+
+        {/* Accuracy indicator */}
+        {geoResult?.accuracy && (
+          <View style={styles.infoRow}>
+            <Ionicons name="radio-outline" size={18} color={colors.neutral[400]} />
+            <Text style={styles.infoLabel}>Accuracy</Text>
+            <Text style={[styles.infoValue, { color: colors.neutral[500] }]}>
+              ±{Math.round(geoResult.accuracy)}m
+            </Text>
+          </View>
+        )}
       </Card>
 
       {/* Actions */}
@@ -244,6 +249,7 @@ export default function PunchInScreen() {
               title={t('common.confirm')}
               onPress={handleConfirm}
               loading={submitting}
+              disabled={geoLoading || !!geoError}
               style={{ flex: 1 }}
             />
           </View>
@@ -307,6 +313,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.4)',
     borderStyle: 'dashed',
   },
+  faceGuideText: {
+    ...typography.caption,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: spacing.sm,
+  },
   infoCard: {
     marginHorizontal: spacing.lg,
     padding: spacing.lg,
@@ -321,13 +332,24 @@ const styles = StyleSheet.create({
   infoLabel: {
     ...typography.bodySmall,
     color: colors.neutral[500],
-    width: 60,
+    width: 70,
   },
   infoValue: {
     ...typography.bodySmall,
     fontFamily: fontFamily.medium,
     color: colors.ink,
     flex: 1,
+  },
+  locationLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  retryText: {
+    ...typography.caption,
+    color: colors.primary,
+    marginTop: 2,
   },
   actions: {
     marginTop: 'auto',

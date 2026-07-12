@@ -78,6 +78,30 @@ export default function AdminLayout() {
       <Tabs.Screen name="approvals" options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="project-workspace" options={{ href: null }} />
+      <Tabs.Screen name="create-project" options={{ href: null }} />
+      <Tabs.Screen name="recurring-tasks" options={{ href: null }} />
+      <Tabs.Screen name="project-qr" options={{ href: null }} />
+      <Tabs.Screen name="assign-site" options={{ href: null }} />
+      <Tabs.Screen name="global-search" options={{ href: null }} />
+      <Tabs.Screen name="calendar" options={{ href: null }} />
+      <Tabs.Screen name="dpr-management" options={{ href: null }} />
+      <Tabs.Screen name="analytics" options={{ href: null }} />
+      <Tabs.Screen name="attendance-report" options={{ href: null }} />
+      <Tabs.Screen name="audit-log" options={{ href: null }} />
+      <Tabs.Screen name="all-sites" options={{ href: null }} />
+      <Tabs.Screen name="roles-permissions" options={{ href: null }} />
+      <Tabs.Screen name="language-settings" options={{ href: null }} />
+      <Tabs.Screen name="notification-settings" options={{ href: null }} />
+      <Tabs.Screen name="conversation" options={{ href: null }} />
+      <Tabs.Screen name="backup-restore" options={{ href: null }} />
+      <Tabs.Screen name="legal" options={{ href: null }} />
+      <Tabs.Screen name="help-about" options={{ href: null }} />
+      <Tabs.Screen name="materials" options={{ href: null }} />
+      <Tabs.Screen name="documents" options={{ href: null }} />
+      <Tabs.Screen name="clients" options={{ href: null }} />
+      <Tabs.Screen name="my-profile" options={{ href: null }} />
+      <Tabs.Screen name="company-settings" options={{ href: null }} />
+      <Tabs.Screen name="new-message" options={{ href: null }} />
     </Tabs>
   );
 }
