@@ -239,6 +239,24 @@ export interface MaterialRequest {
   status: MaterialRequestStatus;
 }
 
+export type EmployeeRequestRole = 'worker' | 'supervisor' | 'helper';
+export type EmployeeRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface EmployeeRequest {
+  id: string;
+  company_id: string;
+  project_id: string;
+  requested_by: string;
+  role_needed: EmployeeRequestRole;
+  headcount: number;
+  needed_by: string | null;
+  notes: string | null;
+  status: EmployeeRequestStatus;
+  decided_by: string | null;
+  decided_at: string | null;
+  created_at: string;
+}
+
 export interface Delivery {
   id: string;
   project_id: string;

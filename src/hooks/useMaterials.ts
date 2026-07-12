@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { uploadLocalMedia, createSignedMediaUrl } from '../lib/mediaStorage';
 import type { Material, MaterialRequest, Delivery } from '../types';
 
 /** Materials for a project. */
@@ -162,5 +163,53 @@ export function useMarkDelivered() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['deliveries'] }),
+  });
+}
+
+/**
+ * Upload delivery challan / truck / material / site photos and attach them
+ * to a delivery row (used by both admin and supervisor — whoever receives
+ * the delivery on site can capture the challan).
+ */
+export function useAddDeliveryPhotos() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ deliveryId, localUris }: { deliveryId: string; localUris: string[] }) => {
+      if (!localUris.length) return;
+      const uploadedPaths: string[] = [];
+      for (let i = 0; i < localUris.length; i++) {
+        const path = await uploadLocalMedia(
+          'documents',
+          `deliveries/${deliveryId}/${Date.now()}_${i}`,
+          { uri: localUris[i], type: 'photo' },
+        );
+        uploadedPaths.push(path);
+      }
+      const { data: existing, error: fetchErr } = await supabase
+        .from('deliveries')
+        .select('photos')
+        .eq('id', deliveryId)
+        .single();
+      if (fetchErr) throw fetchErr;
+      const merged = [...(existing?.photos || []), ...uploadedPaths];
+      const { error } = await supabase.from('deliveries').update({ photos: merged }).eq('id', deliveryId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['deliveries'] }),
+  });
+}
+
+/** Signed URLs for a list of delivery photo storage paths (documents bucket). */
+export function useDeliveryPhotoUrls(paths: string[]) {
+  return useQuery({
+    queryKey: ['delivery_photo_urls', paths],
+    queryFn: async (): Promise<Record<string, string>> => {
+      const entries = await Promise.all(
+        paths.map(async (p) => [p, await createSignedMediaUrl('documents', p)] as const),
+      );
+      return Object.fromEntries(entries);
+    },
+    enabled: paths.length > 0,
+    staleTime: 1000 * 60 * 30,
   });
 }

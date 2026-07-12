@@ -43,6 +43,7 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
       { icon: 'people', label: 'Attendance Report', route: '/(admin)/attendance-report', color: colors.success, perm: 'attendance' },
       { icon: 'search', label: 'Global Search', route: '/(admin)/global-search', color: colors.warning },
       { icon: 'people-circle', label: 'Assign Site & Workers', route: '/(admin)/assign-site', color: colors.info },
+      { icon: 'person-add', label: 'Employee Requests', route: '/(admin)/employee-requests', color: colors.warning },
       { icon: 'repeat', label: 'Recurring Tasks', route: '/(admin)/recurring-tasks', color: colors.success },
       { icon: 'qr-code', label: 'Project QR Codes', route: '/(admin)/project-qr', color: colors.primary },
     ],

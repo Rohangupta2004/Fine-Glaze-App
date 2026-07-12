@@ -20,9 +20,20 @@ import { useProjects } from '../../../src/hooks/useProjects';
 import { useOutboxStore } from '../../../src/stores/outboxStore';
 import { SyncStatusBadge } from '../../../src/components/SyncStatusBadge';
 import { checkGeofence, formatDistance, type GeofenceResult } from '../../../src/lib/geofence';
+import { useTodaySafetyCheck, useSubmitSafetyCheck } from '../../../src/hooks/useSafetyChecks';
 import { colors } from '../../../src/theme/colors';
 import { typography, fontFamily } from '../../../src/theme/typography';
 import { spacing, radius, shadows } from '../../../src/theme/spacing';
+
+// Must match the keys used on the standalone Daily Safety Checklist screen.
+const PPE_ITEMS = [
+  { key: 'helmet', label: 'Hard Hat / Helmet' },
+  { key: 'safety_shoes', label: 'Safety Shoes' },
+  { key: 'vest', label: 'High-Visibility Vest' },
+  { key: 'harness', label: 'Safety Harness (if at height)' },
+  { key: 'gloves', label: 'Gloves' },
+  { key: 'eye_protection', label: 'Eye Protection / Goggles' },
+];
 
 export default function PunchInScreen() {
   const insets = useSafeAreaInsets();
@@ -40,6 +51,19 @@ export default function PunchInScreen() {
   const [geoLoading, setGeoLoading] = useState(true);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const { data: todaySafetyCheck } = useTodaySafetyCheck(profile?.id);
+  const submitSafetyCheck = useSubmitSafetyCheck();
+  const [ppeChecked, setPpeChecked] = useState<Record<string, boolean>>(
+    Object.fromEntries(PPE_ITEMS.map((p) => [p.key, false])),
+  );
+  const [concern, setConcern] = useState('');
+  const safetyDone = !!todaySafetyCheck;
+  const allPpeChecked = PPE_ITEMS.every((p) => ppeChecked[p.key]);
+
+  const togglePpe = (key: string) => {
+    setPpeChecked((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   useEffect(() => {
     getLocation();
@@ -87,9 +111,21 @@ export default function PunchInScreen() {
 
   const handleConfirm = async () => {
     if (!selfieUri || !geoResult || !profile?.id || !activeProject?.id) return;
+    if (!safetyDone && !allPpeChecked) {
+      Alert.alert('Safety Checklist', 'Please confirm every PPE item before punching in.');
+      return;
+    }
 
     setSubmitting(true);
     try {
+      if (!safetyDone) {
+        await submitSafetyCheck.mutateAsync({
+          profileId: profile.id,
+          projectId: activeProject.id,
+          items: ppeChecked,
+          concernReported: concern.trim() || null,
+        });
+      }
       await enqueuePunchIn({
         profileId: profile.id,
         projectId: activeProject.id,
@@ -231,6 +267,43 @@ export default function PunchInScreen() {
         )}
       </Card>
 
+      {/* Daily Safety Checklist — required before punch-in confirmation */}
+      {selfieUri && (
+        <Card style={styles.safetyCard}>
+          {safetyDone ? (
+            <View style={styles.safetyDoneRow}>
+              <Ionicons name="shield-checkmark" size={20} color={colors.success} />
+              <Text style={styles.safetyDoneText}>Safety checklist already completed today</Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.safetyHeaderRow}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={colors.warning} />
+                <Text style={styles.safetyCardTitle}>Confirm PPE before punching in</Text>
+              </View>
+              {PPE_ITEMS.map((item) => (
+                <TouchableOpacity
+                  key={item.key}
+                  style={styles.ppeRow}
+                  onPress={() => togglePpe(item.key)}
+                  accessibilityLabel={`Toggle ${item.label}`}
+                >
+                  <Ionicons
+                    name={ppeChecked[item.key] ? 'checkbox' : 'square-outline'}
+                    size={22}
+                    color={ppeChecked[item.key] ? colors.success : colors.neutral[400]}
+                  />
+                  <Text style={styles.ppeLabel}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
+              {!allPpeChecked && (
+                <Text style={styles.safetyHint}>Check every item to enable punch-in</Text>
+              )}
+            </>
+          )}
+        </Card>
+      )}
+
       {/* Actions */}
       <View style={[styles.actions, { paddingBottom: insets.bottom + spacing.lg }]}>
         {!selfieUri ? (
@@ -249,7 +322,7 @@ export default function PunchInScreen() {
               title={t('common.confirm')}
               onPress={handleConfirm}
               loading={submitting}
-              disabled={geoLoading || !!geoError}
+              disabled={geoLoading || !!geoError || (!safetyDone && !allPpeChecked)}
               style={{ flex: 1 }}
             />
           </View>
@@ -260,6 +333,47 @@ export default function PunchInScreen() {
 }
 
 const styles = StyleSheet.create({
+  safetyCard: {
+    marginHorizontal: spacing.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  safetyHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  safetyCardTitle: {
+    ...typography.bodyMedium,
+    fontFamily: fontFamily.semiBold,
+    color: colors.ink,
+  },
+  ppeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  ppeLabel: {
+    ...typography.bodySmall,
+    color: colors.ink,
+  },
+  safetyHint: {
+    ...typography.caption,
+    color: colors.warning,
+    marginTop: spacing.xs,
+  },
+  safetyDoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  safetyDoneText: {
+    ...typography.bodySmall,
+    fontFamily: fontFamily.medium,
+    color: colors.success,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,

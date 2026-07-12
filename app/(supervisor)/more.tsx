@@ -40,6 +40,11 @@ export default function SupervisorMoreScreen() {
       label: 'Messages',
       route: '/(supervisor)/messages',
     },
+    {
+      icon: 'person-add-outline',
+      label: 'Request Employee',
+      route: '/(supervisor)/request-employee',
+    },
     { icon: 'person-outline', label: 'Profile' },
     { icon: 'wallet-outline', label: 'Salary' },
     { icon: 'language-outline', label: t('settings.language') },
