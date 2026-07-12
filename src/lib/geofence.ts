@@ -57,9 +57,18 @@ export async function checkGeofence(
     throw new Error('Location permission is required for attendance verification.');
   }
 
-  const location = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.High,
-  });
+  const lastKnown = await Location.getLastKnownPositionAsync({ maxAge: 60_000, requiredAccuracy: 75 });
+  let location = lastKnown;
+  if (!location) {
+    location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+      mayShowUserSettingsDialog: true,
+    });
+  }
+  // A second reading avoids rejecting a worker on the first unstable GPS fix.
+  if (location.coords.accuracy != null && location.coords.accuracy > 75) {
+    location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High, mayShowUserSettingsDialog: true });
+  }
 
   const distance = haversineDistance(
     location.coords.latitude,
