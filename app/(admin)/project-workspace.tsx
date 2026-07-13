@@ -26,7 +26,7 @@ import { Card, StatusChip, Avatar, Button } from '../../src/components';
 import { useProject } from '../../src/hooks/useProjects';
 import { useEmployees } from '../../src/hooks/useEmployees';
 import { useProjectDprs } from '../../src/hooks/useDpr';
-import { useProjectPayments, useUpdatePayment } from '../../src/hooks/usePayments';
+import { useProjectPayments, useUpdatePayment, useCreatePayment, useDeletePayment } from '../../src/hooks/usePayments';
 import { useMaterialRequests } from '../../src/hooks/useMaterials';
 import { useDocuments } from '../../src/hooks/useDocuments';
 import { useProjectAttendance, TeamAttendanceRow } from '../../src/hooks/useAttendance';
@@ -754,6 +754,13 @@ function ExpensesTab({
 // Payments
 function PaymentsTab({ payments, projectId }: { payments: Payment[]; projectId: string }) {
   const updatePayment = useUpdatePayment();
+  const createPayment = useCreatePayment();
+  const deletePayment = useDeletePayment();
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [milestoneName, setMilestoneName] = useState('');
+  const [amount, setAmount] = useState('');
+  const [dueDate, setDueDate] = useState('');
 
   const totalBilled = payments.reduce((s, p) => s + p.amount, 0);
   const totalPaid = payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
@@ -767,9 +774,56 @@ function PaymentsTab({ payments, projectId }: { payments: Payment[]; projectId: 
     }
   }
 
+  async function handleAdd() {
+    const amt = parseFloat(amount);
+    if (!milestoneName.trim()) {
+      Alert.alert('Validation', 'Please enter a milestone name');
+      return;
+    }
+    if (isNaN(amt) || amt <= 0) {
+      Alert.alert('Validation', 'Please enter a valid amount');
+      return;
+    }
+    try {
+      await createPayment.mutateAsync({
+        projectId,
+        milestoneName: milestoneName.trim(),
+        amount: amt,
+        dueDate: dueDate || null,
+      });
+      setMilestoneName('');
+      setAmount('');
+      setDueDate('');
+      setShowAdd(false);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to add payment milestone');
+    }
+  }
+
+  function handleDelete(p: Payment) {
+    Alert.alert(
+      'Delete milestone',
+      `Remove "${p.milestone_name}"? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deletePayment.mutateAsync({ id: p.id });
+            } catch (e: any) {
+              Alert.alert('Error', e.message || 'Failed to delete payment');
+            }
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <>
-      <SectionHeader title="Payment Milestones" />
+      <SectionHeader title="Payment Milestones" action="Add" onAction={() => setShowAdd(true)} />
 
       {/* Summary */}
       {payments.length > 0 && (
@@ -800,7 +854,40 @@ function PaymentsTab({ payments, projectId }: { payments: Payment[]; projectId: 
         </Card>
       )}
 
-      {payments.length === 0 && <EmptyState icon="cash-outline" text="No payment milestones defined" />}
+      {/* Add Modal */}
+      <Modal visible={showAdd} transparent animationType="slide" onRequestClose={() => setShowAdd(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Add Payment Milestone</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Milestone name (e.g. Booking, Foundation...)"
+              value={milestoneName}
+              onChangeText={setMilestoneName}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Amount (₹)..."
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="decimal-pad"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Due date (YYYY-MM-DD, optional)..."
+              value={dueDate}
+              onChangeText={setDueDate}
+              keyboardType="numbers-and-punctuation"
+            />
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <Button title="Cancel" variant="tertiary" onPress={() => setShowAdd(false)} style={{ flex: 1 }} />
+              <Button title="Add" onPress={handleAdd} loading={createPayment.isPending} style={{ flex: 1 }} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {payments.length === 0 && <EmptyState icon="cash-outline" text="No payment milestones yet. Tap Add to create one." />}
       {payments.map(p => (
         <Card key={p.id} style={styles.listCard}>
           <View style={styles.listRow}>
@@ -826,6 +913,14 @@ function PaymentsTab({ payments, projectId }: { payments: Payment[]; projectId: 
               </Text>
               <StatusBadge status={p.status} />
             </View>
+            <TouchableOpacity
+              onPress={() => handleDelete(p)}
+              disabled={deletePayment.isPending}
+              hitSlop={8}
+              style={{ paddingLeft: spacing.xs }}
+            >
+              <Ionicons name="trash-outline" size={18} color={colors.neutral[400]} />
+            </TouchableOpacity>
           </View>
         </Card>
       ))}

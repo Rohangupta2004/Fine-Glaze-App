@@ -21,7 +21,7 @@ const ACTIONS: { icon: string; label: string; description: string; route: string
   { icon: 'list', label: 'Create Task', description: 'Assign a new task to a team member', route: '/(admin)/projects', color: colors.success },
   { icon: 'cube', label: 'Request Material', description: 'Submit a material request', route: '/(admin)/projects', color: colors.pending },
   { icon: 'document-text', label: 'Submit DPR', description: 'Create a daily progress report', route: '/(admin)/projects', color: colors.warning },
-  { icon: 'cash', label: 'Add Payment', description: 'Record a payment milestone', route: '/(admin)/projects', color: colors.success },
+  { icon: 'cash', label: 'Add Payment', description: 'Record a payment milestone (pick a project first)', route: '/(admin)/projects', color: colors.success },
 ];
 
 export default function AdminAddScreen() {
