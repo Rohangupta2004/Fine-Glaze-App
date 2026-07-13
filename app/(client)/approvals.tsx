@@ -26,9 +26,9 @@ import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
 import type { ClientApproval } from '../../src/types';
-import { getDprMediaUrl } from '../../src/hooks/useDprTimeline';
+import { SignedImage } from '../../src/components/SignedImage';
 
-// ── Status badge ──────────────────────────────────────────────────────
+// —— Status badge ———————————————————————————————————————————————
 
 function StatusBadge({ status }: { status: string }) {
   const config = {
@@ -44,7 +44,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ── Approval detail panel (inline) ───────────────────────────────────
+// —— Approval detail panel (inline) —————————————————————————————————
 
 function ApprovalDetail({
   item,
@@ -57,10 +57,6 @@ function ApprovalDetail({
   const { width } = useWindowDimensions();
   const { mutateAsync: decide, isPending } = useDecideClientApproval();
   const isDone = item.status !== 'pending';
-
-  const photoUrls: string[] = (item.photos || []).map((p: string) =>
-    p.startsWith('http') ? p : getDprMediaUrl(p)
-  );
 
   const tileSize = (width - spacing.lg * 2 - spacing.sm) / 2;
 
@@ -130,18 +126,28 @@ function ApprovalDetail({
       )}
 
       {/* Photos */}
-      {photoUrls.length > 0 && (
+      {(item.photos || []).length > 0 && (
         <>
           <Text style={styles.sectionLabel}>Photos</Text>
           <View style={styles.photoGrid}>
-            {photoUrls.map((uri, i) => (
-              <Image
-                key={i}
-                source={{ uri }}
-                style={[styles.photoTile, { width: tileSize, height: tileSize }]}
-                resizeMode="cover"
-              />
-            ))}
+            {(item.photos || []).map((p: string, i: number) =>
+              p.startsWith('http') ? (
+                <Image
+                  key={i}
+                  source={{ uri: p }}
+                  style={[styles.photoTile, { width: tileSize, height: tileSize }]}
+                  resizeMode="cover"
+                />
+              ) : (
+                <SignedImage
+                  key={i}
+                  bucket="dpr-media"
+                  storagePath={p}
+                  style={[styles.photoTile, { width: tileSize, height: tileSize }]}
+                  resizeMode="cover"
+                />
+              )
+            )}
           </View>
         </>
       )}
@@ -206,7 +212,7 @@ function ApprovalDetail({
   );
 }
 
-// ── Main screen ───────────────────────────────────────────────────────
+// —— Main screen —————————————————————————————————————————————
 
 export default function ClientApprovalsScreen() {
   const insets = useSafeAreaInsets();

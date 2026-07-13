@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Card, StatusChip } from '../../src/components';
 import { useProjects } from '../../src/hooks/useProjects';
-import { useDprTimeline, getDprMediaUrl } from '../../src/hooks/useDprTimeline';
+import { useDprTimeline } from '../../src/hooks/useDprTimeline';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
@@ -116,7 +116,7 @@ export default function ClientUpdatesScreen() {
                   <TouchableOpacity key={m.id} activeOpacity={0.85}>
                     {m.type === 'photo' ? (
                       <Image
-                        source={{ uri: getDprMediaUrl(m.storage_path) }}
+                        source={{ uri: m.signedUrl }}
                         style={[styles.mediaTile, { width: tileSize, height: tileSize }]}
                         resizeMode="cover"
                       />

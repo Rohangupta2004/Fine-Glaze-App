@@ -1,15 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { getSignedUrl } from '../lib/signedUrl';
 import type { Dpr, DprMedia } from '../types';
+
+export interface DprMediaWithUrl extends DprMedia {
+  signedUrl: string;
+}
 
 export interface DprTimelineEntry {
   dpr: Dpr;
-  media: DprMedia[];
+  media: DprMediaWithUrl[];
 }
 
 /**
  * Approved DPRs with their media for a given project — client media timeline.
  * Only returns DPRs with status='approved' that have at least one media item.
+ * Media items include pre-resolved signed URLs for private storage.
  */
 export function useDprTimeline(projectId: string | null | undefined) {
   return useQuery({
@@ -39,8 +45,16 @@ export function useDprTimeline(projectId: string | null | undefined) {
 
       if (mediaErr) throw mediaErr;
 
-      const mediaByDpr = new Map<string, DprMedia[]>();
-      for (const m of (mediaRows || []) as DprMedia[]) {
+      // Resolve signed URLs for all media items in parallel
+      const mediaWithUrls: DprMediaWithUrl[] = await Promise.all(
+        ((mediaRows || []) as DprMedia[]).map(async (m) => ({
+          ...m,
+          signedUrl: await getSignedUrl('dpr-media', m.storage_path),
+        }))
+      );
+
+      const mediaByDpr = new Map<string, DprMediaWithUrl[]>();
+      for (const m of mediaWithUrls) {
         const arr = mediaByDpr.get(m.dpr_id) ?? [];
         arr.push(m);
         mediaByDpr.set(m.dpr_id, arr);
@@ -56,10 +70,22 @@ export function useDprTimeline(projectId: string | null | undefined) {
 }
 
 /**
- * Public URL for a Supabase storage path.
- * Falls back to a placeholder if not configured.
+ * Get a signed URL for a DPR media storage path.
+ * Use this for one-off resolution outside the timeline hook.
+ */
+export async function getDprMediaSignedUrl(storagePath: string): Promise<string> {
+  return getSignedUrl('dpr-media', storagePath);
+}
+
+/**
+ * @deprecated Use getDprMediaSignedUrl (async) or SignedImage component instead.
+ * Kept temporarily for backwards compatibility — returns broken public URL
+ * since the bucket is now private.
  */
 export function getDprMediaUrl(storagePath: string): string {
+  console.warn(
+    '[getDprMediaUrl] dpr-media is private. Use getDprMediaSignedUrl() or <SignedImage /> instead.'
+  );
   const { data } = supabase.storage.from('dpr-media').getPublicUrl(storagePath);
   return data.publicUrl;
 }
