@@ -1,15 +1,25 @@
 /**
  * Edge Function: materialize-recurring-tasks
  * PRD §29f — Daily cron that materializes recurring tasks into actual
- * task rows for today. Each active recurring_tasks row generates a
- * corresponding tasks row based on its frequency.
+ * task rows for today.
+ *
+ * ── SCHEMA NOTE ──────────────────────────────────────────────────────────
+ * The `tasks` table has these columns (verified from schema.sql):
+ *   id, project_id, assigned_to, title, level_zone, priority,
+ *   window_start, window_end, status, created_by (NOT NULL),
+ *   recurring_task_id (FK to recurring_tasks), created_at
+ *
+ * There is NO `description` column and NO `offline_id` column on tasks.
+ * Idempotency is achieved via `recurring_task_id` + checking if a task
+ * already exists for today with that link.
+ *
+ * `created_by` is NOT NULL — we use the project's first owner/admin as
+ * the creator, or fall back to a project_manager.
  *
  * Frequency format:
  *   'daily'                              — every day
  *   'weekly:mon,wed,fri'                 — specific weekdays
  *   'weekly:sat'                         — single weekday
- *
- * Designed to run daily at 6 AM IST.
  *
  * Schedule:
  *   SELECT cron.schedule(
@@ -97,28 +107,60 @@ serve(async (req: Request) => {
     );
   }
 
-  // ── 3. Check which tasks have already been materialized today ──────────
-  // Use offline_id convention: 'recurring:<recurring_id>:<date>'
-  const offlineIds = dueTasks.map(t => `recurring:${t.id}:${todayStr}`);
+  // ── 3. Find a "system" creator (any owner/admin in the same company) ───
+  // `created_by` is NOT NULL on tasks, so we need a real profile ID.
+  const companyIds = [...new Set(dueTasks.map(t => t.company_id))];
+  const creatorByCompany: Record<string, string> = {};
+
+  for (const companyId of companyIds) {
+    const { data: owner } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('role', 'owner')
+      .eq('status', 'active')
+      .limit(1)
+      .maybeSingle();
+
+    if (owner?.id) {
+      creatorByCompany[companyId] = owner.id;
+    } else {
+      // Fallback: first project_manager
+      const { data: pm } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('role', 'project_manager')
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle();
+      if (pm?.id) creatorByCompany[companyId] = pm.id;
+    }
+  }
+
+  // ── 4. Check which recurring tasks already materialized today ──────────
+  // Use recurring_task_id + created_at date filter for idempotency.
+  const recurringIds = dueTasks.map(t => t.id);
   const { data: existing } = await supabase
     .from('tasks')
-    .select('offline_id')
-    .in('offline_id', offlineIds);
+    .select('recurring_task_id, created_at')
+    .in('recurring_task_id', recurringIds)
+    .gte('created_at', todayStr + 'T00:00:00+00:00')
+    .lt('created_at', todayStr + 'T23:59:59+00:00');
 
-  const existingSet = new Set((existing || []).map((r: any) => r.offline_id));
+  const existingSet = new Set((existing || []).map((r: any) => r.recurring_task_id));
 
-  // ── 4. Insert new task rows for due recurring tasks ────────────────────
+  // ── 5. Insert new task rows for due recurring tasks ────────────────────
   const newTasks = dueTasks
-    .filter(t => !existingSet.has(`recurring:${t.id}:${todayStr}`))
+    .filter(t => !existingSet.has(t.id) && creatorByCompany[t.company_id])
     .map(t => ({
       project_id: t.project_id,
       title: t.title,
-      description: `Auto-generated from recurring schedule (zone: ${t.level_zone || 'all'})`,
-      priority: t.priority || 'medium',
-      status: 'pending',
       level_zone: t.level_zone,
-      offline_id: `recurring:${t.id}:${todayStr}`,
-      created_at: new Date().toISOString(),
+      priority: t.priority || 'medium',
+      status: 'pending' as const,
+      created_by: creatorByCompany[t.company_id],
+      recurring_task_id: t.id,
     }));
 
   let inserted = 0;
@@ -134,7 +176,7 @@ serve(async (req: Request) => {
     inserted = insertedRows?.length || 0;
   }
 
-  console.log(`[materialize-recurring-tasks] Materialized ${inserted} new tasks (${existingSet.size} already existed)`);
+  console.log(`[materialize-recurring-tasks] Materialized ${inserted} new tasks (${existingSet.size} already existed, ${dueTasks.length - newTasks.length} skipped due to missing creator)`);
 
   return new Response(
     JSON.stringify({
@@ -145,6 +187,7 @@ serve(async (req: Request) => {
       dueToday: dueTasks.length,
       alreadyMaterialized: existingSet.size,
       materialized: inserted,
+      skippedNoCreator: dueTasks.length - newTasks.length,
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );

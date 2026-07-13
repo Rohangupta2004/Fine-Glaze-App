@@ -20,6 +20,11 @@ CREATE EXTENSION IF NOT EXISTS pg_net;
 -- Called by AFTER INSERT trigger on notifications. Sends HTTP POST to
 -- the send-notification Edge Function which handles push delivery via
 -- Expo Push API.
+--
+-- IMPORTANT: sends `x-trigger-dispatch: 1` header so the Edge Function
+-- knows to SKIP the insert (the row already exists). Without this header,
+-- the function would insert another notification row → trigger fires
+-- again → infinite recursion.
 CREATE OR REPLACE FUNCTION dispatch_notification()
 RETURNS trigger AS $$
 DECLARE
@@ -34,12 +39,15 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- Fire-and-forget HTTP POST to send-notification Edge Function
+  -- Fire-and-forget HTTP POST to send-notification Edge Function.
+  -- x-trigger-dispatch header tells the function this is a trigger callback,
+  -- so it should NOT insert into notifications (would cause recursion).
   PERFORM net.http_post(
     url := edge_url,
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || service_role
+      'Authorization', 'Bearer ' || service_role,
+      'x-trigger-dispatch', '1'
     ),
     body := jsonb_build_object(
       'recipientId', NEW.recipient_id,
@@ -130,7 +138,14 @@ CREATE TRIGGER trg_task_assigned_notify
   FOR EACH ROW
   EXECUTE FUNCTION notify_task_assigned();
 
--- ── Trigger: New document uploaded → notify project members ───────────────
+-- ── Trigger: Document upload → notify project members ───────────────────
+-- Note: if a pre-existing `notify_document_upload()` (without the trailing
+-- "d") trigger exists from a previous deployment, drop it first to avoid
+-- duplicate notifications to owners.
+DROP FUNCTION IF EXISTS notify_document_upload() CASCADE;
+DROP TRIGGER IF EXISTS trg_document_upload_notify ON documents;
+DROP TRIGGER IF EXISTS trg_document_uploaded_notify ON documents;
+
 CREATE OR REPLACE FUNCTION notify_document_uploaded()
 RETURNS trigger AS $$
 DECLARE

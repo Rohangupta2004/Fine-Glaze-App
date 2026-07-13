@@ -58,7 +58,8 @@ BEGIN
     url := edge_url,
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || service_role
+      'Authorization', 'Bearer ' || service_role,
+      'x-trigger-dispatch', '1'
     ),
     body := jsonb_build_object(
       'recipientId', NEW.recipient_id,
@@ -153,6 +154,11 @@ CREATE TRIGGER trg_task_assigned_notify
 
 
 -- Trigger: Document upload → notify project members
+-- Drop any pre-existing notify_document_upload() (no "d") to avoid dupes
+DROP FUNCTION IF EXISTS notify_document_upload() CASCADE;
+DROP TRIGGER IF EXISTS trg_document_upload_notify ON documents;
+DROP TRIGGER IF EXISTS trg_document_uploaded_notify ON documents;
+
 CREATE OR REPLACE FUNCTION notify_document_uploaded()
 RETURNS trigger AS $$
 DECLARE

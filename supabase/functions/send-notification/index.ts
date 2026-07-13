@@ -1,11 +1,28 @@
 /**
- * send-notification Edge Function
+ * Edge Function: send-notification
  * PRD §10 — Push notification delivery
  *
  * Receives notification data, stores it in the notifications table,
  * and sends push via Expo Push API.
  *
- * Called by database triggers or other Edge Functions.
+ * ── RECURSION GUARD ────────────────────────────────────────────────────
+ * This function is invoked by `trg_dispatch_notification` (an AFTER INSERT
+ * trigger on the notifications table). The trigger fires whenever any row
+ * is inserted into notifications — including rows this function itself
+ * inserts. That would cause infinite recursion:
+ *
+ *     trigger fires → calls send-notification
+ *     → send-notification inserts a notification row
+ *     → trigger fires again → calls send-notification again → ∞
+ *
+ * Solution: callers MUST send `x-trigger-dispatch: 1` header when invoking
+ * from `dispatch_notification()`. When that header is present, we SKIP the
+ * insert (the trigger already inserted the row before calling us) and
+ * only send the Expo push.
+ *
+ * Direct callers (e.g. other Edge Functions wanting to notify) call
+ * WITHOUT the header — we insert the row, the trigger fires, the trigger
+ * calls us back WITH the header, and we send the push. One insert, one push.
  *
  * Body: {
  *   recipientId: string,
@@ -23,7 +40,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-trigger-dispatch',
 };
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
@@ -55,20 +72,35 @@ serve(async (req: Request) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // 1. Store notification in database
-    const { error: insertError } = await supabase.from('notifications').insert({
-      recipient_id: recipientId,
-      kind,
-      title,
-      body,
-      ref_table: refTable || null,
-      ref_id: refId || null,
-      important,
-    });
+    // ── Recursion guard ────────────────────────────────────────────────
+    // If called by trg_dispatch_notification, the notification row already
+    // exists. Skip the insert to avoid infinite recursion.
+    const isTriggerDispatch = req.headers.get('x-trigger-dispatch') === '1';
 
-    if (insertError) throw insertError;
+    if (!isTriggerDispatch) {
+      // Direct call — insert the notification row.
+      // The trigger will fire, call us back with x-trigger-dispatch=1,
+      // and we'll send the push on the second pass.
+      const { error: insertError } = await supabase.from('notifications').insert({
+        recipient_id: recipientId,
+        kind,
+        title,
+        body,
+        ref_table: refTable || null,
+        ref_id: refId || null,
+        important,
+      });
 
-    // 2. Get recipient's push token
+      if (insertError) throw insertError;
+
+      // Push will be sent when the trigger calls us back.
+      return new Response(
+        JSON.stringify({ success: true, dispatched_via_trigger: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ── Trigger-dispatched call: send the push ─────────────────────────
     const { data: profile } = await supabase
       .from('profiles')
       .select('push_token')
@@ -76,7 +108,6 @@ serve(async (req: Request) => {
       .single();
 
     if (profile?.push_token) {
-      // 3. Send push notification via Expo
       const pushResponse = await fetch(EXPO_PUSH_URL, {
         method: 'POST',
         headers: {
@@ -99,15 +130,17 @@ serve(async (req: Request) => {
       });
 
       const pushResult = await pushResponse.json();
-      console.log('Push result:', pushResult);
+      console.log('[send-notification] Push result:', pushResult);
+    } else {
+      console.log(`[send-notification] No push_token for ${recipientId}, in-app only`);
     }
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ success: true, push_sent: !!profile?.push_token }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {
-    console.error('Notification error:', error);
+    console.error('[send-notification] Notification error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

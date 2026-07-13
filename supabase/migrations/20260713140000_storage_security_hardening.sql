@@ -31,7 +31,7 @@ FOR SELECT TO authenticated USING (
     is_admin_role()
     OR EXISTS (
       SELECT 1 FROM projects p
-      WHERE p.id::text = (storage.foldername(name))[1]
+      WHERE p.id::text = (storage.foldername(storage.objects.name))[1]
         AND is_assigned_to_project(p.id)
     )
     OR EXISTS (
@@ -39,7 +39,7 @@ FOR SELECT TO authenticated USING (
       SELECT 1 FROM projects p
       JOIN client_orgs co ON co.id = p.client_org_id
       JOIN profiles up ON up.id = auth.uid()
-      WHERE p.id::text = (storage.foldername(name))[1]
+      WHERE p.id::text = (storage.foldername(storage.objects.name))[1]
         AND up.role = 'client'
         AND up.company_id = co.id
     )
@@ -59,17 +59,17 @@ FOR SELECT TO authenticated USING (
     -- Documents stored under project/<id>/...
     OR EXISTS (
       SELECT 1 FROM projects p
-      WHERE p.id::text = (storage.foldername(name))[2]
+      WHERE p.id::text = (storage.foldername(storage.objects.name))[2]
         AND is_assigned_to_project(p.id)
     )
     -- Documents stored under profile/<id>/...  (own profile docs)
-    OR (storage.foldername(name))[1] = 'profile'
-        AND (storage.foldername(name))[2] = auth.uid()::text
+    OR (storage.foldername(storage.objects.name))[1] = 'profile'
+        AND (storage.foldername(storage.objects.name))[2] = auth.uid()::text
     -- Documents stored under company/<id>/... (own company docs)
     OR EXISTS (
       SELECT 1 FROM profiles up
       WHERE up.id = auth.uid()
-        AND up.company_id::text = (storage.foldername(name))[2]
+        AND up.company_id::text = (storage.foldername(storage.objects.name))[2]
     )
   )
 );
@@ -87,7 +87,7 @@ FOR SELECT TO authenticated USING (
     OR EXISTS (
       SELECT 1
       FROM conversation_members cm
-      WHERE cm.conversation_id::text = (storage.foldername(name))[1]
+      WHERE cm.conversation_id::text = (storage.foldername(storage.objects.name))[1]
         AND cm.profile_id = auth.uid()
     )
   )
