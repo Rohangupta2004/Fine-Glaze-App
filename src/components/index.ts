@@ -11,3 +11,11 @@ export { SearchBar } from './SearchBar';
 export { SegmentedControl } from './SegmentedControl';
 export { Banner } from './Banner';
 export { DatePickerField } from './DatePickerField';
+
+// Gradient & glow design system (v1.1)
+export { GradientCard } from './GradientCard';
+export { GradientButton } from './GradientButton';
+export { GlassSheet } from './GlassSheet';
+export { GradientIcon } from './GradientIcon';
+export { StatusPill } from './StatusPill';
+export { GradientProgressBar } from './GradientProgressBar';
