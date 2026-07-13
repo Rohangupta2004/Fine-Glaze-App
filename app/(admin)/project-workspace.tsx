@@ -21,6 +21,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { Card, StatusChip, Avatar, Button } from '../../src/components';
 import { useProject } from '../../src/hooks/useProjects';
@@ -36,7 +37,7 @@ import { useMyConversations } from '../../src/hooks/useConversations';
 import { useAuthStore } from '../../src/stores/authStore';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
-import { spacing, radius } from '../../src/theme/spacing';
+import { spacing, radius, shadows } from '../../src/theme/spacing';
 import type { Task, Dpr, DocumentRow, Expense, Payment, MaterialRequest, Attendance } from '../../src/types';
 
 // ── Tab Definition ────────────────────────────────────────────────────────────
@@ -764,6 +765,8 @@ function PaymentsTab({ payments, projectId }: { payments: Payment[]; projectId: 
 
   const totalBilled = payments.reduce((s, p) => s + p.amount, 0);
   const totalPaid = payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
+  const totalPending = totalBilled - totalPaid;
+  const paidPct = totalBilled > 0 ? Math.round((totalPaid / totalBilled) * 100) : 0;
 
   async function handleToggle(p: Payment) {
     const next = p.status === 'paid' ? 'pending' : 'paid';
@@ -825,105 +828,242 @@ function PaymentsTab({ payments, projectId }: { payments: Payment[]; projectId: 
     <>
       <SectionHeader title="Payment Milestones" action="Add" onAction={() => setShowAdd(true)} />
 
-      {/* Summary */}
+      {/* ── Gradient Hero Summary Card ─────────────────────────────────── */}
       {payments.length > 0 && (
-        <Card style={styles.sectionCard}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md }}>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={[typography.h5, { color: colors.success }]}>{fmtINR(totalPaid)}</Text>
-              <Text style={styles.listSubtitle}>Received</Text>
+        <View style={payStyles.heroWrap}>
+          <LinearGradient
+            colors={['#695030', '#918050', '#C8B79C']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={payStyles.heroCard}
+          >
+            {/* Glow halo behind the percentage ring */}
+            <View style={payStyles.heroGlow} pointerEvents="none" />
+
+            <View style={payStyles.heroTop}>
+              <View style={payStyles.ringWrap}>
+                <View style={payStyles.ringOuter}>
+                  <Text style={payStyles.ringPct}>{paidPct}%</Text>
+                  <Text style={payStyles.ringLabel}>Collected</Text>
+                </View>
+              </View>
+              <View style={payStyles.heroStats}>
+                <View style={payStyles.heroStatRow}>
+                  <View style={[payStyles.heroDot, { backgroundColor: '#BBF7D0' }]} />
+                  <Text style={payStyles.heroStatLabel}>Received</Text>
+                  <Text style={payStyles.heroStatValue}>{fmtINR(totalPaid)}</Text>
+                </View>
+                <View style={payStyles.heroStatRow}>
+                  <View style={[payStyles.heroDot, { backgroundColor: '#FDE68A' }]} />
+                  <Text style={payStyles.heroStatLabel}>Pending</Text>
+                  <Text style={payStyles.heroStatValue}>{fmtINR(totalPending)}</Text>
+                </View>
+                <View style={payStyles.heroStatRow}>
+                  <View style={[payStyles.heroDot, { backgroundColor: 'rgba(255,255,255,0.85)' }]} />
+                  <Text style={payStyles.heroStatLabel}>Total</Text>
+                  <Text style={payStyles.heroStatValue}>{fmtINR(totalBilled)}</Text>
+                </View>
+              </View>
             </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={[typography.h5, { color: colors.warning }]}>{fmtINR(totalBilled - totalPaid)}</Text>
-              <Text style={styles.listSubtitle}>Pending</Text>
+
+            {/* Gradient progress bar */}
+            <View style={payStyles.barTrack}>
+              <LinearGradient
+                colors={['#86EFAC', '#22C55E']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[payStyles.barFill, { width: `${paidPct}%` }]}
+              />
             </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={[typography.h5, { color: colors.ink }]}>{fmtINR(totalBilled)}</Text>
-              <Text style={styles.listSubtitle}>Total</Text>
-            </View>
-          </View>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, {
-              width: `${totalBilled > 0 ? Math.round(totalPaid / totalBilled * 100) : 0}%` as any,
-              backgroundColor: colors.success,
-            }]} />
-          </View>
-          <Text style={[typography.caption, { color: colors.neutral[500], marginTop: spacing.xs, textAlign: 'right' }]}>
-            {totalBilled > 0 ? Math.round(totalPaid / totalBilled * 100) : 0}% collected
-          </Text>
-        </Card>
+          </LinearGradient>
+        </View>
       )}
 
-      {/* Add Modal */}
+      {/* ── Add Payment Modal (glassy + gradient button) ───────────────── */}
       <Modal visible={showAdd} transparent animationType="slide" onRequestClose={() => setShowAdd(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>Add Payment Milestone</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Milestone name (e.g. Booking, Foundation...)"
-              value={milestoneName}
-              onChangeText={setMilestoneName}
+        <View style={payStyles.overlay}>
+          <View style={payStyles.sheet}>
+            {/* Glow accent at the top of the sheet */}
+            <LinearGradient
+              colors={['#695030', '#918050']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={payStyles.sheetAccent}
             />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Amount (₹)..."
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-            />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Due date (YYYY-MM-DD, optional)..."
-              value={dueDate}
-              onChangeText={setDueDate}
-              keyboardType="numbers-and-punctuation"
-            />
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <Button title="Cancel" variant="tertiary" onPress={() => setShowAdd(false)} style={{ flex: 1 }} />
-              <Button title="Add" onPress={handleAdd} loading={createPayment.isPending} style={{ flex: 1 }} />
+            <View style={payStyles.sheetBody}>
+              <View style={payStyles.sheetHeader}>
+                <View style={payStyles.sheetIcon}>
+                  <LinearGradient
+                    colors={['#695030', '#918050']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={payStyles.sheetIconGrad}
+                  >
+                    <Ionicons name="cash" size={22} color={colors.white} />
+                  </LinearGradient>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={payStyles.sheetTitle}>Add Payment Milestone</Text>
+                  <Text style={payStyles.sheetSubtitle}>Track a new billing stage for this project</Text>
+                </View>
+              </View>
+
+              {/* Field: Milestone name */}
+              <Text style={payStyles.fieldLabel}>Milestone name</Text>
+              <TextInput
+                style={payStyles.input}
+                placeholder="e.g. Booking, Foundation, Finishing..."
+                placeholderTextColor={colors.neutral[400]}
+                value={milestoneName}
+                onChangeText={setMilestoneName}
+              />
+
+              {/* Field: Amount */}
+              <Text style={payStyles.fieldLabel}>Amount (₹)</Text>
+              <View style={payStyles.amountWrap}>
+                <Text style={payStyles.amountPrefix}>₹</Text>
+                <TextInput
+                  style={payStyles.amountInput}
+                  placeholder="0"
+                  placeholderTextColor={colors.neutral[400]}
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+              {/* Field: Due date */}
+              <Text style={payStyles.fieldLabel}>Due date <Text style={payStyles.optional}>(optional)</Text></Text>
+              <TextInput
+                style={payStyles.input}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.neutral[400]}
+                value={dueDate}
+                onChangeText={setDueDate}
+                keyboardType="numbers-and-punctuation"
+              />
+
+              {/* Action buttons */}
+              <View style={payStyles.actionRow}>
+                <TouchableOpacity
+                  style={payStyles.cancelBtn}
+                  onPress={() => setShowAdd(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={payStyles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={payStyles.addBtnWrap}
+                  onPress={handleAdd}
+                  disabled={createPayment.isPending}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={['#695030', '#918050']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={payStyles.addBtn}
+                  >
+                    {createPayment.isPending ? (
+                      <ActivityIndicator color={colors.white} size="small" />
+                    ) : (
+                      <>
+                        <Ionicons name="add-circle" size={18} color={colors.white} />
+                        <Text style={payStyles.addBtnText}>Add Milestone</Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
       </Modal>
 
-      {payments.length === 0 && <EmptyState icon="cash-outline" text="No payment milestones yet. Tap Add to create one." />}
-      {payments.map(p => (
-        <Card key={p.id} style={styles.listCard}>
-          <View style={styles.listRow}>
-            <TouchableOpacity onPress={() => handleToggle(p)} disabled={updatePayment.isPending} hitSlop={8}>
-              <View style={[styles.iconBox, { backgroundColor: p.status === 'paid' ? colors.successBg : colors.warningBg }]}>
-                <Ionicons
-                  name={p.status === 'paid' ? 'checkmark-circle' : 'time'}
-                  size={20}
-                  color={p.status === 'paid' ? colors.success : colors.warning}
-                />
+      {/* ── Empty State ────────────────────────────────────────────────── */}
+      {payments.length === 0 && (
+        <View style={payStyles.emptyWrap}>
+          <LinearGradient
+            colors={['#FFFBEB', '#F9F9F8']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={payStyles.emptyCard}
+          >
+            <View style={payStyles.emptyIconWrap}>
+              <LinearGradient
+                colors={['#918050', '#C8B79C']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={payStyles.emptyIconGrad}
+              >
+                <Ionicons name="cash-outline" size={32} color={colors.white} />
+              </LinearGradient>
+            </View>
+            <Text style={payStyles.emptyTitle}>No milestones yet</Text>
+            <Text style={payStyles.emptySubtitle}>Tap "Add" above to create your first payment milestone.</Text>
+          </LinearGradient>
+        </View>
+      )}
+
+      {/* ── Milestone cards ────────────────────────────────────────────── */}
+      {payments.map(p => {
+        const isPaid = p.status === 'paid';
+        return (
+          <View key={p.id} style={payStyles.milestoneWrap}>
+            <Card style={payStyles.milestoneCard}>
+              <View style={payStyles.milestoneRow}>
+                <TouchableOpacity
+                  onPress={() => handleToggle(p)}
+                  disabled={updatePayment.isPending}
+                  hitSlop={8}
+                >
+                  <LinearGradient
+                    colors={isPaid ? ['#86EFAC', '#22C55E'] : ['#FDE68A', '#F59E0B']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={payStyles.milestoneIcon}
+                  >
+                    <Ionicons
+                      name={isPaid ? 'checkmark-circle' : 'time'}
+                      size={20}
+                      color={colors.white}
+                    />
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <View style={payStyles.milestoneInfo}>
+                  <Text style={payStyles.milestoneName}>{p.milestone_name}</Text>
+                  <Text style={payStyles.milestoneMeta}>
+                    {p.due_date ? `Due ${fmtShort(p.due_date)}` : 'No due date'}
+                    {p.paid_at ? ` · Paid ${fmtShort(p.paid_at)}` : ''}
+                  </Text>
+                </View>
+
+                <View style={payStyles.milestoneRight}>
+                  <Text style={[payStyles.milestoneAmount, { color: isPaid ? colors.success : colors.ink }]}>
+                    {fmtINR(p.amount)}
+                  </Text>
+                  <View style={[payStyles.statusPill, { backgroundColor: isPaid ? colors.successBg : colors.warningBg }]}>
+                    <View style={[payStyles.statusDot, { backgroundColor: isPaid ? colors.success : colors.warning }]} />
+                    <Text style={[payStyles.statusText, { color: isPaid ? colors.success : colors.warning }]}>
+                      {p.status}
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => handleDelete(p)}
+                  disabled={deletePayment.isPending}
+                  hitSlop={8}
+                  style={payStyles.deleteBtn}
+                >
+                  <Ionicons name="trash-outline" size={16} color={colors.neutral[400]} />
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
-            <View style={styles.listInfo}>
-              <Text style={styles.listTitle}>{p.milestone_name}</Text>
-              <Text style={styles.listSubtitle}>
-                {p.due_date ? `Due ${fmtShort(p.due_date)}` : 'No due date'}
-                {p.paid_at ? ` · Paid ${fmtShort(p.paid_at)}` : ''}
-              </Text>
-            </View>
-            <View style={{ alignItems: 'flex-end', gap: 4 }}>
-              <Text style={[styles.amountText, { color: p.status === 'paid' ? colors.success : colors.ink }]}>
-                {fmtINR(p.amount)}
-              </Text>
-              <StatusBadge status={p.status} />
-            </View>
-            <TouchableOpacity
-              onPress={() => handleDelete(p)}
-              disabled={deletePayment.isPending}
-              hitSlop={8}
-              style={{ paddingLeft: spacing.xs }}
-            >
-              <Ionicons name="trash-outline" size={18} color={colors.neutral[400]} />
-            </TouchableOpacity>
+            </Card>
           </View>
-        </Card>
-      ))}
+        );
+      })}
     </>
   );
 }
@@ -1365,4 +1505,349 @@ const styles = StyleSheet.create({
   // Empty
   empty: { alignItems: 'center', paddingVertical: spacing['4xl'], gap: spacing.sm },
   emptyText: { ...typography.bodyMedium, color: colors.neutral[400], textAlign: 'center' },
+});
+
+// ── Payments Tab — Gradient & Glow Styles ────────────────────────────────────
+const payStyles = StyleSheet.create({
+  // Hero summary card
+  heroWrap: {
+    marginBottom: spacing.lg,
+    borderRadius: radius.xl,
+    ...shadows.xl,
+  },
+  heroCard: {
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  heroGlow: {
+    position: 'absolute',
+    top: -60,
+    right: -60,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+  ringWrap: {
+    position: 'relative',
+  },
+  ringOuter: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 5,
+    borderColor: 'rgba(255, 255, 255, 0.92)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ringPct: {
+    ...typography.h4,
+    color: colors.white,
+    fontFamily: fontFamily.bold,
+    fontSize: 22,
+  },
+  ringLabel: {
+    ...typography.caption,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 2,
+    fontSize: 10,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  heroStats: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  heroStatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  heroDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  heroStatLabel: {
+    flex: 1,
+    ...typography.caption,
+    color: 'rgba(255, 255, 255, 0.78)',
+    fontSize: 11,
+  },
+  heroStatValue: {
+    ...typography.bodyMedium,
+    color: colors.white,
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+  },
+
+  // Gradient progress bar
+  barTrack: {
+    height: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: radius.full,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: 10,
+    borderRadius: radius.full,
+  },
+
+  // ── Add Payment Modal ────────────────────────────────────────────────
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(30, 24, 21, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius['3xl'],
+    borderTopRightRadius: radius['3xl'],
+    overflow: 'hidden',
+    ...shadows.xl,
+  },
+  sheetAccent: {
+    height: 5,
+    width: '100%',
+  },
+  sheetBody: {
+    padding: spacing['2xl'],
+    paddingBottom: spacing['4xl'] + (Platform.OS === 'ios' ? 16 : 0),
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  sheetIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    ...shadows.md,
+  },
+  sheetIconGrad: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetTitle: {
+    ...typography.h5,
+    color: colors.ink,
+    marginBottom: 2,
+  },
+  sheetSubtitle: {
+    ...typography.caption,
+    color: colors.neutral[500],
+  },
+  fieldLabel: {
+    ...typography.caption,
+    color: colors.neutral[600],
+    fontFamily: fontFamily.medium,
+    marginBottom: spacing.xs,
+    marginLeft: spacing.xs,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  optional: {
+    color: colors.neutral[400],
+    textTransform: 'none',
+    fontFamily: fontFamily.regular,
+    fontSize: 11,
+    letterSpacing: 0,
+  },
+  input: {
+    borderWidth: 1.5,
+    borderColor: colors.neutral[200],
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    ...typography.bodyMedium,
+    color: colors.ink,
+    backgroundColor: colors.neutral[100],
+  },
+  amountWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.neutral[200],
+    borderRadius: radius.md,
+    marginBottom: spacing.md,
+    backgroundColor: colors.neutral[100],
+    paddingLeft: spacing.md,
+  },
+  amountPrefix: {
+    ...typography.h6,
+    color: colors.primary,
+    fontFamily: fontFamily.semiBold,
+    marginRight: spacing.xs,
+  },
+  amountInput: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    paddingRight: spacing.md,
+    ...typography.bodyMedium,
+    color: colors.ink,
+    fontFamily: fontFamily.semiBold,
+    fontSize: 18,
+  },
+
+  // Action buttons
+  actionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.neutral[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelText: {
+    ...typography.bodyMedium,
+    color: colors.neutral[600],
+    fontFamily: fontFamily.medium,
+  },
+  addBtnWrap: {
+    flex: 1.4,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    ...shadows.md,
+  },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
+  },
+  addBtnText: {
+    ...typography.bodyMedium,
+    color: colors.white,
+    fontFamily: fontFamily.semiBold,
+  },
+
+  // ── Empty State ──────────────────────────────────────────────────────
+  emptyWrap: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.xl,
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+    ...shadows.sm,
+  },
+  emptyCard: {
+    borderRadius: radius.xl,
+    padding: spacing['4xl'],
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    overflow: 'hidden',
+    ...shadows.lg,
+  },
+  emptyIconGrad: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    ...typography.h6,
+    color: colors.ink,
+    fontFamily: fontFamily.semiBold,
+  },
+  emptySubtitle: {
+    ...typography.bodySmall,
+    color: colors.neutral[500],
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+
+  // ── Milestone cards ──────────────────────────────────────────────────
+  milestoneWrap: {
+    marginBottom: spacing.sm,
+    borderRadius: radius.lg,
+  },
+  milestoneCard: {
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    ...shadows.sm,
+  },
+  milestoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  milestoneIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.sm,
+  },
+  milestoneInfo: {
+    flex: 1,
+  },
+  milestoneName: {
+    ...typography.bodyMedium,
+    fontFamily: fontFamily.medium,
+    color: colors.ink,
+  },
+  milestoneMeta: {
+    ...typography.caption,
+    color: colors.neutral[500],
+    marginTop: 2,
+    textTransform: 'capitalize',
+  },
+  milestoneRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  milestoneAmount: {
+    ...typography.bodyMedium,
+    fontFamily: fontFamily.semiBold,
+    fontSize: 15,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    ...typography.caption,
+    fontFamily: fontFamily.semiBold,
+    fontSize: 10,
+    textTransform: 'capitalize',
+  },
+  deleteBtn: {
+    paddingLeft: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
 });

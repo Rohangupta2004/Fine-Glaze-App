@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { Card, StatusChip } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -15,7 +16,7 @@ import { useProjects } from '../../src/hooks/useProjects';
 import { useAllPayments } from '../../src/hooks/usePayments';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
-import { spacing, radius } from '../../src/theme/spacing';
+import { spacing, radius, shadows } from '../../src/theme/spacing';
 
 export default function ClientDashboard() {
   const insets = useSafeAreaInsets();
@@ -83,27 +84,47 @@ export default function ClientDashboard() {
             </Card>
           </View>
 
-          {/* Payment Summary */}
-          <Card style={styles.paymentCard}>
-            <Text style={styles.sectionTitle}>💰 Payment Overview</Text>
-            <View style={styles.paymentRow}>
-              <View style={styles.paymentItem}>
-                <Text style={styles.paymentLabel}>Total Billed</Text>
-                <Text style={styles.paymentValue}>₹{totalBilled.toLocaleString('en-IN')}</Text>
+          {/* Payment Summary — gradient hero */}
+          <View style={styles.paymentHeroWrap}>
+            <LinearGradient
+              colors={['#695030', '#918050', '#C8B79C']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.paymentHeroCard}
+            >
+              <View style={styles.paymentHeroGlow} pointerEvents="none" />
+
+              <View style={styles.paymentHeroHeader}>
+                <Ionicons name="cash" size={20} color={colors.white} />
+                <Text style={styles.paymentHeroTitle}>Payment Overview</Text>
               </View>
-              <View style={styles.paymentItem}>
-                <Text style={styles.paymentLabel}>Paid</Text>
-                <Text style={[styles.paymentValue, { color: colors.success }]}>₹{totalPaid.toLocaleString('en-IN')}</Text>
+
+              <View style={styles.paymentRow}>
+                <View style={styles.paymentItem}>
+                  <Text style={styles.paymentLabel}>Total Billed</Text>
+                  <Text style={styles.paymentValue}>₹{totalBilled.toLocaleString('en-IN')}</Text>
+                </View>
+                <View style={styles.paymentItem}>
+                  <Text style={styles.paymentLabel}>Paid</Text>
+                  <Text style={[styles.paymentValue, { color: '#BBF7D0' }]}>₹{totalPaid.toLocaleString('en-IN')}</Text>
+                </View>
+                <View style={styles.paymentItem}>
+                  <Text style={styles.paymentLabel}>Pending</Text>
+                  <Text style={[styles.paymentValue, { color: '#FDE68A' }]}>₹{(totalBilled - totalPaid).toLocaleString('en-IN')}</Text>
+                </View>
               </View>
-              <View style={styles.paymentItem}>
-                <Text style={styles.paymentLabel}>Pending</Text>
-                <Text style={[styles.paymentValue, { color: colors.warning }]}>₹{(totalBilled - totalPaid).toLocaleString('en-IN')}</Text>
+
+              <View style={styles.progressTrack}>
+                <LinearGradient
+                  colors={['#86EFAC', '#22C55E']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.progressFill, { width: `${paidPct}%` }]}
+                />
               </View>
-            </View>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${paidPct}%` }]} />
-            </View>
-          </Card>
+              <Text style={styles.progressLabel}>{paidPct}% collected</Text>
+            </LinearGradient>
+          </View>
         </>
       ) : (
         <Card style={styles.emptyCard}>
@@ -147,14 +168,70 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, padding: spacing.md, alignItems: 'center', gap: spacing.xs },
   statValue: { ...typography.h4 },
   statLabel: { ...typography.caption, color: colors.neutral[500] },
-  paymentCard: { padding: spacing.xl },
-  sectionTitle: { ...typography.h6, color: colors.ink, marginBottom: spacing.lg },
-  paymentRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md },
-  paymentItem: { alignItems: 'center' },
-  paymentLabel: { ...typography.caption, color: colors.neutral[500], marginBottom: spacing.xs },
-  paymentValue: { ...typography.h6, color: colors.ink },
-  progressTrack: { height: 8, backgroundColor: colors.neutral[100], borderRadius: 4 },
-  progressFill: { height: 8, backgroundColor: colors.success, borderRadius: 4 },
+  paymentHeroWrap: {
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+    ...shadows.xl,
+  },
+  paymentHeroCard: {
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  paymentHeroGlow: {
+    position: 'absolute',
+    top: -60,
+    right: -60,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  paymentHeroHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  paymentHeroTitle: {
+    ...typography.h6,
+    color: colors.white,
+    fontFamily: fontFamily.semiBold,
+  },
+  paymentRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.lg },
+  paymentItem: { alignItems: 'center', flex: 1 },
+  paymentLabel: {
+    ...typography.caption,
+    color: 'rgba(255, 255, 255, 0.78)',
+    marginBottom: spacing.xs,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  paymentValue: {
+    ...typography.h6,
+    color: colors.white,
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+  },
+  progressTrack: {
+    height: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: radius.full,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 10,
+    borderRadius: radius.full,
+  },
+  progressLabel: {
+    ...typography.caption,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: spacing.xs,
+    textAlign: 'right',
+    fontSize: 10,
+  },
   emptyCard: { padding: spacing['4xl'], alignItems: 'center', gap: spacing.md },
   emptyText: { ...typography.bodyMedium, color: colors.neutral[400] },
 });
