@@ -14,12 +14,13 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Avatar, Button, Input } from '../../src/components';
 import { useEmployee, useUpdateEmployee } from '../../src/hooks/useEmployees';
-import { useAttendanceHistory } from '../../src/hooks/useAttendance';
+import { useAttendanceHistory, useTodayAttendance } from '../../src/hooks/useAttendance';
 import { useMyTasks } from '../../src/hooks/useTasks';
 import { useProjects } from '../../src/hooks/useProjects';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
+import { showAlert } from '../../src/utils/alert';
 
 const TABS = ['Overview', 'Attendance', 'Tasks', 'Salary'] as const;
 type Tab = typeof TABS[number];
@@ -37,6 +38,7 @@ export default function EmployeeProfileScreen() {
   const { data: attendance } = useAttendanceHistory(id, 31);
   const { data: tasks } = useMyTasks(id);
   const { data: projects = [] } = useProjects();
+  const { data: todayAtt } = useTodayAttendance(id);
   const [tab, setTab] = useState<Tab>('Overview');
   const updateEmployee = useUpdateEmployee();
 
@@ -70,14 +72,14 @@ export default function EmployeeProfileScreen() {
       });
       setEditOpen(false);
     } catch (e: any) {
-      Alert.alert('Could not save', e?.message || 'Try again.');
+      showAlert('Could not save', e?.message || 'Try again.');
     }
   };
 
   const toggleActive = () => {
     if (!emp) return;
     const deactivating = emp.status === 'active';
-    Alert.alert(
+    showAlert(
       deactivating ? 'Deactivate employee?' : 'Reactivate employee?',
       deactivating
         ? `${emp.full_name} will no longer be able to use the app.`
@@ -90,7 +92,7 @@ export default function EmployeeProfileScreen() {
           onPress: () =>
             updateEmployee.mutate(
               { id: emp.id, updates: { status: deactivating ? 'inactive' : 'active' } as any },
-              { onError: (e: any) => Alert.alert('Failed', e?.message || 'Try again.') },
+              { onError: (e: any) => showAlert('Failed', e?.message || 'Try again.') },
             ),
         },
       ],
@@ -178,6 +180,38 @@ export default function EmployeeProfileScreen() {
               <QuickStat icon="list" label="Tasks" value={pendingTasks} color={colors.info} />
               <QuickStat icon="checkmark-done" label="Done" value={completedTasks} color={colors.success} />
             </View>
+
+            {/* Today's Status */}
+            <Card style={styles.todayStatusCard}>
+              <View style={styles.todayStatusRow}>
+                <View style={styles.todayStatusLeft}>
+                  <Ionicons name="time-outline" size={20} color={colors.primary} />
+                  <Text style={styles.todayStatusLabel}>Today's Status</Text>
+                </View>
+                <View style={[styles.todayStatusBadge, {
+                  backgroundColor: todayAtt?.check_in_at 
+                    ? (todayAtt?.check_out_at ? colors.successBg : colors.warningBg)
+                    : colors.neutral[100]
+                }]}>
+                  <Text style={[styles.todayStatusText, {
+                    color: todayAtt?.check_in_at
+                      ? (todayAtt?.check_out_at ? colors.success : colors.warning)
+                      : colors.neutral[500]
+                  }]}>
+                    {todayAtt?.check_in_at
+                      ? (todayAtt?.check_out_at ? '✓ Shift Done' : '● Punched In')
+                      : 'Not Punched In'}
+                  </Text>
+                </View>
+              </View>
+              {todayAtt?.check_in_at && (
+                <Text style={styles.todayStatusTime}>
+                  In: {new Date(todayAtt.check_in_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                  {todayAtt?.check_out_at ? ` → Out: ${new Date(todayAtt.check_out_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                </Text>
+              )}
+            </Card>
+
             {emp.address && (
               <Card style={styles.infoCard}>
                 <Text style={styles.infoLabel}>Address</Text>
@@ -195,6 +229,22 @@ export default function EmployeeProfileScreen() {
 
         {tab === 'Attendance' && (
           <View style={styles.tabContent}>
+            {/* Summary Bar */}
+            <View style={styles.attendanceSummary}>
+              <View style={styles.attendanceSummaryItem}>
+                <View style={[styles.summaryDot, { backgroundColor: colors.success }]} />
+                <Text style={styles.summaryText}>Present: {presentDays}</Text>
+              </View>
+              <View style={styles.attendanceSummaryItem}>
+                <View style={[styles.summaryDot, { backgroundColor: colors.warning }]} />
+                <Text style={styles.summaryText}>Leave: {leaveDays}</Text>
+              </View>
+              <View style={styles.attendanceSummaryItem}>
+                <View style={[styles.summaryDot, { backgroundColor: colors.error }]} />
+                <Text style={styles.summaryText}>Absent: {Math.max(0, 30 - presentDays - leaveDays)}</Text>
+              </View>
+            </View>
+
             {(attendance || []).slice(0, 15).map((a) => (
               <Card key={a.id} style={styles.attendanceCard}>
                 <View style={styles.attendanceRow}>
@@ -217,27 +267,42 @@ export default function EmployeeProfileScreen() {
                 </View>
               </Card>
             ))}
-            {(!attendance || attendance.length === 0) && <Text style={styles.emptyText}>No attendance records</Text>}
+            {(!attendance || attendance.length === 0) && (
+              <View style={styles.emptyAttendance}>
+                <Ionicons name="calendar-outline" size={48} color={colors.neutral[300]} />
+                <Text style={styles.emptyAttendanceTitle}>No Attendance Records</Text>
+                <Text style={styles.emptyAttendanceDesc}>Attendance will appear here automatically when this employee punches in from their app.</Text>
+              </View>
+            )}
           </View>
         )}
 
         {tab === 'Tasks' && (
           <View style={styles.tabContent}>
             {(tasks || []).map((task) => (
-              <Card key={task.id} style={styles.taskCard}>
-                <View style={styles.taskRow}>
-                  <View style={[styles.priorityDot, {
-                    backgroundColor: task.priority === 'high' ? colors.error : task.priority === 'medium' ? colors.warning : colors.success,
-                  }]} />
-                  <View style={styles.taskInfo}>
-                    <Text style={styles.taskTitle}>{task.title}</Text>
-                    {task.level_zone && <Text style={styles.taskMeta}>{task.level_zone}</Text>}
+              <TouchableOpacity
+                key={task.id}
+                onPress={() => router.push({ pathname: '/(admin)/project-workspace' as any, params: { id: task.project_id, intent: 'task' } })}
+                activeOpacity={0.7}
+              >
+                <Card style={styles.taskCard}>
+                  <View style={styles.taskRow}>
+                    <View style={[styles.priorityDot, {
+                      backgroundColor: task.priority === 'high' ? colors.error : task.priority === 'medium' ? colors.warning : colors.success,
+                    }]} />
+                    <View style={styles.taskInfo}>
+                      <Text style={styles.taskTitle}>{task.title}</Text>
+                      <Text style={styles.taskMeta}>
+                        {task.level_zone ? `${task.level_zone} · ` : ''}
+                        {projects.find(p => p.id === task.project_id)?.name || 'Project'}
+                      </Text>
+                    </View>
+                    <Text style={[styles.taskStatus, {
+                      color: task.status === 'done' ? colors.success : task.status === 'blocked' ? colors.error : colors.warning,
+                    }]}>{task.status}</Text>
                   </View>
-                  <Text style={[styles.taskStatus, {
-                    color: task.status === 'done' ? colors.success : task.status === 'blocked' ? colors.error : colors.warning,
-                  }]}>{task.status}</Text>
-                </View>
-              </Card>
+                </Card>
+              </TouchableOpacity>
             ))}
             {(!tasks || tasks.length === 0) && <Text style={styles.emptyText}>No tasks assigned</Text>}
           </View>
@@ -379,4 +444,18 @@ const styles = StyleSheet.create({
   salaryLabel: { ...typography.caption, fontFamily: fontFamily.semiBold, color: colors.neutral[400], marginBottom: spacing.xs },
   salaryValue: { ...typography.h4, color: colors.ink },
   emptyText: { ...typography.bodyMedium, color: colors.neutral[400], textAlign: 'center', paddingVertical: spacing['3xl'] },
+  todayStatusCard: { padding: spacing.lg, marginBottom: spacing.sm, borderLeftWidth: 3, borderLeftColor: colors.primary },
+  todayStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  todayStatusLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  todayStatusLabel: { ...typography.bodySmall, fontFamily: fontFamily.medium, color: colors.ink },
+  todayStatusBadge: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full },
+  todayStatusText: { ...typography.caption, fontFamily: fontFamily.semiBold },
+  todayStatusTime: { ...typography.caption, color: colors.neutral[500], marginTop: spacing.xs, marginLeft: 28 },
+  attendanceSummary: { flexDirection: 'row', gap: spacing.lg, marginBottom: spacing.lg, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, backgroundColor: colors.surface, borderRadius: radius.md },
+  attendanceSummaryItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  summaryDot: { width: 8, height: 8, borderRadius: 4 },
+  summaryText: { ...typography.caption, fontFamily: fontFamily.medium, color: colors.ink },
+  emptyAttendance: { alignItems: 'center', paddingVertical: spacing['3xl'], gap: spacing.sm },
+  emptyAttendanceTitle: { ...typography.h5, color: colors.neutral[500] },
+  emptyAttendanceDesc: { ...typography.bodySmall, color: colors.neutral[400], textAlign: 'center', paddingHorizontal: spacing.xl, lineHeight: 20 },
 });

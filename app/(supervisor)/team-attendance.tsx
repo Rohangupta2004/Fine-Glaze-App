@@ -11,6 +11,8 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { Avatar, Card } from '../../src/components';
 import { useProjects } from '../../src/hooks/useProjects';
 import { useProjectAttendance } from '../../src/hooks/useAttendance';
@@ -61,24 +63,31 @@ export default function TeamAttendanceScreen() {
   const isToday = selectedDate === todayISO();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          hitSlop={8}
-          style={styles.backBtn}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.title}>Team Attendance</Text>
-          {activeProject && (
-            <Text style={styles.projectName}>{activeProject.name}</Text>
-          )}
+      <LinearGradient
+        colors={['#695030', '#7E6144', '#918050']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.headerWrap, { paddingTop: insets.top }]}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            hitSlop={8}
+            style={styles.backBtn}
+          >
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <View style={styles.headerCenter}>
+            <Text style={styles.title}>Team Attendance</Text>
+            {activeProject && (
+              <Text style={styles.projectName}>{activeProject.name}</Text>
+            )}
+          </View>
+          <View style={{ width: TOUCH_TARGET }} />
         </View>
-        <View style={{ width: TOUCH_TARGET }} />
-      </View>
+      </LinearGradient>
 
       {/* Date Navigator */}
       <View style={styles.dateNav}>
@@ -174,6 +183,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  headerWrap: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',

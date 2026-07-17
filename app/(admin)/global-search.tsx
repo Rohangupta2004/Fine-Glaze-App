@@ -144,17 +144,23 @@ export default function GlobalSearchScreen() {
               <Text style={styles.sectionTitle}>Tasks ({results.tasks.length})</Text>
             </View>
             {results.tasks.map((task) => (
-              <Card key={task.id} style={styles.resultCard} variant="interactive">
-                <View style={styles.resultRow}>
-                  <View style={[styles.typeIcon, { backgroundColor: colors.warningBg }]}>
-                    <Ionicons name="checkmark-circle" size={18} color={colors.warning} />
+              <TouchableOpacity
+                key={task.id}
+                onPress={() => router.push({ pathname: '/(admin)/project-workspace' as any, params: { id: task.project_id, intent: 'task' } })}
+                activeOpacity={0.7}
+              >
+                <Card style={styles.resultCard} variant="interactive">
+                  <View style={styles.resultRow}>
+                    <View style={[styles.typeIcon, { backgroundColor: colors.warningBg }]}>
+                      <Ionicons name="checkmark-circle" size={18} color={colors.warning} />
+                    </View>
+                    <View style={styles.resultInfo}>
+                      <Text style={styles.resultTitle}>{task.title}</Text>
+                      <Text style={styles.resultSub}>{task.level_zone} · {task.priority} · {task.status}</Text>
+                    </View>
                   </View>
-                  <View style={styles.resultInfo}>
-                    <Text style={styles.resultTitle}>{task.title}</Text>
-                    <Text style={styles.resultSub}>{task.level_zone} · {task.priority} · {task.status}</Text>
-                  </View>
-                </View>
-              </Card>
+                </Card>
+              </TouchableOpacity>
             ))}
           </View>
         )}

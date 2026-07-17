@@ -18,6 +18,7 @@ import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
 import type { LeaveType, RequestStatus } from '../../src/types';
+import { showAlert } from '../../src/utils/alert';
 
 const LEAVE_TYPES: { key: LeaveType; label: string }[] = [
   { key: 'casual', label: 'Casual Leave' },
@@ -57,11 +58,11 @@ export default function LeaveRequestScreen() {
 
   const handleSubmit = async () => {
     if (!fromDate || !toDate) {
-      Alert.alert('Error', 'Please fill in from and to dates (YYYY-MM-DD format)');
+      showAlert('Error', 'Please fill in from and to dates (YYYY-MM-DD format)');
       return;
     }
     if (!profile?.id || !profile?.company_id) {
-      Alert.alert('Error', 'Profile not loaded');
+      showAlert('Error', 'Profile not loaded');
       return;
     }
     setSubmitting(true);
@@ -74,14 +75,14 @@ export default function LeaveRequestScreen() {
         toDate,
         reason: reason || undefined,
       });
-      Alert.alert('Submitted', 'Your leave request has been submitted for approval.', [
+      showAlert('Submitted', 'Your leave request has been submitted for approval.', [
         { text: 'OK', onPress: () => setView('history') },
       ]);
       setFromDate('');
       setToDate('');
       setReason('');
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to submit leave request');
+      showAlert('Error', e.message || 'Failed to submit leave request');
     } finally {
       setSubmitting(false);
     }

@@ -8,10 +8,12 @@ import { spacing, TOUCH_TARGET } from '../theme/spacing';
 interface PinPadProps {
   onComplete: (pin: string) => void;
   length?: number;
+  theme?: 'light' | 'dark';
 }
 
-export function PinPad({ onComplete, length = 6 }: PinPadProps) {
+export function PinPad({ onComplete, length = 6, theme = 'light' }: PinPadProps) {
   const [pin, setPin] = useState('');
+  const isDark = theme === 'dark';
 
   const handlePress = useCallback(
     (digit: string) => {
@@ -39,7 +41,11 @@ export function PinPad({ onComplete, length = 6 }: PinPadProps) {
         {Array.from({ length }, (_, i) => (
           <View
             key={i}
-            style={[styles.dot, i < pin.length && styles.dotFilled]}
+            style={[
+              styles.dot,
+              isDark && styles.dotDark,
+              i < pin.length && (isDark ? styles.dotFilledDark : styles.dotFilled),
+            ]}
           />
         ))}
       </View>
@@ -68,7 +74,7 @@ export function PinPad({ onComplete, length = 6 }: PinPadProps) {
                     <Ionicons
                       name="backspace-outline"
                       size={28}
-                      color={colors.ink}
+                      color={isDark ? colors.authText : colors.ink}
                     />
                   </TouchableOpacity>
                 );
@@ -80,7 +86,7 @@ export function PinPad({ onComplete, length = 6 }: PinPadProps) {
                   onPress={() => handlePress(key)}
                   activeOpacity={0.6}
                 >
-                  <Text style={styles.keyText}>{key}</Text>
+                  <Text style={[styles.keyText, isDark && styles.keyTextDark]}>{key}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -110,9 +116,16 @@ const styles = StyleSheet.create({
     borderColor: colors.neutral[300],
     backgroundColor: colors.transparent,
   },
+  dotDark: {
+    borderColor: '#3D332C',
+  },
   dotFilled: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
+  },
+  dotFilledDark: {
+    backgroundColor: colors.secondary,
+    borderColor: colors.secondary,
   },
   pad: {
     gap: spacing.md,
@@ -131,5 +144,8 @@ const styles = StyleSheet.create({
   keyText: {
     ...typography.h2,
     color: colors.ink,
+  },
+  keyTextDark: {
+    color: colors.authText,
   },
 });

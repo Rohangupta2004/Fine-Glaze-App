@@ -3,5 +3,13 @@
   "compilerOptions": {
     "strict": true
   },
-  "exclude": ["supabase/functions"]
+  "exclude": [
+    "supabase/functions"
+  ],
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
 }

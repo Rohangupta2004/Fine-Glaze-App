@@ -31,13 +31,20 @@ export default function ClientDashboard() {
   const paidPct = totalBilled > 0 ? Math.round((totalPaid / totalBilled) * 100) : 0;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingTop: insets.top + spacing.lg, paddingBottom: spacing['6xl'] }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
-    >
-      <Text style={styles.greeting}>Welcome, {firstName} 👋</Text>
+    <View style={{ flex: 1 }}>
+      <LinearGradient 
+        colors={['#FFFFFF', '#F9F8F6', '#EAE6DF']} 
+        start={{ x: 0, y: 0 }} 
+        end={{ x: 1, y: 1 }} 
+        style={StyleSheet.absoluteFill} 
+      />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingTop: insets.top + spacing.lg, paddingBottom: spacing['6xl'] }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
+      >
+        <Text style={styles.greeting}>Welcome, {firstName} 👋</Text>
 
       {project ? (
         <>
@@ -132,7 +139,8 @@ export default function ClientDashboard() {
           <Text style={styles.emptyText}>No projects assigned yet</Text>
         </Card>
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -147,7 +155,7 @@ function DetailRow({ icon, label, value }: { icon: string; label: string; value:
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg },
+  container: { flex: 1, backgroundColor: 'transparent', paddingHorizontal: spacing.lg },
   greeting: { ...typography.h4, color: colors.ink, marginBottom: spacing['2xl'] },
   projectCard: { padding: spacing.xl, marginBottom: spacing.lg },
   projectHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.xl },

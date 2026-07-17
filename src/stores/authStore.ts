@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
 import { supabase } from '../lib/supabase';
+import { safeGetItem, safeSetItem } from '../lib/safeStorage';
 import type { Profile, UserRole, UIExperience } from '../types';
 import { getUIExperience } from '../types';
 
@@ -48,7 +48,7 @@ function phoneToEmail(phone: string): string {
   return `${digits}@fineglazeapp.com`;
 }
 
-/** Simple hash for PIN (not crypto-grade, but stored in SecureStore) */
+
 async function hashPin(pin: string): Promise<string> {
   // In production, use a proper hash. For now, a simple approach
   // since SecureStore is already encrypted at rest.
@@ -110,19 +110,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setPin: async (pin) => {
     const hashed = await hashPin(pin);
-    await SecureStore.setItemAsync('fg_pin_hash', hashed);
+    await safeSetItem('fg_pin_hash', hashed);
     set({ hasPin: true });
   },
 
   verifyPin: async (pin) => {
-    const stored = await SecureStore.getItemAsync('fg_pin_hash');
+    const stored = await safeGetItem('fg_pin_hash');
     if (!stored) return false;
     const hashed = await hashPin(pin);
     return hashed === stored;
   },
 
   checkPinExists: async () => {
-    const stored = await SecureStore.getItemAsync('fg_pin_hash');
+    const stored = await safeGetItem('fg_pin_hash');
     const exists = !!stored;
     set({ hasPin: exists });
     return exists;

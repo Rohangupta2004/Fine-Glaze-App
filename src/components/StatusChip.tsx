@@ -58,11 +58,13 @@ export function StatusChip({ status, label, size = 'md' }: StatusChipProps) {
     <View
       style={[
         styles.chip,
-        { backgroundColor: config.bg },
+        { backgroundColor: config.bg, borderColor: config.text, borderWidth: 1 },
         size === 'sm' && styles.chipSm,
       ]}
     >
-      <View style={[styles.dot, { backgroundColor: config.text }]} />
+      {status !== 'draft' && status !== 'inactive' && (
+        <View style={[styles.dot, { backgroundColor: config.text }]} />
+      )}
       <Text
         style={[
           styles.label,

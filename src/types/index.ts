@@ -115,6 +115,7 @@ export interface Project {
   stage: ProjectStage | null;
   start_date: string | null;
   expected_end_date: string | null;
+  image_url?: string | null;
 }
 
 export interface Assignment {
@@ -147,7 +148,7 @@ export interface Attendance {
 
 export interface Task {
   id: string;
-  project_id: string;
+  project_id: string | null;
   assigned_to: string | null;
   title: string;
   level_zone: string | null;

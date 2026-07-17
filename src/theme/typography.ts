@@ -22,24 +22,24 @@ export const typography = {
 
   h2: {
     fontFamily: fontFamily.semiBold,
-    fontSize: 28,
-    lineHeight: 36,
-  } as TextStyle,
-
-  h3: {
-    fontFamily: fontFamily.semiBold,
     fontSize: 24,
     lineHeight: 32,
   } as TextStyle,
 
-  h4: {
-    fontFamily: fontFamily.semiBold,
+  h3: {
+    fontFamily: fontFamily.medium,
     fontSize: 20,
     lineHeight: 28,
   } as TextStyle,
 
+  h4: {
+    fontFamily: fontFamily.medium,
+    fontSize: 18,
+    lineHeight: 26,
+  } as TextStyle,
+
   h5: {
-    fontFamily: fontFamily.semiBold,
+    fontFamily: fontFamily.medium,
     fontSize: 16,
     lineHeight: 24,
   } as TextStyle,

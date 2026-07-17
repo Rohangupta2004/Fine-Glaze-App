@@ -7,7 +7,9 @@ import {
   TouchableOpacity,
   Alert,
   Switch,
+  ActivityIndicator,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,10 +17,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { Card, Avatar, Button } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useMonthlySalary } from '../../src/hooks/useSalary';
+import { supabase } from '../../src/lib/supabase';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
 import { useTranslation } from 'react-i18next';
+import { showAlert } from '../../src/utils/alert';
 
 type TabKey = 'details' | 'salary' | 'bank' | 'settings';
 
@@ -44,12 +48,57 @@ export default function ProfileScreen() {
   const { t, i18n } = useTranslation();
   const { profile, signOut } = useAuthStore();
   const [activeTab, setActiveTab] = useState<TabKey>('details');
+  const [uploading, setUploading] = useState(false);
+
+  const changePhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      showAlert('Permission Denied', 'We need photo library access to update your profile picture.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (result.canceled || !profile) return;
+
+    setUploading(true);
+    try {
+      const uri = result.assets[0].uri;
+      const response = await fetch(uri);
+      const bytes = await response.arrayBuffer();
+      const path = `avatars/${profile.id}.jpg`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(path, bytes, { contentType: 'image/jpeg', upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+      const { error: dbError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: urlData.publicUrl })
+        .eq('id', profile.id);
+      if (dbError) throw dbError;
+
+      useAuthStore.setState({ profile: { ...profile, avatar_url: publicUrl } });
+      showAlert('Success ✅', 'Profile photo updated.');
+    } catch (e: any) {
+      showAlert('Upload failed', e?.message || 'Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const now = new Date();
   const { data: salary } = useMonthlySalary(profile?.id, now.getFullYear(), now.getMonth() + 1);
 
   const handleLogout = async () => {
-    Alert.alert(
+    showAlert(
       'Log Out',
       'Are you sure you want to log out?',
       [
@@ -85,7 +134,14 @@ export default function ProfileScreen() {
 
       {/* Profile summary */}
       <View style={styles.profileBanner}>
-        <Avatar name={profile?.full_name ?? 'W'} uri={profile?.avatar_url} size={72} />
+        <TouchableOpacity onPress={changePhoto} style={styles.avatarTouchable} disabled={uploading}>
+          <Avatar name={profile?.full_name ?? 'W'} uri={profile?.avatar_url} size={72} />
+          <View style={styles.cameraBadge}>
+            {uploading
+              ? <ActivityIndicator size={10} color="#fff" />
+              : <Ionicons name="camera" size={12} color="#fff" />}
+          </View>
+        </TouchableOpacity>
         <View style={styles.profileText}>
           <Text style={styles.profileName}>{profile?.full_name ?? 'Worker'}</Text>
           <Text style={styles.profileMeta}>{profile?.worker_id ?? profile?.phone ?? ''}</Text>
@@ -322,6 +378,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.neutral[100],
   },
+  avatarTouchable: { position: 'relative' },
+  cameraBadge: { position: 'absolute', bottom: 0, right: 0, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.white },
   profileText: {
     flex: 1,
   },

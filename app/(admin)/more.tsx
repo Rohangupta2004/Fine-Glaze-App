@@ -1,6 +1,5 @@
 /**
- * Admin More Menu — matches reference screenshot_8 panel 13
- * All admin management, finance, settings links.
+ * Admin More Menu
  */
 import React from 'react';
 import {
@@ -10,16 +9,17 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card, Avatar } from '../../src/components';
+import { Avatar } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { usePermissions } from '../../src/hooks/usePermissions';
 import { colors } from '../../src/theme/colors';
-import { typography, fontFamily } from '../../src/theme/typography';
-import { spacing, radius } from '../../src/theme/spacing';
+import { fontFamily } from '../../src/theme/typography';
+import { spacing } from '../../src/theme/spacing';
 
 interface MenuItem {
   icon: string;
@@ -27,45 +27,47 @@ interface MenuItem {
   route: string;
   color?: string;
   badge?: number;
-  /** permission key required to see this item (owner sees all) */
   perm?: string;
 }
 
-const SECTIONS: { title: string; items: MenuItem[] }[] = [
+const SECTIONS: { title: string; items: MenuItem[]; gradient: string[] }[] = [
   {
     title: 'Management',
+    gradient: ['#695030', '#7D5F3A'],
     items: [
-      { icon: 'document-text', label: 'DPR Management', route: '/(admin)/dpr-management', color: colors.info, perm: 'dpr_approvals' },
-      { icon: 'folder', label: 'Documents Vault', route: '/(admin)/documents', color: colors.primary },
-      { icon: 'cube', label: 'Materials', route: '/(admin)/materials', color: colors.warning, perm: 'materials' },
-      { icon: 'business', label: 'Clients', route: '/(admin)/clients', color: colors.info, perm: 'clients' },
-      { icon: 'calendar', label: 'Calendar', route: '/(admin)/calendar', color: colors.primary },
-      { icon: 'people', label: 'Attendance Report', route: '/(admin)/attendance-report', color: colors.success, perm: 'attendance' },
-      { icon: 'search', label: 'Global Search', route: '/(admin)/global-search', color: colors.warning },
-      { icon: 'people-circle', label: 'Assign Site & Workers', route: '/(admin)/assign-site', color: colors.info },
-      { icon: 'person-add', label: 'Employee Requests', route: '/(admin)/employee-requests', color: colors.warning },
-      { icon: 'repeat', label: 'Recurring Tasks', route: '/(admin)/recurring-tasks', color: colors.success },
-      { icon: 'qr-code', label: 'Project QR Codes', route: '/(admin)/project-qr', color: colors.primary },
+      { icon: 'document-text', label: 'DPR Management', route: '/(admin)/dpr-management', color: '#2563EB', perm: 'dpr_approvals' },
+      { icon: 'folder', label: 'Documents Vault', route: '/(admin)/documents', color: '#695030' },
+      { icon: 'cube', label: 'Materials', route: '/(admin)/materials', color: '#D97706', perm: 'materials' },
+      { icon: 'business', label: 'Clients', route: '/(admin)/clients', color: '#2563EB', perm: 'clients' },
+      { icon: 'calendar', label: 'Calendar', route: '/(admin)/calendar', color: '#695030' },
+      { icon: 'people', label: 'Attendance Report', route: '/(admin)/attendance-report', color: '#059669', perm: 'attendance' },
+      { icon: 'search', label: 'Global Search', route: '/(admin)/global-search', color: '#D97706' },
+      { icon: 'people-circle', label: 'Assign Site & Workers', route: '/(admin)/assign-site', color: '#2563EB' },
+      { icon: 'person-add', label: 'Employee Requests', route: '/(admin)/employee-requests', color: '#D97706' },
+      { icon: 'repeat', label: 'Recurring Tasks', route: '/(admin)/recurring-tasks', color: '#059669' },
+      { icon: 'qr-code', label: 'Project QR Codes', route: '/(admin)/project-qr', color: '#695030' },
     ],
   },
   {
     title: 'Reports & Analytics',
+    gradient: ['#2563EB', '#3B82F6'],
     items: [
-      { icon: 'bar-chart', label: 'Analytics', route: '/(admin)/analytics', color: colors.info },
-      { icon: 'list', label: 'Audit Log', route: '/(admin)/audit-log', color: colors.neutral[600] },
+      { icon: 'bar-chart', label: 'Analytics', route: '/(admin)/analytics', color: '#2563EB' },
+      { icon: 'list', label: 'Audit Log', route: '/(admin)/audit-log', color: '#6B7280' },
     ],
   },
   {
     title: 'Settings',
+    gradient: ['#7C3AED', '#8B5CF6'],
     items: [
-      { icon: 'person-circle', label: 'My Profile', route: '/(admin)/my-profile', color: colors.primary },
-      { icon: 'business', label: 'Company Settings', route: '/(admin)/company-settings', color: colors.neutral[700], perm: 'settings' },
-      { icon: 'shield-checkmark', label: 'Roles & Permissions', route: '/(admin)/roles-permissions', color: colors.warning, perm: 'settings' },
-      { icon: 'notifications', label: 'Notification Settings', route: '/(admin)/notification-settings', color: colors.info },
-      { icon: 'language', label: 'Language', route: '/(admin)/language-settings', color: colors.success },
-      { icon: 'cloud-download', label: 'Backup & Restore', route: '/(admin)/backup-restore', color: colors.pending },
-      { icon: 'help-circle', label: 'Help & Support', route: '/(admin)/help-about', color: colors.neutral[500] },
-      { icon: 'information-circle', label: 'About Fine Glaze COS', route: '/(admin)/help-about', color: colors.primary },
+      { icon: 'person-circle', label: 'My Profile', route: '/(admin)/my-profile', color: '#695030' },
+      { icon: 'business', label: 'Company Settings', route: '/(admin)/company-settings', color: '#374151', perm: 'settings' },
+      { icon: 'shield-checkmark', label: 'Roles & Permissions', route: '/(admin)/roles-permissions', color: '#D97706', perm: 'settings' },
+      { icon: 'notifications', label: 'Notification Settings', route: '/(admin)/notification-settings', color: '#2563EB' },
+      { icon: 'language', label: 'Language', route: '/(admin)/language-settings', color: '#059669' },
+      { icon: 'cloud-download', label: 'Backup & Restore', route: '/(admin)/backup-restore', color: '#7C3AED' },
+      { icon: 'help-circle', label: 'Help & Support', route: '/(admin)/help-about', color: '#6B7280' },
+      { icon: 'information-circle', label: 'About Fine Glaze COS', route: '/(admin)/help-about', color: '#695030' },
     ],
   },
 ];
@@ -85,35 +87,52 @@ export default function AdminMoreScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingTop: insets.top + spacing.lg, paddingBottom: spacing['6xl'] }}
+      contentContainerStyle={{ paddingBottom: 100 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Profile card */}
-      <Card style={styles.profileCard}>
-        <View style={styles.profileRow}>
-          <Avatar name={profile?.full_name || 'Admin'} uri={profile?.avatar_url} size={56} />
+      {/* Gradient Profile Hero */}
+      <LinearGradient
+        colors={['#695030', '#8B6840', '#A8824E']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.profileHero, { paddingTop: insets.top + spacing.lg }]}
+      >
+        <View style={styles.heroBubble} />
+        <TouchableOpacity
+          style={styles.profileRow}
+          activeOpacity={0.85}
+          onPress={() => router.push('/(admin)/my-profile' as any)}
+        >
+          <Avatar name={profile?.full_name || 'Admin'} uri={profile?.avatar_url} size={60} />
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{profile?.full_name || 'Admin'}</Text>
             <Text style={styles.profileRole}>{profile?.role?.replace('_', ' ') || 'Admin'}</Text>
             <Text style={styles.profilePhone}>{profile?.phone || ''}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.neutral[400]} />
-        </View>
-      </Card>
+          <View style={styles.profileArrow}>
+            <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.8)" />
+          </View>
+        </TouchableOpacity>
+      </LinearGradient>
 
-      {/* Menu sections */}
-      {visibleSections.map((section) => (
-        <View key={section.title} style={styles.section}>
-          <Text style={styles.sectionTitle}>{section.title}</Text>
-          <Card style={styles.menuCard}>
-            {section.items.map((item, idx) => (
-              <React.Fragment key={item.label}>
+      {/* Menu Sections */}
+      <View style={styles.body}>
+        {visibleSections.map((section) => (
+          <View key={section.title} style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <LinearGradient colors={section.gradient as any} style={styles.sectionDot} />
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+            </View>
+            <View style={styles.menuList}>
+              {section.items.map((item, idx) => (
                 <TouchableOpacity
-                  style={styles.menuItem}
+                  key={item.label}
+                  style={styles.menuItemCard}
                   onPress={() => router.push(item.route as any)}
+                  activeOpacity={0.7}
                 >
-                  <View style={[styles.menuIcon, { backgroundColor: (item.color || colors.primary) + '15' }]}>
-                    <Ionicons name={item.icon as any} size={20} color={item.color || colors.primary} />
+                  <View style={[styles.menuIconWrap, { backgroundColor: (item.color || colors.primary) + '18' }]}>
+                    <Ionicons name={item.icon as any} size={18} color={item.color || colors.primary} />
                   </View>
                   <Text style={styles.menuLabel}>{item.label}</Text>
                   {item.badge && item.badge > 0 && (
@@ -121,50 +140,75 @@ export default function AdminMoreScreen() {
                       <Text style={styles.badgeText}>{item.badge}</Text>
                     </View>
                   )}
-                  <Ionicons name="chevron-forward" size={18} color={colors.neutral[300]} />
+                  <Ionicons name="chevron-forward" size={15} color={colors.neutral[300]} />
                 </TouchableOpacity>
-                {idx < section.items.length - 1 && <View style={styles.divider} />}
-              </React.Fragment>
-            ))}
-          </Card>
-        </View>
-      ))}
+              ))}
+            </View>
+          </View>
+        ))}
 
-      {/* Logout */}
-      <TouchableOpacity
-        style={styles.logoutBtn}
-        onPress={() => {
-          signOut();
-          router.replace('/(auth)/welcome');
-        }}
-      >
-        <Ionicons name="log-out-outline" size={20} color={colors.error} />
-        <Text style={styles.logoutText}>Log Out</Text>
-      </TouchableOpacity>
+        {/* Logout */}
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          activeOpacity={0.8}
+          onPress={() => {
+            signOut();
+            router.replace('/(auth)/welcome');
+          }}
+        >
+          <LinearGradient colors={['#FEE2E2', '#FECACA']} style={styles.logoutGrad}>
+            <Ionicons name="log-out-outline" size={18} color={colors.error} />
+            <Text style={styles.logoutText}>Log Out</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg },
-  profileCard: { padding: spacing.xl, marginBottom: spacing.xl },
-  profileRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  container: { flex: 1, backgroundColor: '#EDE8E1' },
+
+  // Profile Hero
+  profileHero: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, overflow: 'hidden' },
+  heroBubble: { position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.08)' },
+  profileRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   profileInfo: { flex: 1 },
-  profileName: { ...typography.h5, color: colors.ink },
-  profileRole: { ...typography.caption, color: colors.primary, textTransform: 'capitalize', marginTop: 2 },
-  profilePhone: { ...typography.caption, color: colors.neutral[500], marginTop: 2 },
-  section: { marginBottom: spacing.xl },
-  sectionTitle: { ...typography.caption, color: colors.neutral[500], textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.sm, marginLeft: spacing.xs },
-  menuCard: { padding: 0, overflow: 'hidden' },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.lg, gap: spacing.md },
-  menuIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  menuLabel: { flex: 1, ...typography.bodyMedium, fontFamily: fontFamily.medium, color: colors.ink },
+  profileName: { fontSize: 18, fontFamily: fontFamily.bold, color: '#fff' },
+  profileRole: { fontSize: 12, color: 'rgba(255,255,255,0.75)', textTransform: 'capitalize', marginTop: 2, fontFamily: fontFamily.medium },
+  profilePhone: { fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2, fontFamily: fontFamily.regular },
+  profileArrow: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+
+  // Body
+  body: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+
+  // Section
+  section: { marginBottom: spacing.lg },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  sectionDot: { width: 14, height: 14, borderRadius: 4 },
+  sectionTitle: { fontSize: 11, fontFamily: fontFamily.bold, color: colors.neutral[500], textTransform: 'uppercase', letterSpacing: 1 },
+
+  // Menu List
+  menuList: { gap: spacing.sm },
+  menuItemCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(105,80,48,0.08)',
+    boxShadow: '0px 2px 10px rgba(105,80,48,0.05)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+  } as any,
+  menuIconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  menuLabel: { flex: 1, fontSize: 14, fontFamily: fontFamily.medium, color: '#1E1815' },
   badge: { backgroundColor: colors.error, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
-  badgeText: { ...typography.caption, color: colors.white, fontFamily: fontFamily.semiBold, fontSize: 10 },
-  divider: { height: 1, backgroundColor: colors.neutral[100], marginLeft: spacing.lg + 36 + spacing.md },
-  logoutBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
-    paddingVertical: spacing.lg, marginTop: spacing.md,
-  },
-  logoutText: { ...typography.bodyMedium, fontFamily: fontFamily.semiBold, color: colors.error },
+  badgeText: { fontSize: 10, color: '#fff', fontFamily: fontFamily.bold },
+
+  // Logout
+  logoutBtn: { marginTop: spacing.md, marginBottom: spacing.lg, borderRadius: 16, overflow: 'hidden' },
+  logoutGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.lg, borderRadius: 16 },
+  logoutText: { fontSize: 15, fontFamily: fontFamily.semiBold, color: colors.error },
 });

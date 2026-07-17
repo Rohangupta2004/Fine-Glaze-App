@@ -27,6 +27,7 @@ import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
 import type { ClientApproval } from '../../src/types';
 import { SignedImage } from '../../src/components/SignedImage';
+import { showAlert } from '../../src/utils/alert';
 
 // —— Status badge ———————————————————————————————————————————————
 
@@ -62,7 +63,7 @@ function ApprovalDetail({
 
   const handleDecide = async (status: 'approved' | 'rejected') => {
     const label = status === 'approved' ? 'Approve' : 'Reject';
-    Alert.alert(
+    showAlert(
       `${label} Request`,
       `Are you sure you want to ${label.toLowerCase()} "${item.title}"? This cannot be undone.`,
       [
@@ -74,7 +75,7 @@ function ApprovalDetail({
             try {
               await decide({ id: item.id, status });
             } catch (e: any) {
-              Alert.alert('Error', e.message ?? 'Failed to update. Please try again.');
+              showAlert('Error', e.message ?? 'Failed to update. Please try again.');
             }
           },
         },

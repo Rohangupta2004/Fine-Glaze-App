@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { Card, Button, Input } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -20,11 +22,13 @@ import {
   useProjectTasks,
   useUpdateTaskStatus,
   useCreateTask,
+  useMyTasks,
 } from '../../src/hooks/useTasks';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius, TOUCH_TARGET } from '../../src/theme/spacing';
-import type { TaskStatus, TaskPriority } from '../../src/types';
+import type { TaskStatus, TaskPriority, Task } from '../../src/types';
+import { showAlert } from '../../src/utils/alert';
 
 const FILTERS: { label: string; value: TaskStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
@@ -43,25 +47,34 @@ const PRIORITY_OPTIONS: TaskPriority[] = ['high', 'medium', 'low'];
 
 export default function SupervisorTasksScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const profile = useAuthStore((s) => s.profile);
   const { data: projects } = useProjects();
   const { data: employees } = useEmployees();
   const activeProject = (projects || [])[0];
 
-  const { data: tasks, refetch, isRefetching } = useProjectTasks(activeProject?.id);
+  const { data: projectTasks = [], refetch: refetchProject, isRefetching: isRefetchingProject } = useProjectTasks(activeProject?.id);
+  const { data: myTasks = [], refetch: refetchMine, isRefetching: isRefetchingMine } = useMyTasks(profile?.id);
+
+  const tasks = React.useMemo(() => {
+    const map = new Map<string, Task>();
+    projectTasks.forEach(t => map.set(t.id, t));
+    myTasks.forEach(t => {
+      if (!map.has(t.id)) map.set(t.id, t);
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.window_start && b.window_start) {
+        return new Date(a.window_start).getTime() - new Date(b.window_start).getTime();
+      }
+      return 0;
+    });
+  }, [projectTasks, myTasks]);
+
+  const isRefetching = isRefetchingProject || isRefetchingMine;
+  const refetch = () => { refetchProject(); refetchMine(); };
   const updateStatus = useUpdateTaskStatus();
-  const createTask = useCreateTask();
 
   const [filter, setFilter] = useState<TaskStatus | 'all'>('all');
-  const [showCreate, setShowCreate] = useState(false);
-
-  // Create task form state
-  const [newTitle, setNewTitle] = useState('');
-  const [newZone, setNewZone] = useState('');
-  const [newPriority, setNewPriority] = useState<TaskPriority>('medium');
-  const [newAssignee, setNewAssignee] = useState<string>('');
-
-  const workers = (employees || []).filter((e) => e.role === 'worker' || e.role === 'supervisor');
 
   const filtered = (tasks || []).filter(
     (t) => filter === 'all' || t.status === filter,
@@ -77,42 +90,33 @@ export default function SupervisorTasksScreen() {
     updateStatus.mutate({ taskId, status: next });
   };
 
-  const handleCreate = async () => {
-    if (!newTitle.trim() || !profile?.id || !activeProject?.id) return;
-    try {
-      await createTask.mutateAsync({
-        projectId: activeProject.id,
-        createdBy: profile.id,
-        title: newTitle.trim(),
-        assignedTo: newAssignee || null,
-        levelZone: newZone.trim() || null,
-        priority: newPriority,
-      });
-      setShowCreate(false);
-      setNewTitle(''); setNewZone(''); setNewPriority('medium'); setNewAssignee('');
-    } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to create task');
-    }
-  };
+
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + spacing.lg }]}>
+    <View style={styles.container}>
       {/* Header */}
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>Tasks</Text>
-        <TouchableOpacity
-          style={styles.addTaskBtn}
-          onPress={() => setShowCreate(true)}
-          hitSlop={8}
-        >
-          <Ionicons name="add-circle" size={30} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Project label */}
-      {activeProject && (
-        <Text style={styles.projectLabel}>{activeProject.name}</Text>
-      )}
+      <LinearGradient
+        colors={['#695030', '#7E6144', '#918050']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.headerWrap, { paddingTop: insets.top }]}
+      >
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.title}>Tasks</Text>
+            {activeProject && (
+              <Text style={styles.projectLabel}>{activeProject.name}</Text>
+            )}
+          </View>
+          <TouchableOpacity
+            style={styles.addTaskBtn}
+            onPress={() => router.push('/create-task')}
+            hitSlop={8}
+          >
+            <Ionicons name="add-circle" size={30} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
 
       {/* Filter chips */}
       <ScrollView
@@ -204,159 +208,55 @@ export default function SupervisorTasksScreen() {
             {filter === 'all' && (
               <Button
                 title="Create Task"
-                onPress={() => setShowCreate(true)}
+                onPress={() => router.push('/create-task')}
                 variant="secondary"
               />
             )}
           </View>
         )}
       </ScrollView>
-
-      {/* Create Task Modal */}
-      <Modal visible={showCreate} animationType="slide" presentationStyle="pageSheet">
-        <View style={[styles.modal, { paddingTop: insets.top + spacing.md }]}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>New Task</Text>
-            <TouchableOpacity
-              onPress={() => setShowCreate(false)}
-              hitSlop={8}
-              style={styles.closeBtn}
-            >
-              <Ionicons name="close" size={26} color={colors.ink} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.modalForm}
-            keyboardShouldPersistTaps="handled"
-          >
-            <Input
-              label="Task Title *"
-              placeholder="Describe what needs to be done"
-              value={newTitle}
-              onChangeText={setNewTitle}
-            />
-            <View style={styles.formGap} />
-            <Input
-              label="Level / Zone"
-              placeholder="e.g. Level 4 - East Wing"
-              value={newZone}
-              onChangeText={setNewZone}
-            />
-            <View style={styles.formGap} />
-
-            {/* Priority */}
-            <Text style={styles.fieldLabel}>Priority</Text>
-            <View style={styles.priorityRow}>
-              {PRIORITY_OPTIONS.map((p) => (
-                <TouchableOpacity
-                  key={p}
-                  style={[
-                    styles.priorityChip,
-                    newPriority === p && { backgroundColor: PRIORITY_COLOR[p] },
-                  ]}
-                  onPress={() => setNewPriority(p)}
-                  hitSlop={4}
-                >
-                  <Text
-                    style={[
-                      styles.priorityChipText,
-                      newPriority === p && { color: colors.white },
-                    ]}
-                  >
-                    {p.charAt(0).toUpperCase() + p.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View style={styles.formGap} />
-
-            {/* Assignee */}
-            <Text style={styles.fieldLabel}>Assign To</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.assigneeRow}
-              contentContainerStyle={{ gap: spacing.sm }}
-            >
-              <TouchableOpacity
-                style={[
-                  styles.assigneeChip,
-                  !newAssignee && styles.assigneeChipActive,
-                ]}
-                onPress={() => setNewAssignee('')}
-              >
-                <Text style={[styles.assigneeText, !newAssignee && styles.assigneeTextActive]}>
-                  Unassigned
-                </Text>
-              </TouchableOpacity>
-              {workers.map((w) => (
-                <TouchableOpacity
-                  key={w.id}
-                  style={[
-                    styles.assigneeChip,
-                    newAssignee === w.id && styles.assigneeChipActive,
-                  ]}
-                  onPress={() => setNewAssignee(w.id)}
-                >
-                  <Text
-                    style={[
-                      styles.assigneeText,
-                      newAssignee === w.id && styles.assigneeTextActive,
-                    ]}
-                  >
-                    {w.full_name.split(' ')[0]}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <View style={{ height: spacing.xl }} />
-
-            <Button
-              title="Create Task"
-              onPress={handleCreate}
-              loading={createTask.isPending}
-              disabled={!newTitle.trim()}
-            />
-          </ScrollView>
-        </View>
-      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg },
+  container: { flex: 1, backgroundColor: '#FAF8F5' },
+  headerWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+    paddingTop: spacing.md,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    overflow: 'hidden',
+  },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.xs,
   },
-  title: { ...typography.h3, color: colors.ink },
+  title: { ...typography.h4, color: '#fff' },
   addTaskBtn: {
     width: TOUCH_TARGET,
     height: TOUCH_TARGET,
     alignItems: 'flex-end',
     justifyContent: 'center',
   },
-  projectLabel: { ...typography.caption, color: colors.neutral[500], marginBottom: spacing.lg },
-  filterRow: { marginBottom: spacing.md, flexGrow: 0 },
+  projectLabel: { ...typography.bodySmall, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  filterRow: { marginTop: spacing.md, marginBottom: spacing.md, flexGrow: 0, paddingHorizontal: spacing.lg },
   filterChip: {
     paddingHorizontal: spacing.lg,
     height: TOUCH_TARGET - 8,
     justifyContent: 'center',
     borderRadius: radius.full,
-    backgroundColor: colors.surface,
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: colors.neutral[200],
   },
   filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   filterText: { ...typography.bodySmall, fontFamily: fontFamily.medium, color: colors.neutral[600] },
   filterTextActive: { color: colors.white },
-  list: { paddingBottom: spacing['6xl'] },
-  taskCard: { marginBottom: spacing.sm },
+  list: { paddingBottom: spacing['6xl'], paddingHorizontal: spacing.lg },
+  taskCard: { marginBottom: spacing.sm, backgroundColor: '#fff', borderRadius: radius.xl },
   taskRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   checkBtn: {
     width: TOUCH_TARGET,

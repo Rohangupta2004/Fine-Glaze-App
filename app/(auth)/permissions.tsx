@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -8,8 +8,9 @@ import { Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import { Button } from '../../src/components';
+import { Button, GradientButton } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
@@ -59,7 +60,6 @@ export default function PermissionsScreen() {
   };
 
   const handleContinue = () => {
-    // Route to role-based home — root layout handles this
     if (profile) {
       const group = getGroup(profile.role);
       router.replace(`/(${group})/home` as any);
@@ -71,42 +71,56 @@ export default function PermissionsScreen() {
   const allGranted = perms.every((p) => p.granted);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 40 }]}>
-      <Text style={styles.title}>{t('auth.permissionsTitle')}</Text>
-      <Text style={styles.subtitle}>{t('auth.permissionsSubtitle')}</Text>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={[colors.authBg, colors.neutral[100]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
+        <Text style={styles.title}>{t('auth.permissionsTitle')}</Text>
+        <Text style={styles.subtitle}>{t('auth.permissionsSubtitle')}</Text>
 
-      <View style={styles.list}>
-        {perms.map((perm) => (
-          <View key={perm.key} style={styles.permRow}>
-            <View style={[styles.iconCircle, perm.granted && styles.iconCircleGranted]}>
-              <Ionicons
-                name={perm.granted ? 'checkmark' : perm.icon}
-                size={22}
-                color={perm.granted ? colors.white : colors.primary}
-              />
+        <View style={styles.list}>
+          {perms.map((perm) => (
+            <View key={perm.key} style={styles.permRow}>
+              <View style={[
+                styles.iconCircle,
+                styles.iconCircleDark,
+                perm.granted && styles.iconCircleGranted
+              ]}>
+                <Ionicons
+                  name={perm.granted ? 'checkmark' : perm.icon}
+                  size={20}
+                  color={perm.granted ? colors.white : colors.secondary}
+                />
+              </View>
+              <View style={styles.permText}>
+                <Text style={styles.permTitle}>{t(perm.titleKey)}</Text>
+                <Text style={styles.permDesc}>{t(perm.descKey)}</Text>
+              </View>
             </View>
-            <View style={styles.permText}>
-              <Text style={styles.permTitle}>{t(perm.titleKey)}</Text>
-              <Text style={styles.permDesc}>{t(perm.descKey)}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
 
-      <View style={[styles.buttons, { paddingBottom: insets.bottom + 24 }]}>
-        {!allGranted && (
+        <View style={[styles.buttons, { paddingBottom: insets.bottom + 24 }]}>
+          {!allGranted && (
+            <GradientButton
+              title={t('auth.grantAll')}
+              onPress={handleGrantAll}
+              fullWidth
+              size="lg"
+            />
+          )}
           <Button
-            title={t('auth.grantAll')}
-            onPress={handleGrantAll}
+            title={t('auth.continueSetup')}
+            onPress={handleContinue}
+            variant={allGranted ? 'primary' : 'tertiary'}
             fullWidth
+            textStyle={!allGranted ? styles.skipText : undefined}
           />
-        )}
-        <Button
-          title={t('auth.continueSetup')}
-          onPress={handleContinue}
-          variant={allGranted ? 'primary' : 'tertiary'}
-          fullWidth
-        />
+        </View>
       </View>
     </View>
   );
@@ -131,20 +145,25 @@ function getGroup(role: string): string {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.authBg,
+  },
+  content: {
+    flex: 1,
     paddingHorizontal: spacing['2xl'],
   },
   title: {
     ...typography.h3,
-    color: colors.ink,
+    color: colors.authText,
     textAlign: 'center',
     marginBottom: spacing.sm,
+    fontFamily: fontFamily.semiBold,
   },
   subtitle: {
     ...typography.bodyMedium,
-    color: colors.neutral[500],
+    color: colors.neutral[400],
     textAlign: 'center',
     marginBottom: spacing['3xl'],
+    fontFamily: fontFamily.regular,
   },
   list: {
     gap: spacing.xl,
@@ -163,23 +182,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconCircleDark: {
+    backgroundColor: 'rgba(145, 128, 80, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(145, 128, 80, 0.25)',
+  },
   iconCircleGranted: {
     backgroundColor: colors.success,
+    borderColor: colors.success,
   },
   permText: {
     flex: 1,
   },
   permTitle: {
     ...typography.h6,
-    color: colors.ink,
+    color: colors.authText,
     marginBottom: 2,
+    fontFamily: fontFamily.semiBold,
   },
   permDesc: {
     ...typography.bodySmall,
-    color: colors.neutral[500],
+    color: colors.neutral[400],
+    fontFamily: fontFamily.regular,
   },
   buttons: {
     marginTop: 'auto',
     gap: spacing.md,
+  },
+  skipText: {
+    color: colors.neutral[400],
+    fontFamily: fontFamily.medium,
   },
 });

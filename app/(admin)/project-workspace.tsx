@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { Card, StatusChip, Avatar, Button } from '../../src/components';
+import { Card, StatusChip, Avatar, Button, GradientCard, ProgressRing } from '../../src/components';
 import { useProject } from '../../src/hooks/useProjects';
 import { useEmployees } from '../../src/hooks/useEmployees';
 import { useProjectDprs } from '../../src/hooks/useDpr';
@@ -76,13 +76,15 @@ function InfoRow({ icon, label, value }: { icon: string; label: string; value: s
   );
 }
 
-function StatBox({ label, value, icon, color }: { label: string; value: string; icon: string; color: string }) {
+function StatBox({ label, value, icon, color, onPress }: { label: string; value: string; icon: string; color: string; onPress?: () => void }) {
   return (
-    <Card style={styles.statBox}>
-      <Ionicons name={icon as any} size={20} color={color} />
-      <Text style={[styles.statBoxValue, { color }]}>{value}</Text>
-      <Text style={styles.statBoxLabel}>{label}</Text>
-    </Card>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={{ flex: 1 }} disabled={!onPress}>
+      <Card style={styles.statBox}>
+        <Ionicons name={icon as any} size={20} color={color} />
+        <Text style={[styles.statBoxValue, { color }]}>{value}</Text>
+        <Text style={styles.statBoxLabel}>{label}</Text>
+      </Card>
+    </TouchableOpacity>
   );
 }
 
@@ -143,72 +145,159 @@ function OverviewTab({
   payments,
   materialReqs,
   tasks,
+  onTabChange,
 }: {
   project: any;
   employees: any[];
   payments: Payment[];
   materialReqs: MaterialRequest[];
   tasks: Task[];
+  onTabChange: (tab: any) => void;
 }) {
   const totalBilled = payments.reduce((s, p) => s + p.amount, 0);
   const totalPaid = payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
   const pendingMaterials = materialReqs.filter(m => m.status === 'pending');
   const openTasks = tasks.filter(t => t.status === 'pending');
+  const payPct = totalBilled > 0 ? Math.round(totalPaid / totalBilled * 100) : 0;
 
   return (
-    <>
-      {/* Progress */}
-      <Card style={styles.overviewCard}>
-        <View style={styles.progressSection}>
-          <View style={styles.progressRing}>
-            <Text style={styles.progressPct}>{project.progress_pct}%</Text>
-            <Text style={styles.progressLabel}>Complete</Text>
+    <View style={ovStyles.content}>
+      {/* Hero: ring on top, meta grid below */}
+      <View style={ovStyles.glassCard}>
+        <View style={ovStyles.heroCard}>
+          <View style={ovStyles.gaugeWrap}>
+            <ProgressRing
+              progress={project.progress_pct || 0}
+              size={132}
+              strokeWidth={10}
+              startColor="#A9713F"
+              endColor="#6B4423"
+              trackColor="rgba(139,94,52,0.14)"
+              showLabel={false}
+            />
+            <View style={ovStyles.gaugeLabel}>
+              <Text style={ovStyles.gaugePct}>{project.progress_pct || 0}%</Text>
+              <Text style={ovStyles.gaugeSub}>Complete</Text>
+            </View>
           </View>
-          <View style={styles.progressDetails}>
-            <InfoRow icon="layers" label="Stage" value={project.stage || '—'} />
-            <InfoRow icon="location" label="City" value={project.city || '—'} />
-            <InfoRow icon="calendar" label="Start" value={fmt(project.start_date)} />
-            <InfoRow icon="flag" label="End" value={fmt(project.expected_end_date)} />
-          </View>
-        </View>
-        {/* Full-width progress bar */}
-        <View style={{ marginTop: spacing.lg }}>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${project.progress_pct}%` as any, backgroundColor: colors.primary }]} />
-          </View>
-        </View>
-      </Card>
 
-      {/* Quick Stats */}
-      <View style={styles.quickStatsRow}>
-        <StatBox label="Team" value={employees.length.toString()} icon="people" color={colors.info} />
-        <StatBox label="Tasks" value={openTasks.length.toString()} icon="checkmark-circle" color={colors.warning} />
-        <StatBox label="Payments" value={`₹${(totalPaid / 100000).toFixed(1)}L`} icon="cash" color={colors.success} />
-        <StatBox label="Materials" value={pendingMaterials.length.toString()} icon="cube" color={colors.error} />
+          <View style={ovStyles.metaDivider} />
+
+          <View style={ovStyles.metaGrid}>
+            <View style={ovStyles.metaItem}>
+              <View style={[ovStyles.metaIcon, { backgroundColor: '#FCF0DA' }]}>
+                <Ionicons name="layers" size={14} color="#B8860B" />
+              </View>
+              <View>
+                <Text style={ovStyles.metaTextLabel}>Stage</Text>
+                <Text style={[ovStyles.metaTextValue, { color: '#8B8680', fontFamily: fontFamily.medium }]}>{project.stage || '—'}</Text>
+              </View>
+            </View>
+            <View style={ovStyles.metaItem}>
+              <View style={[ovStyles.metaIcon, { backgroundColor: '#FCF0DA' }]}>
+                <Ionicons name="location" size={14} color="#B8860B" />
+              </View>
+              <View>
+                <Text style={ovStyles.metaTextLabel}>City</Text>
+                <Text style={ovStyles.metaTextValue}>{project.city || '—'}</Text>
+              </View>
+            </View>
+            <View style={ovStyles.metaItem}>
+              <View style={[ovStyles.metaIcon, { backgroundColor: '#FCF0DA' }]}>
+                <Ionicons name="calendar" size={14} color="#B8860B" />
+              </View>
+              <View>
+                <Text style={ovStyles.metaTextLabel}>Start</Text>
+                <Text style={ovStyles.metaTextValue}>{fmt(project.start_date)}</Text>
+              </View>
+            </View>
+            <View style={ovStyles.metaItem}>
+              <View style={[ovStyles.metaIcon, { backgroundColor: '#FCF0DA' }]}>
+                <Ionicons name="flag" size={14} color="#B8860B" />
+              </View>
+              <View>
+                <Text style={ovStyles.metaTextLabel}>End</Text>
+                <Text style={ovStyles.metaTextValue}>{fmt(project.expected_end_date)}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
       </View>
 
-      {/* Payment Progress */}
-      <Card style={styles.sectionCard}>
-        <Text style={styles.sectionCardTitle}>💰 Payment Progress</Text>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, {
-            width: `${totalBilled > 0 ? Math.round(totalPaid / totalBilled * 100) : 0}%` as any,
-            backgroundColor: colors.success,
-          }]} />
-        </View>
-        <Text style={[typography.bodySmall, { color: colors.neutral[600], marginTop: spacing.sm }]}>
-          {fmtINR(totalPaid)} collected of {fmtINR(totalBilled)} billed
-        </Text>
-      </Card>
+      {/* stat cards: 2x2, horizontal layout */}
+      <View style={ovStyles.statsGrid}>
+        <TouchableOpacity style={ovStyles.statCardGlass} activeOpacity={0.7} onPress={() => onTabChange('Employees')}>
+          <View style={[ovStyles.statIcon, { backgroundColor: '#E8EEFC' }]}>
+            <Ionicons name="people" size={19} color="#3D6FE0" />
+          </View>
+          <View>
+            <Text style={ovStyles.statValue}>{employees.length}</Text>
+            <Text style={ovStyles.statLabel}>Team</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={ovStyles.statCardGlass} activeOpacity={0.7} onPress={() => onTabChange('Tasks')}>
+          <View style={[ovStyles.statIcon, { backgroundColor: '#FCF0DA' }]}>
+            <Ionicons name="checkmark-circle" size={19} color="#B8860B" />
+          </View>
+          <View>
+            <Text style={ovStyles.statValue}>{openTasks.length}</Text>
+            <Text style={ovStyles.statLabel}>Tasks</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={ovStyles.statCardGlass} activeOpacity={0.7} onPress={() => onTabChange('Payments')}>
+          <View style={[ovStyles.statIcon, { backgroundColor: '#E4F5E9' }]}>
+            <Ionicons name="cash" size={19} color="#3FA65B" />
+          </View>
+          <View>
+            <Text style={ovStyles.statValue}>₹{(totalPaid / 100000).toFixed(1)}L</Text>
+            <Text style={ovStyles.statLabel}>Payments</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={ovStyles.statCardGlass} activeOpacity={0.7} onPress={() => onTabChange('Materials')}>
+          <View style={[ovStyles.statIcon, { backgroundColor: '#FBE6E1' }]}>
+            <Ionicons name="cube" size={19} color="#D6503A" />
+          </View>
+          <View>
+            <Text style={ovStyles.statValue}>{pendingMaterials.length}</Text>
+            <Text style={ovStyles.statLabel}>Materials</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
 
-      {/* Address */}
+      {/* payment progress */}
+      <View style={ovStyles.sectionCardGlass}>
+        <View style={ovStyles.sectionHead}>
+          <View style={[ovStyles.sectionIcon, { backgroundColor: '#FCF0DA' }]}>
+            <Ionicons name="wallet" size={14} color="#B8860B" />
+          </View>
+          <Text style={ovStyles.sectionTitle}>Payment Progress</Text>
+        </View>
+        <View style={ovStyles.trackBar}>
+          <LinearGradient
+            colors={['#E8A93A', '#f3c465']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[ovStyles.trackFill, { width: `${Math.max(payPct, 2)}%` as any }]}
+          />
+        </View>
+        <Text style={ovStyles.trackCaption}>
+          <Text style={{ fontWeight: '700', color: '#2A241D' }}>{fmtINR(totalPaid)}</Text> collected of <Text style={{ fontWeight: '700', color: '#2A241D' }}>{fmtINR(totalBilled)}</Text> billed
+        </Text>
+      </View>
+
+      {/* site address */}
       {!!project.address && (
-        <Card style={styles.sectionCard}>
-          <Text style={styles.sectionCardTitle}>📍 Site Address</Text>
-          <Text style={[typography.bodySmall, { color: colors.neutral[700] }]}>{project.address}</Text>
-        </Card>
+        <View style={ovStyles.sectionCardGlass}>
+          <View style={ovStyles.sectionHead}>
+            <View style={[ovStyles.sectionIcon, { backgroundColor: '#FBE6E1' }]}>
+              <Ionicons name="location" size={14} color="#D6503A" />
+            </View>
+            <Text style={ovStyles.sectionTitle}>Site Address</Text>
+          </View>
+          <Text style={ovStyles.addressText}>{project.address}</Text>
+        </View>
       )}
-    </>
+    </View>
   );
 }
 
@@ -224,6 +313,7 @@ function TasksTab({
   projectId: string;
   currentUserId: string;
 }) {
+  const router = useRouter();
   const updateStatus = useUpdateTaskStatus();
   const createTask = useCreateTask();
   const [showAdd, setShowAdd] = useState(false);
@@ -343,7 +433,14 @@ function TasksTab({
               </Text>
               <Text style={styles.listSubtitle}>
                 {task.level_zone ? `${task.level_zone} · ` : ''}
-                {task.assigned_to ? employeeMap.get(task.assigned_to) || 'Assigned' : 'Unassigned'}
+                {task.assigned_to ? (
+                  <Text 
+                    style={{ color: colors.primary, textDecorationLine: 'underline' }}
+                    onPress={() => router.push({ pathname: '/(admin)/employee-profile' as any, params: { id: task.assigned_to } })}
+                  >
+                    {employeeMap.get(task.assigned_to) || 'Assigned'}
+                  </Text>
+                ) : 'Unassigned'}
                 {task.window_start ? ` · Due ${fmtShort(task.window_start)}` : ''}
               </Text>
             </View>
@@ -1287,34 +1384,44 @@ export default function ProjectWorkspaceScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
-        </TouchableOpacity>
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle} numberOfLines={1}>{project.name}</Text>
-          <StatusChip status={project.status} />
-        </View>
-      </View>
-
-      {/* Tab Bar */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.tabBar}
-        contentContainerStyle={{ gap: spacing.xs, paddingHorizontal: spacing.lg }}
+      {/* Gradient Header */}
+      <LinearGradient
+        colors={['#3E2A18', '#6B4423', '#A9713F']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
       >
-        {TABS.map((t) => (
-          <TouchableOpacity
-            key={t}
-            style={[styles.tabPill, tab === t && styles.tabPillActive]}
-            onPress={() => setTab(t)}
-          >
-            <Text style={[styles.tabPillText, tab === t && styles.tabPillTextActive]}>{t}</Text>
+        <View style={styles.topbar}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={20} color="#fff" />
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+          <Text style={styles.projTitle} numberOfLines={1}>{project.name}</Text>
+          <View style={styles.statusPillTop}>
+            <View style={styles.statusDotTop} />
+            <Text style={styles.statusTextTop}>On Track</Text>
+          </View>
+        </View>
+
+        {/* Tab Bar */}
+        <View style={styles.tabsWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tabBar}
+            contentContainerStyle={{ gap: 6, paddingHorizontal: 5, paddingVertical: 5 }}
+          >
+            {TABS.map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.tabPill, tab === t && styles.tabPillActive]}
+                onPress={() => setTab(t)}
+              >
+                <Text style={[styles.tabPillText, tab === t && styles.tabPillTextActive]}>{t}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </LinearGradient>
 
       {/* Content */}
       <ScrollView
@@ -1329,6 +1436,7 @@ export default function ProjectWorkspaceScreen() {
             payments={payments}
             materialReqs={materialReqs}
             tasks={tasks}
+            onTabChange={setTab}
           />
         )}
         {tab === 'Tasks' && (
@@ -1388,29 +1496,41 @@ export default function ProjectWorkspaceScreen() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#FAF8F5' },
   center: { justifyContent: 'center', alignItems: 'center' },
   loadingText: { ...typography.bodyMedium, color: colors.neutral[400] },
 
   // Header
   header: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
-    borderBottomWidth: 1, borderBottomColor: colors.divider,
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.xl,
+    paddingBottom: spacing.lg, overflow: 'hidden',
+    borderBottomLeftRadius: 26,
+    borderBottomRightRadius: 26,
   },
-  headerInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { ...typography.h5, color: colors.ink, flex: 1, marginRight: spacing.sm },
+  topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 1 },
+  backBtn: {
+    width: 34, height: 34, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  projTitle: { flex: 1, textAlign: 'center', fontFamily: fontFamily.semiBold, fontSize: 19, color: '#fff', letterSpacing: 0.2 },
+  statusPillTop: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100,
+  },
+  statusDotTop: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#3FA65B' },
+  statusTextTop: { fontSize: 11.5, fontFamily: fontFamily.bold, color: '#3FA65B' },
 
   // Tab bar
-  tabBar: { flexGrow: 0, marginBottom: spacing.sm, paddingTop: spacing.sm },
+  tabsWrapper: { marginTop: 20, zIndex: 1 },
+  tabBar: { backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 14 },
   tabPill: {
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm - 2,
-    borderRadius: radius.full, backgroundColor: colors.neutral[100],
-    borderWidth: 1, borderColor: colors.neutral[200],
+    paddingHorizontal: 15, paddingVertical: 9, borderRadius: 10,
   },
-  tabPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabPillText: { ...typography.bodySmall, fontFamily: fontFamily.medium, color: colors.neutral[500] },
-  tabPillTextActive: { color: colors.white },
+  tabPillActive: { backgroundColor: '#fff', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 14 },
+  tabPillText: { fontSize: 12.5, fontFamily: fontFamily.semiBold, color: 'rgba(255,255,255,0.68)' },
+  tabPillTextActive: { color: '#3E2A18' },
 
   // Overview
   overviewCard: { padding: spacing.xl, marginBottom: spacing.md },
@@ -1850,4 +1970,50 @@ const payStyles = StyleSheet.create({
     paddingLeft: spacing.xs,
     paddingVertical: spacing.xs,
   },
+});
+
+// ── Overview Tab Styles ─────────────────────────────────────────────────────────
+const ovStyles = StyleSheet.create({
+  content: { gap: 14 },
+  glassCard: {
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    borderColor: 'rgba(255,255,255,0.7)',
+    borderWidth: 1,
+    borderRadius: 22,
+    shadowColor: '#3E2A18', shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.15, shadowRadius: 34, elevation: 4,
+    overflow: 'hidden',
+  },
+  heroCard: { padding: 24, paddingBottom: 20 },
+  gaugeWrap: { position: 'relative', width: 132, height: 132, alignSelf: 'center' },
+  gaugeLabel: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  gaugePct: { fontFamily: fontFamily.bold, fontSize: 28, color: '#3E2A18', lineHeight: 32 },
+  gaugeSub: { fontSize: 10, letterSpacing: 0.6, textTransform: 'uppercase', color: '#8B8680', fontFamily: fontFamily.semiBold, marginTop: 4 },
+  metaDivider: { height: 1, backgroundColor: 'rgba(139,94,52,0.14)', marginVertical: 20 },
+  metaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, justifyContent: 'space-between' },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 10, width: '47%' },
+  metaIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  metaTextLabel: { fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5, color: '#8B8680', fontFamily: fontFamily.semiBold },
+  metaTextValue: { fontSize: 13.5, fontFamily: fontFamily.semiBold, color: '#2A241D', marginTop: 2 },
+  
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' },
+  statCardGlass: {
+    width: '48%',
+    backgroundColor: 'rgba(255,255,255,0.6)', borderColor: 'rgba(255,255,255,0.7)', borderWidth: 1, borderRadius: 22,
+    padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12,
+  },
+  statIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  statValue: { fontFamily: fontFamily.bold, fontSize: 18, color: '#3E2A18' },
+  statLabel: { fontSize: 9.5, letterSpacing: 0.3, textTransform: 'uppercase', color: '#8B8680', fontFamily: fontFamily.semiBold, marginTop: 2 },
+  
+  sectionCardGlass: {
+    backgroundColor: 'rgba(255,255,255,0.6)', borderColor: 'rgba(255,255,255,0.7)', borderWidth: 1, borderRadius: 22,
+    padding: 18,
+  },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 12 },
+  sectionIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { fontFamily: fontFamily.semiBold, fontSize: 13.5, color: '#3E2A18' },
+  trackBar: { width: '100%', height: 9, borderRadius: 100, backgroundColor: 'rgba(139,94,52,0.12)', overflow: 'hidden', marginBottom: 10 },
+  trackFill: { height: '100%', borderRadius: 100 },
+  trackCaption: { fontSize: 12, color: '#8B8680', fontFamily: fontFamily.medium },
+  addressText: { fontSize: 13.5, color: '#2A241D', lineHeight: 20, fontFamily: fontFamily.medium },
 });

@@ -25,7 +25,7 @@ export function useCreateTask() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (params: {
-      projectId: string;
+      projectId?: string | null;
       title: string;
       assignedTo?: string | null;
       priority?: TaskPriority;
@@ -34,8 +34,8 @@ export function useCreateTask() {
       windowEnd?: string | null;
       createdBy: string;
     }) => {
-      const { error } = await supabase.from('tasks').insert({
-        project_id: params.projectId,
+      const { data, error } = await supabase.from('tasks').insert({
+        project_id: params.projectId || null,
         title: params.title,
         assigned_to: params.assignedTo || null,
         priority: params.priority || 'medium',
@@ -44,8 +44,21 @@ export function useCreateTask() {
         window_end: params.windowEnd || null,
         status: 'pending',
         created_by: params.createdBy,
-      });
+      }).select();
+      
       if (error) throw error;
+
+      if (params.assignedTo && params.assignedTo !== params.createdBy && data?.[0]) {
+        await supabase.from('notifications').insert({
+          recipient_id: params.assignedTo,
+          kind: 'task_assigned',
+          title: 'New Task Assigned',
+          body: `You have been assigned: ${params.title}`,
+          ref_table: 'tasks',
+          ref_id: data[0].id,
+          important: params.priority === 'high',
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });

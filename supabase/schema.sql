@@ -61,6 +61,9 @@ CREATE TABLE client_orgs (
   created_at    TIMESTAMPTZ DEFAULT now()
 );
 
+-- Add client_org_id to profiles (done here since client_orgs is defined after profiles)
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS client_org_id UUID REFERENCES client_orgs(id) ON DELETE SET NULL;
+
 -- ── PROJECTS ─────────────────────────────────────────────────────────
 CREATE TABLE projects (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),

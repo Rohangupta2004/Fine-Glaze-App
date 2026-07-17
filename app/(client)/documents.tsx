@@ -19,6 +19,7 @@ import { useDocumentUpload } from '../../src/hooks/useDocumentUpload';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
+import { showAlert } from '../../src/utils/alert';
 
 const CATEGORY_ICON: Record<string, { icon: string; color: string }> = {
   drawings: { icon: 'map', color: colors.info },
@@ -56,9 +57,9 @@ export default function ClientDocumentsScreen() {
       await upload.mutateAsync({ ownerType: 'project', ownerId: project.id, category: upCategory });
       setUploadModal(false);
       refetch();
-      Alert.alert('Uploaded ✅', 'Your document has been shared with the Fine Glaze team.');
+      showAlert('Uploaded ✅', 'Your document has been shared with the Fine Glaze team.');
     } catch (e: any) {
-      if (e?.message !== 'File selection cancelled') Alert.alert('Upload failed', e?.message || 'Try again.');
+      if (e?.message !== 'File selection cancelled') showAlert('Upload failed', e?.message || 'Try again.');
     }
   };
 

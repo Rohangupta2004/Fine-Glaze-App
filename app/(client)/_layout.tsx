@@ -6,21 +6,26 @@ import { fontFamily } from '../../src/theme/typography';
 export default function ClientLayout() {
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.neutral[400],
-        tabBarStyle: {
-          backgroundColor: colors.white,
-          borderTopColor: colors.neutral[200],
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 4,
-        },
-        tabBarLabelStyle: {
-          fontFamily: fontFamily.medium,
-          fontSize: 11,
-        },
+      screenOptions={({ route }) => {
+        const visibleTabs = ['home', 'updates', 'documents', 'payments', 'more'];
+        const showTabBar = visibleTabs.includes(route.name);
+        return {
+          headerShown: false,
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: colors.neutral[400],
+          tabBarStyle: {
+            display: showTabBar ? 'flex' : 'none',
+            backgroundColor: colors.white,
+            borderTopColor: colors.neutral[200],
+            height: 60,
+            paddingBottom: 8,
+            paddingTop: 4,
+          },
+          tabBarLabelStyle: {
+            fontFamily: fontFamily.medium,
+            fontSize: 11,
+          },
+        };
       }}
     >
       {/* ── Visible 5-tab structure ── */}

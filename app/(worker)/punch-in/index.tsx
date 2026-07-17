@@ -24,6 +24,7 @@ import { useTodaySafetyCheck, useSubmitSafetyCheck } from '../../../src/hooks/us
 import { colors } from '../../../src/theme/colors';
 import { typography, fontFamily } from '../../../src/theme/typography';
 import { spacing, radius, shadows } from '../../../src/theme/spacing';
+import { showAlert } from '../../../src/utils/alert';
 
 // Must match the keys used on the standalone Daily Safety Checklist screen.
 const PPE_ITEMS = [
@@ -102,7 +103,7 @@ export default function PunchInScreen() {
         setSelfieUri(photo.uri);
       }
     } catch (e) {
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+      showAlert('Error', 'Failed to take photo. Please try again.');
     }
   };
 
@@ -113,7 +114,7 @@ export default function PunchInScreen() {
   const handleConfirm = async () => {
     if (!selfieUri || !geoResult || !profile?.id || !activeProject?.id) return;
     if (!safetyDone && !allPpeChecked) {
-      Alert.alert('Safety Checklist', 'Please confirm every PPE item before punching in.');
+      showAlert('Safety Checklist', 'Please confirm every PPE item before punching in.');
       return;
     }
 
@@ -137,7 +138,7 @@ export default function PunchInScreen() {
         capturedAt: new Date().toISOString(),
       });
       setSubmitting(false);
-      Alert.alert(
+      showAlert(
         'Punch In Recorded',
         geoResult.isWithinRadius
           ? 'Your attendance has been saved and will sync automatically.'
@@ -147,7 +148,7 @@ export default function PunchInScreen() {
     } catch (e: unknown) {
       setSubmitting(false);
       const msg = e instanceof Error ? e.message : 'Failed to record attendance.';
-      Alert.alert('Error', msg);
+      showAlert('Error', msg);
     }
   };
 

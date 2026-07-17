@@ -18,6 +18,7 @@ interface InputProps extends TextInputProps {
   icon?: keyof typeof Ionicons.glyphMap;
   rightIcon?: keyof typeof Ionicons.glyphMap;
   onRightIconPress?: () => void;
+  theme?: 'light' | 'dark';
 }
 
 export function Input({
@@ -27,17 +28,24 @@ export function Input({
   rightIcon,
   onRightIconPress,
   style,
+  theme = 'light',
   ...rest
 }: InputProps) {
   const [focused, setFocused] = useState(false);
+  const isDark = theme === 'dark';
 
   return (
     <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && (
+        <Text style={[styles.label, isDark && styles.labelDark]}>
+          {label}
+        </Text>
+      )}
       <View
         style={[
           styles.inputContainer,
-          focused && styles.focused,
+          isDark && styles.inputContainerDark,
+          focused && (isDark ? styles.focusedDark : styles.focused),
           error && styles.errorBorder,
         ]}
       >
@@ -45,13 +53,13 @@ export function Input({
           <Ionicons
             name={icon}
             size={20}
-            color={focused ? colors.primary : colors.neutral[400]}
+            color={focused ? colors.primary : (isDark ? colors.authPlaceholder : colors.neutral[400])}
             style={styles.icon}
           />
         )}
         <TextInput
-          style={[styles.input, style]}
-          placeholderTextColor={colors.neutral[400]}
+          style={[styles.input, isDark && styles.inputDark, style]}
+          placeholderTextColor={isDark ? colors.authPlaceholder : colors.neutral[400]}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           {...rest}
@@ -61,7 +69,7 @@ export function Input({
             <Ionicons
               name={rightIcon}
               size={20}
-              color={colors.neutral[400]}
+              color={isDark ? colors.authPlaceholder : colors.neutral[400]}
             />
           </TouchableOpacity>
         )}
@@ -80,6 +88,9 @@ const styles = StyleSheet.create({
     color: colors.ink,
     marginBottom: spacing.sm,
   },
+  labelDark: {
+    color: colors.authText,
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -90,8 +101,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     minHeight: 52,
   },
+  inputContainerDark: {
+    backgroundColor: colors.authSurface,
+    borderColor: colors.authBorder,
+  },
   focused: {
     borderColor: colors.primary,
+  },
+  focusedDark: {
+    borderColor: colors.secondary,
   },
   errorBorder: {
     borderColor: colors.error,
@@ -105,6 +123,9 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.regular,
     color: colors.ink,
     paddingVertical: spacing.md,
+  },
+  inputDark: {
+    color: colors.authText,
   },
   errorText: {
     ...typography.bodySmall,

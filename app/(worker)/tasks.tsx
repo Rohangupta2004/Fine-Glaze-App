@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 import { Card } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -21,6 +22,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 export default function TasksScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabKey>('today');
   const profile = useAuthStore((s) => s.profile);
@@ -33,7 +35,17 @@ export default function TasksScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.lg }]}>
-      <Text style={styles.title}>{t('worker.myTasks')}</Text>
+      {/* Header Row */}
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>{t('worker.myTasks')}</Text>
+        <TouchableOpacity
+          onPress={() => router.push('/create-task')}
+          style={styles.addTaskBtn}
+          hitSlop={8}
+        >
+          <Ionicons name="add-circle" size={30} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
 
       {/* Tabs */}
       <View style={styles.tabs}>
@@ -106,10 +118,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     paddingHorizontal: spacing.lg,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
   title: {
     ...typography.h3,
     color: colors.ink,
-    marginBottom: spacing.lg,
+  },
+  addTaskBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   tabs: {
     flexDirection: 'row',

@@ -23,6 +23,7 @@ import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius, TOUCH_TARGET } from '../../src/theme/spacing';
 import type { EmployeeRequestRole, EmployeeRequestStatus } from '../../src/types';
+import { showAlert } from '../../src/utils/alert';
 
 const ROLE_OPTIONS: { key: EmployeeRequestRole; label: string }[] = [
   { key: 'worker', label: 'Worker' },
@@ -57,7 +58,7 @@ export default function RequestEmployeeScreen() {
 
   const handleSubmit = async () => {
     if (!profile?.id || !profile.company_id || !activeProject?.id || !headcountIsValid) {
-      Alert.alert('Check details', 'Enter a headcount of at least 1.');
+      showAlert('Check details', 'Enter a headcount of at least 1.');
       return;
     }
     try {
@@ -69,11 +70,11 @@ export default function RequestEmployeeScreen() {
         headcount: headcountValue,
         notes: notes.trim() || undefined,
       });
-      Alert.alert('Sent to Admin', 'Your employee request has been submitted for approval.');
+      showAlert('Sent to Admin', 'Your employee request has been submitted for approval.');
       setHeadcount('1'); setNotes(''); setRoleNeeded('worker');
       setMode('list');
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to submit request');
+      showAlert('Error', e?.message || 'Failed to submit request');
     }
   };
 

@@ -19,3 +19,10 @@ export { GlassSheet } from './GlassSheet';
 export { GradientIcon } from './GradientIcon';
 export { StatusPill } from './StatusPill';
 export { GradientProgressBar } from './GradientProgressBar';
+
+// Google Maps Address Autocomplete (v1.2)
+export { AddressAutocomplete, StaticMapPreview } from './AddressAutocomplete';
+
+// SVG Progress Ring (v1.3)
+export { ProgressRing } from './ProgressRing';
+

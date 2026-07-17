@@ -18,6 +18,7 @@ import { useTodaySafetyCheck, useSubmitSafetyCheck } from '../../src/hooks/useSa
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
+import { showAlert } from '../../src/utils/alert';
 
 const PPE_ITEMS = [
   { key: 'helmet', label: 'Hard Hat / Helmet', icon: 'construct-outline' as const },
@@ -54,11 +55,11 @@ export default function SafetyChecklistScreen() {
 
   const handleSubmit = async () => {
     if (!profile?.id || !project?.id) {
-      Alert.alert('Error', 'Profile or project not loaded');
+      showAlert('Error', 'Profile or project not loaded');
       return;
     }
     if (!allChecked) {
-      Alert.alert('PPE Required', 'Please confirm all PPE items are worn before submitting.');
+      showAlert('PPE Required', 'Please confirm all PPE items are worn before submitting.');
       return;
     }
     setSubmitting(true);
@@ -69,9 +70,9 @@ export default function SafetyChecklistScreen() {
         items: checked,
         concernReported: concern || null,
       });
-      Alert.alert('Submitted', 'Safety checklist submitted. Stay safe! 👷');
+      showAlert('Submitted', 'Safety checklist submitted. Stay safe! 👷');
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to submit');
+      showAlert('Error', e.message || 'Failed to submit');
     } finally {
       setSubmitting(false);
     }

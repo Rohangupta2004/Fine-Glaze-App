@@ -14,6 +14,7 @@ import { supabase } from '../../src/lib/supabase';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing } from '../../src/theme/spacing';
+import { showAlert } from '../../src/utils/alert';
 
 export default function CompanySettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -47,9 +48,9 @@ export default function CompanySettingsScreen() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['company'] });
-      Alert.alert('Saved ✅', 'Company details updated.');
+      showAlert('Saved ✅', 'Company details updated.');
     },
-    onError: (e: any) => Alert.alert('Could not save', e?.message || 'Try again.'),
+    onError: (e: any) => showAlert('Could not save', e?.message || 'Try again.'),
   });
 
   return (

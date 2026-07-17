@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,9 +14,12 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Button, Card, Input } from '../../src/components';
 import { supabase } from '../../src/lib/supabase';
+import { useAuthStore } from '../../src/stores/authStore';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
+import { showAlert } from '../../src/utils/alert';
+
 import type { UserRole } from '../../src/types';
 
 const ROLES: { label: string; value: UserRole }[] = [
@@ -59,32 +63,29 @@ export default function AddEmployeeScreen() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      // Call the server-side Edge Function with the caller's JWT so RLS can
-      // verify the caller is an admin of the same company.
-      const { data, error } = await supabase.functions.invoke('create-user', {
+      const { data: funcData, error: funcErr } = await supabase.functions.invoke('create-user', {
         body: {
           full_name: fullName.trim(),
           phone: phone.trim(),
           role,
           daily_rate: dailyRate ? parseFloat(dailyRate) : null,
           address: address.trim() || null,
-        },
+        }
       });
 
-      if (error) {
-        // error.message contains the HTTP body returned by the function
-        throw new Error(error.message);
+      if (funcErr) {
+        throw new Error(funcErr.message || 'Failed to create user');
       }
 
-      const tempPassword: string = data?.temp_password ?? '(see admin)';
+      if (funcData?.error) {
+        throw new Error(funcData.error);
+      }
 
-      Alert.alert(
-        'Employee Added',
-        `${fullName} has been added.\nLogin: ${phone}\nTemp password: ${tempPassword}`,
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
+      showAlert('Employee Added!', `${fullName} has been added.\nLogin: ${phone}\nTemp password: ${funcData.temp_password}`);
+      router.back();
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to add employee');
+      const msg = e?.message || 'Failed to add employee';
+      showAlert('Error', msg);
     } finally {
       setSubmitting(false);
     }
@@ -112,7 +113,7 @@ export default function AddEmployeeScreen() {
         ))}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing['6xl'] }}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing['6xl'] }}>
         {step === 'info' && (
           <>
             <Text style={styles.stepTitle}>Basic Information</Text>
@@ -165,19 +166,18 @@ export default function AddEmployeeScreen() {
             </Card>
           </>
         )}
+        {/* Navigation buttons inside scroll */}
+        <View style={[styles.bottomActions, { marginTop: spacing.xl }]}>
+          {stepIndex > 0 && (
+            <Button title="Back" variant="secondary" onPress={() => setStep(STEPS[stepIndex - 1])} style={{ flex: 1 }} />
+          )}
+          {stepIndex < STEPS.length - 1 ? (
+            <Button title="Next" onPress={() => setStep(STEPS[stepIndex + 1])} disabled={!canNext} style={{ flex: 1 }} />
+          ) : (
+            <Button title="Add Employee" onPress={handleSubmit} loading={submitting} style={{ flex: 1 }} />
+          )}
+        </View>
       </ScrollView>
-
-      {/* Bottom actions */}
-      <View style={[styles.bottomActions, { paddingBottom: insets.bottom + spacing.lg }]}>
-        {stepIndex > 0 && (
-          <Button title="Back" variant="secondary" onPress={() => setStep(STEPS[stepIndex - 1])} style={{ flex: 1 }} />
-        )}
-        {stepIndex < STEPS.length - 1 ? (
-          <Button title="Next" onPress={() => setStep(STEPS[stepIndex + 1])} disabled={!canNext} style={{ flex: 1 }} />
-        ) : (
-          <Button title="Add Employee" onPress={handleSubmit} loading={submitting} style={{ flex: 1 }} />
-        )}
-      </View>
     </View>
   );
 }
@@ -219,5 +219,5 @@ const styles = StyleSheet.create({
   reviewValue: { ...typography.bodySmall, fontFamily: fontFamily.medium, color: colors.ink },
   infoBox: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.lg, backgroundColor: colors.infoBg },
   infoText: { flex: 1, ...typography.bodySmall, color: colors.info },
-  bottomActions: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.neutral[100] },
+  bottomActions: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.neutral[100], backgroundColor: colors.white, boxShadow: '0px -4px 16px rgba(0,0,0,0.06)' },
 });

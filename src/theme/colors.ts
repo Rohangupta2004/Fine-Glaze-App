@@ -48,6 +48,13 @@ export const colors = {
   transparent: 'transparent',
   overlay: 'rgba(30, 24, 21, 0.5)',  // Modal overlay
   divider: '#E7E5E0',                // N-200
+
+  // ── Auth Theme Helpers (Light) ─────────────────────
+  authBg: '#F9F9F8',                 // Same as background
+  authSurface: '#FFFFFF',            // Same as surface
+  authBorder: '#E7E5E0',             // Same as divider
+  authText: '#1E1815',               // Same as ink
+  authPlaceholder: '#9A9488',        // Neutral 500
 } as const;
 
 export type ColorKey = keyof typeof colors;

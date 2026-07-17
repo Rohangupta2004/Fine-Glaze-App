@@ -15,6 +15,7 @@ import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius, TOUCH_TARGET } from '../../src/theme/spacing';
 import type { EmployeeRequestStatus } from '../../src/types';
+import { showAlert } from '../../src/utils/alert';
 
 const STATUS_META: Record<EmployeeRequestStatus, { color: string; bg: string; label: string }> = {
   pending: { color: colors.warning, bg: colors.warningBg, label: 'Pending' },
@@ -39,7 +40,7 @@ export default function EmployeeRequestsScreen() {
     if (!profile?.id) return;
     decide.mutate(
       { id, status, decidedBy: profile.id },
-      { onError: (e: any) => Alert.alert('Failed', e?.message || 'Please try again.') },
+      { onError: (e: any) => showAlert('Failed', e?.message || 'Please try again.') },
     );
   };
 

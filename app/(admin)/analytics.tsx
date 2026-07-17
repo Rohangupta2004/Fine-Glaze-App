@@ -1,12 +1,3 @@
-/**
- * Analytics — Admin
- * PRD §29b — Only 5 useful charts, no vanity graphs:
- * 1. Attendance trend (30 days)
- * 2. DPR completion rate
- * 3. Material requests (pending vs fulfilled)
- * 4. Project completion %
- * 5. Payment status (billed vs received)
- */
 import React from 'react';
 import {
   View,
@@ -20,11 +11,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 
-import { Card } from '../../src/components';
 import { supabase } from '../../src/lib/supabase';
 import { colors } from '../../src/theme/colors';
-import { typography, fontFamily } from '../../src/theme/typography';
-import { spacing, radius } from '../../src/theme/spacing';
+import { fontFamily } from '../../src/theme/typography';
+import { spacing } from '../../src/theme/spacing';
 
 interface AnalyticsData {
   attendanceTrend: { present: number; absent: number; total: number; rate: number };
@@ -108,27 +98,31 @@ function ProgressBar({ value, color, height = 8 }: { value: number; color: strin
 }
 
 const pStyles = StyleSheet.create({
-  track: { flex: 1, backgroundColor: colors.neutral[100], borderRadius: 4 },
-  fill: { borderRadius: 4 },
+  track: { flex: 1, backgroundColor: '#F3F4F6', borderRadius: 10, overflow: 'hidden' },
+  fill: { borderRadius: 10 },
 });
 
-function CircularProgress({ value, color, size = 80 }: { value: number; color: string; size?: number }) {
+function CircularProgress({ value, color, size = 96, icon }: { value: number; color: string; size?: number; icon?: string }) {
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <View style={{
         width: size, height: size, borderRadius: size / 2,
-        borderWidth: 6, borderColor: colors.neutral[100],
+        borderWidth: 8, borderColor: '#F3F4F6',
         alignItems: 'center', justifyContent: 'center',
+        backgroundColor: '#fff',
       }}>
         <View style={{
           position: 'absolute', width: size, height: size, borderRadius: size / 2,
-          borderWidth: 6, borderColor: color,
+          borderWidth: 8, borderColor: color,
           borderRightColor: 'transparent',
           borderBottomColor: value > 50 ? color : 'transparent',
           borderLeftColor: value > 75 ? color : 'transparent',
           transform: [{ rotate: `${(value / 100) * 360 - 90}deg` }],
         }} />
-        <Text style={{ ...typography.h5, color: colors.ink }}>{value}%</Text>
+        {icon ? (
+          <Ionicons name={icon as any} size={24} color={color} style={{ marginBottom: -4 }} />
+        ) : null}
+        <Text style={{ fontSize: 20, fontFamily: fontFamily.bold, color: '#1E1815', marginTop: icon ? -2 : 0 }}>{value}%</Text>
       </View>
     </View>
   );
@@ -147,119 +141,154 @@ export default function AnalyticsScreen() {
   const { data } = useAnalytics();
 
   return (
-    <ScrollView
-      style={[styles.container, { paddingTop: insets.top + spacing.lg }]}
-      contentContainerStyle={{ paddingBottom: spacing['6xl'] }}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Analytics</Text>
-        <View style={{ width: 24 }} />
+    <View style={styles.container}>
+      {/* Light Header */}
+      <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={20} color="#1E1815" />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerLabel}>Performance & Reports</Text>
+            <Text style={styles.headerTitle}>Analytics</Text>
+          </View>
+        </View>
+        
+        {/* Overall Status Bar */}
+        <View style={styles.statusBar}>
+          <View style={styles.statusItem}>
+            <Text style={styles.statusVal}>{data?.projectCompletion.projects.length || 0}</Text>
+            <Text style={styles.statusLbl}>Active Projects</Text>
+          </View>
+          <View style={styles.statusItem}>
+            <Text style={styles.statusVal}>{data?.attendanceTrend.rate || 0}%</Text>
+            <Text style={styles.statusLbl}>Attendance</Text>
+          </View>
+          <View style={[styles.statusItem, { borderRightWidth: 0 }]}>
+            <Text style={styles.statusVal}>{data?.payments.rate || 0}%</Text>
+            <Text style={styles.statusLbl}>Collection</Text>
+          </View>
+        </View>
       </View>
 
-      {/* 1. Attendance Trend (30 days) */}
-      <Card style={styles.chartCard}>
-        <View style={styles.chartHeader}>
-          <Ionicons name="people" size={20} color={colors.info} />
-          <Text style={styles.chartTitle}>Attendance (30 days)</Text>
-        </View>
-        <View style={styles.chartContent}>
-          <CircularProgress value={data?.attendanceTrend.rate ?? 0} color={colors.success} />
-          <View style={styles.chartLegend}>
-            <LegendItem color={colors.success} label="Present" value={data?.attendanceTrend.present ?? 0} />
-            <LegendItem color={colors.error} label="Absent" value={data?.attendanceTrend.absent ?? 0} />
-            <LegendItem color={colors.neutral[400]} label="Total Records" value={data?.attendanceTrend.total ?? 0} />
-          </View>
-        </View>
-      </Card>
-
-      {/* 2. DPR Completion Rate */}
-      <Card style={styles.chartCard}>
-        <View style={styles.chartHeader}>
-          <Ionicons name="document-text" size={20} color={colors.warning} />
-          <Text style={styles.chartTitle}>DPR Completion</Text>
-        </View>
-        <View style={styles.chartContent}>
-          <CircularProgress value={data?.dprCompletion.rate ?? 0} color={colors.success} />
-          <View style={styles.chartLegend}>
-            <LegendItem color={colors.success} label="Approved" value={data?.dprCompletion.approved ?? 0} />
-            <LegendItem color={colors.warning} label="Pending" value={data?.dprCompletion.submitted ?? 0} />
-            <LegendItem color={colors.error} label="Rejected" value={data?.dprCompletion.rejected ?? 0} />
-          </View>
-        </View>
-      </Card>
-
-      {/* 3. Material Requests */}
-      <Card style={styles.chartCard}>
-        <View style={styles.chartHeader}>
-          <Ionicons name="cube" size={20} color={colors.pending} />
-          <Text style={styles.chartTitle}>Material Requests</Text>
-        </View>
-        <View style={styles.barGroup}>
-          <BarItem label="Pending" value={data?.materials.pending ?? 0} color={colors.warning} total={
-            (data?.materials.pending ?? 0) + (data?.materials.approved ?? 0) + (data?.materials.rejected ?? 0) + (data?.materials.ordered ?? 0)
-          } />
-          <BarItem label="Approved" value={data?.materials.approved ?? 0} color={colors.success} total={
-            (data?.materials.pending ?? 0) + (data?.materials.approved ?? 0) + (data?.materials.rejected ?? 0) + (data?.materials.ordered ?? 0)
-          } />
-          <BarItem label="Ordered" value={data?.materials.ordered ?? 0} color={colors.info} total={
-            (data?.materials.pending ?? 0) + (data?.materials.approved ?? 0) + (data?.materials.rejected ?? 0) + (data?.materials.ordered ?? 0)
-          } />
-          <BarItem label="Rejected" value={data?.materials.rejected ?? 0} color={colors.error} total={
-            (data?.materials.pending ?? 0) + (data?.materials.approved ?? 0) + (data?.materials.rejected ?? 0) + (data?.materials.ordered ?? 0)
-          } />
-        </View>
-      </Card>
-
-      {/* 4. Project Completion */}
-      <Card style={styles.chartCard}>
-        <View style={styles.chartHeader}>
-          <Ionicons name="business" size={20} color={colors.primary} />
-          <Text style={styles.chartTitle}>Project Completion</Text>
-        </View>
-        {(data?.projectCompletion.projects || []).map((proj, idx) => (
-          <View key={idx} style={styles.projectBar}>
-            <View style={styles.projectBarHeader}>
-              <Text style={styles.projectBarName} numberOfLines={1}>{proj.name}</Text>
-              <Text style={[styles.projectBarPct, { color: proj.progress >= 80 ? colors.success : proj.progress >= 50 ? colors.warning : colors.primary }]}>
-                {proj.progress}%
-              </Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.list}
+      >
+        {/* 1. Attendance Trend (30 days) */}
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeader}>
+            <View style={[styles.chartIcon, { backgroundColor: 'rgba(59,130,246,0.1)' }]}>
+              <Ionicons name="people" size={20} color="#3B82F6" />
             </View>
-            <ProgressBar value={proj.progress} color={proj.progress >= 80 ? colors.success : proj.progress >= 50 ? colors.warning : colors.primary} />
+            <Text style={styles.chartTitle}>Attendance (30 Days)</Text>
           </View>
-        ))}
-        {(!data?.projectCompletion.projects || data.projectCompletion.projects.length === 0) && (
-          <Text style={styles.noData}>No projects yet</Text>
-        )}
-      </Card>
+          <View style={styles.chartContent}>
+            <CircularProgress value={data?.attendanceTrend.rate ?? 0} color="#10B981" icon="calendar" />
+            <View style={styles.chartLegend}>
+              <LegendItem color="#10B981" label="Present" value={data?.attendanceTrend.present ?? 0} />
+              <LegendItem color="#EF4444" label="Absent" value={data?.attendanceTrend.absent ?? 0} />
+              <LegendItem color="#9CA3AF" label="Total Records" value={data?.attendanceTrend.total ?? 0} />
+            </View>
+          </View>
+        </View>
 
-      {/* 5. Payment Status */}
-      <Card style={styles.chartCard}>
-        <View style={styles.chartHeader}>
-          <Ionicons name="cash" size={20} color={colors.success} />
-          <Text style={styles.chartTitle}>Payment Status</Text>
-        </View>
-        <View style={styles.paymentStats}>
-          <View style={styles.paymentStat}>
-            <Text style={styles.paymentAmount}>{fmtINR(data?.payments.totalBilled ?? 0)}</Text>
-            <Text style={styles.paymentLabel}>Total Billed</Text>
+        {/* 2. DPR Completion Rate */}
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeader}>
+            <View style={[styles.chartIcon, { backgroundColor: 'rgba(139,92,246,0.1)' }]}>
+              <Ionicons name="document-text" size={20} color="#8B5CF6" />
+            </View>
+            <Text style={styles.chartTitle}>DPR Completion Rate</Text>
           </View>
-          <View style={styles.paymentStat}>
-            <Text style={[styles.paymentAmount, { color: colors.success }]}>{fmtINR(data?.payments.totalReceived ?? 0)}</Text>
-            <Text style={styles.paymentLabel}>Received</Text>
-          </View>
-          <View style={styles.paymentStat}>
-            <Text style={[styles.paymentAmount, { color: colors.warning }]}>{fmtINR(data?.payments.pending ?? 0)}</Text>
-            <Text style={styles.paymentLabel}>Pending</Text>
+          <View style={styles.chartContent}>
+            <CircularProgress value={data?.dprCompletion.rate ?? 0} color="#8B5CF6" icon="document-text" />
+            <View style={styles.chartLegend}>
+              <LegendItem color="#10B981" label="Approved" value={data?.dprCompletion.approved ?? 0} />
+              <LegendItem color="#F59E0B" label="Pending" value={data?.dprCompletion.submitted ?? 0} />
+              <LegendItem color="#EF4444" label="Rejected" value={data?.dprCompletion.rejected ?? 0} />
+            </View>
           </View>
         </View>
-        <ProgressBar value={data?.payments.rate ?? 0} color={colors.success} height={10} />
-        <Text style={styles.paymentRate}>{data?.payments.rate ?? 0}% collected</Text>
-      </Card>
-    </ScrollView>
+
+        {/* 3. Material Requests */}
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeader}>
+            <View style={[styles.chartIcon, { backgroundColor: 'rgba(245,158,11,0.1)' }]}>
+              <Ionicons name="cube" size={20} color="#F59E0B" />
+            </View>
+            <Text style={styles.chartTitle}>Material Requests</Text>
+          </View>
+          <View style={styles.barGroup}>
+            <BarItem label="Pending" value={data?.materials.pending ?? 0} color="#F59E0B" total={
+              (data?.materials.pending ?? 0) + (data?.materials.approved ?? 0) + (data?.materials.rejected ?? 0) + (data?.materials.ordered ?? 0)
+            } />
+            <BarItem label="Approved" value={data?.materials.approved ?? 0} color="#10B981" total={
+              (data?.materials.pending ?? 0) + (data?.materials.approved ?? 0) + (data?.materials.rejected ?? 0) + (data?.materials.ordered ?? 0)
+            } />
+            <BarItem label="Ordered" value={data?.materials.ordered ?? 0} color="#3B82F6" total={
+              (data?.materials.pending ?? 0) + (data?.materials.approved ?? 0) + (data?.materials.rejected ?? 0) + (data?.materials.ordered ?? 0)
+            } />
+            <BarItem label="Rejected" value={data?.materials.rejected ?? 0} color="#EF4444" total={
+              (data?.materials.pending ?? 0) + (data?.materials.approved ?? 0) + (data?.materials.rejected ?? 0) + (data?.materials.ordered ?? 0)
+            } />
+          </View>
+        </View>
+
+        {/* 4. Project Completion */}
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeader}>
+            <View style={[styles.chartIcon, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
+              <Ionicons name="business" size={20} color="#10B981" />
+            </View>
+            <Text style={styles.chartTitle}>Project Completion</Text>
+          </View>
+          {(data?.projectCompletion.projects || []).map((proj, idx) => (
+            <View key={idx} style={styles.projectBar}>
+              <View style={styles.projectBarHeader}>
+                <Text style={styles.projectBarName} numberOfLines={1}>{proj.name}</Text>
+                <Text style={[styles.projectBarPct, { color: proj.progress >= 80 ? '#10B981' : proj.progress >= 50 ? '#F59E0B' : '#3B82F6' }]}>
+                  {proj.progress}%
+                </Text>
+              </View>
+              <ProgressBar value={proj.progress} color={proj.progress >= 80 ? '#10B981' : proj.progress >= 50 ? '#F59E0B' : '#3B82F6'} />
+            </View>
+          ))}
+          {(!data?.projectCompletion.projects || data.projectCompletion.projects.length === 0) && (
+            <Text style={styles.noData}>No active projects</Text>
+          )}
+        </View>
+
+        {/* 5. Payment Status */}
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeader}>
+            <View style={[styles.chartIcon, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
+              <Ionicons name="cash" size={20} color="#10B981" />
+            </View>
+            <Text style={styles.chartTitle}>Payment Collection</Text>
+          </View>
+          <View style={styles.paymentStats}>
+            <View style={styles.paymentStat}>
+              <Text style={styles.paymentAmount}>{fmtINR(data?.payments.totalBilled ?? 0)}</Text>
+              <Text style={styles.paymentLabel}>Total Billed</Text>
+            </View>
+            <View style={styles.paymentStat}>
+              <Text style={[styles.paymentAmount, { color: '#10B981' }]}>{fmtINR(data?.payments.totalReceived ?? 0)}</Text>
+              <Text style={styles.paymentLabel}>Received</Text>
+            </View>
+            <View style={styles.paymentStat}>
+              <Text style={[styles.paymentAmount, { color: '#F59E0B' }]}>{fmtINR(data?.payments.pending ?? 0)}</Text>
+              <Text style={styles.paymentLabel}>Pending</Text>
+            </View>
+          </View>
+          
+          <View style={styles.paymentTrack}>
+            <View style={[styles.paymentFill, { width: `${data?.payments.rate ?? 0}%` as any }]} />
+          </View>
+          <Text style={styles.paymentRate}>{data?.payments.rate ?? 0}% collected</Text>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -287,31 +316,61 @@ function BarItem({ label, value, color, total }: { label: string; value: number;
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xl },
-  title: { ...typography.h4, color: colors.ink },
-  chartCard: { padding: spacing.xl, marginBottom: spacing.lg },
-  chartHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
-  chartTitle: { ...typography.h6, color: colors.ink },
+  container: { flex: 1, backgroundColor: '#FAF8F5' },
+
+  // Header
+  header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  headerTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
+  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', boxShadow: '0px 4px 12px rgba(0,0,0,0.05)' } as any,
+  headerLabel: { fontSize: 13, color: '#666', fontFamily: fontFamily.medium, letterSpacing: 0.2 },
+  headerTitle: { fontSize: 32, color: '#1E1815', fontFamily: fontFamily.bold, letterSpacing: -0.5, marginTop: 2 },
+  
+  statusBar: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 16, paddingVertical: spacing.md, borderWidth: 1, borderColor: 'rgba(105,80,48,0.1)', boxShadow: '0px 4px 12px rgba(0,0,0,0.03)' } as any,
+  statusItem: { flex: 1, alignItems: 'center', borderRightWidth: 1, borderRightColor: 'rgba(105,80,48,0.08)' },
+  statusVal: { fontSize: 20, color: '#1E1815', fontFamily: fontFamily.bold },
+  statusLbl: { fontSize: 10, color: '#666', fontFamily: fontFamily.medium, marginTop: 4, textTransform: 'uppercase' },
+
+  // List
+  list: { paddingHorizontal: spacing.lg, paddingBottom: 100, gap: spacing.md, paddingTop: spacing.md },
+  
+  // Card
+  chartCard: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: spacing.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(105,80,48,0.08)',
+    boxShadow: '0px 4px 14px rgba(0,0,0,0.03)'
+  } as any,
+  chartHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xl },
+  chartIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  chartTitle: { fontSize: 16, fontFamily: fontFamily.bold, color: '#1E1815' },
   chartContent: { flexDirection: 'row', alignItems: 'center', gap: spacing.xl },
-  chartLegend: { flex: 1, gap: spacing.sm },
+  chartLegend: { flex: 1, gap: spacing.md },
+  
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendLabel: { ...typography.bodySmall, color: colors.neutral[600], flex: 1 },
-  legendValue: { ...typography.bodySmall, fontFamily: fontFamily.semiBold, color: colors.ink },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendLabel: { fontSize: 13, color: colors.neutral[600], fontFamily: fontFamily.medium, flex: 1 },
+  legendValue: { fontSize: 14, fontFamily: fontFamily.bold, color: '#1E1815' },
+  
   barGroup: { gap: spacing.md },
-  barItem: { gap: 4 },
-  barLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  barLabel: { ...typography.bodySmall, color: colors.neutral[600] },
-  barValue: { ...typography.bodySmall, fontFamily: fontFamily.semiBold },
-  projectBar: { marginBottom: spacing.md },
-  projectBarHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  projectBarName: { ...typography.bodySmall, color: colors.ink, flex: 1, marginRight: spacing.sm },
-  projectBarPct: { ...typography.bodySmall, fontFamily: fontFamily.semiBold },
-  noData: { ...typography.bodySmall, color: colors.neutral[400], textAlign: 'center', paddingVertical: spacing.xl },
-  paymentStats: { flexDirection: 'row', marginBottom: spacing.lg },
+  barItem: { gap: 6 },
+  barLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  barLabel: { fontSize: 13, color: colors.neutral[600], fontFamily: fontFamily.medium },
+  barValue: { fontSize: 14, fontFamily: fontFamily.bold },
+  
+  projectBar: { marginBottom: spacing.lg },
+  projectBarHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  projectBarName: { fontSize: 13, fontFamily: fontFamily.semiBold, color: '#1E1815', flex: 1, marginRight: spacing.sm },
+  projectBarPct: { fontSize: 13, fontFamily: fontFamily.bold },
+  noData: { fontSize: 13, color: colors.neutral[400], textAlign: 'center', paddingVertical: spacing.xl, fontStyle: 'italic' },
+  
+  paymentStats: { flexDirection: 'row', marginBottom: spacing.xl },
   paymentStat: { flex: 1, alignItems: 'center' },
-  paymentAmount: { ...typography.h5, color: colors.ink },
-  paymentLabel: { ...typography.caption, color: colors.neutral[500], marginTop: 2 },
-  paymentRate: { ...typography.caption, color: colors.neutral[500], textAlign: 'center', marginTop: spacing.sm },
+  paymentAmount: { fontSize: 18, fontFamily: fontFamily.bold, color: '#1E1815' },
+  paymentLabel: { fontSize: 11, color: colors.neutral[500], fontFamily: fontFamily.medium, marginTop: 4, textTransform: 'uppercase' },
+  
+  paymentTrack: { height: 12, backgroundColor: '#F3F4F6', borderRadius: 6, overflow: 'hidden', marginBottom: spacing.sm },
+  paymentFill: { height: '100%', backgroundColor: '#10B981', borderRadius: 6 },
+  paymentRate: { fontSize: 12, color: colors.neutral[500], fontFamily: fontFamily.semiBold, textAlign: 'center' },
 });

@@ -9,12 +9,12 @@ export const spacing = {
   sm: 8,
   md: 12,
   lg: 16,
-  xl: 20,
-  '2xl': 24,
-  '3xl': 32,
-  '4xl': 40,
-  '5xl': 48,
-  '6xl': 64,
+  xl: 24,
+  '2xl': 40,
+  '3xl': 48,
+  '4xl': 64,
+  '5xl': 96,
+  '6xl': 128,
 } as const;
 
 /** Border radius tokens */
@@ -29,7 +29,7 @@ export const radius = {
   full: 9999, // Pill shape
 } as const;
 
-/** Shadow tokens */
+/** Shadow tokens — neutral */
 export const shadows = {
   sm: {
     shadowColor: '#1E1815',
@@ -39,24 +39,60 @@ export const shadows = {
     elevation: 1,
   },
   md: {
-    shadowColor: '#1E1815',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowColor: '#695030',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 20,
+    elevation: 4,
   },
   lg: {
-    shadowColor: '#1E1815',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowColor: '#695030',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.08,
+    shadowRadius: 32,
+    elevation: 6,
   },
   xl: {
-    shadowColor: '#1E1815',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
+    shadowColor: '#695030',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.1,
+    shadowRadius: 48,
+    elevation: 8,
+  },
+} as const;
+
+/** Brand-coloured glow shadows — use for cards, CTAs, elevated surfaces */
+export const glowShadows = {
+  /** Subtle bronze lift — default card glow */
+  sm: {
+    shadowColor: '#695030',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  /** Medium bronze glow — interactive / hover cards */
+  md: {
+    shadowColor: '#695030',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
     shadowRadius: 16,
+    elevation: 6,
+  },
+  /** Strong bronze glow — hero cards, CTAs */
+  lg: {
+    shadowColor: '#695030',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  /** Gold accent glow — premium badges, gradient buttons */
+  gold: {
+    shadowColor: '#918050',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
     elevation: 8,
   },
 } as const;

@@ -8,7 +8,7 @@
  * Uses SecureStore to track timestamps.
  */
 
-import * as SecureStore from 'expo-secure-store';
+import { safeGetItem, safeSetItem, safeDeleteItem } from './safeStorage';
 import { AppState, type AppStateStatus } from 'react-native';
 
 const BACKGROUND_TIMESTAMP_KEY = 'fg_background_at';
@@ -23,14 +23,14 @@ export type LockAction = 'none' | 'pin' | 'full_reauth';
  * Record when the app goes to background.
  */
 export async function recordBackgroundTimestamp(): Promise<void> {
-  await SecureStore.setItemAsync(BACKGROUND_TIMESTAMP_KEY, Date.now().toString());
+  await safeSetItem(BACKGROUND_TIMESTAMP_KEY, Date.now().toString());
 }
 
 /**
  * Record a successful login.
  */
 export async function recordLogin(): Promise<void> {
-  await SecureStore.setItemAsync(LAST_LOGIN_KEY, Date.now().toString());
+  await safeSetItem(LAST_LOGIN_KEY, Date.now().toString());
 }
 
 /**
@@ -38,7 +38,7 @@ export async function recordLogin(): Promise<void> {
  */
 export async function checkInactivityLock(): Promise<LockAction> {
   // Check 7-day full re-auth first
-  const lastLogin = await SecureStore.getItemAsync(LAST_LOGIN_KEY);
+  const lastLogin = await safeGetItem(LAST_LOGIN_KEY);
   if (lastLogin) {
     const elapsed = Date.now() - parseInt(lastLogin, 10);
     if (elapsed > FULL_REAUTH_TIMEOUT_MS) {
@@ -47,7 +47,7 @@ export async function checkInactivityLock(): Promise<LockAction> {
   }
 
   // Check 30-min inactivity PIN lock
-  const backgroundAt = await SecureStore.getItemAsync(BACKGROUND_TIMESTAMP_KEY);
+  const backgroundAt = await safeGetItem(BACKGROUND_TIMESTAMP_KEY);
   if (backgroundAt) {
     const elapsed = Date.now() - parseInt(backgroundAt, 10);
     if (elapsed > INACTIVITY_TIMEOUT_MS) {
@@ -62,7 +62,7 @@ export async function checkInactivityLock(): Promise<LockAction> {
  * Clear the background timestamp (user has re-authenticated).
  */
 export async function clearBackgroundTimestamp(): Promise<void> {
-  await SecureStore.deleteItemAsync(BACKGROUND_TIMESTAMP_KEY);
+  await safeDeleteItem(BACKGROUND_TIMESTAMP_KEY);
 }
 
 /**
