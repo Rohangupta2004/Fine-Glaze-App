@@ -4,35 +4,7 @@
  *
  * Receives notification data, stores it in the notifications table,
  * and sends push via Expo Push API.
- *
- * ── RECURSION GUARD ────────────────────────────────────────────────────
- * This function is invoked by `trg_dispatch_notification` (an AFTER INSERT
- * trigger on the notifications table). The trigger fires whenever any row
- * is inserted into notifications — including rows this function itself
- * inserts. That would cause infinite recursion:
- *
- *     trigger fires → calls send-notification
- *     → send-notification inserts a notification row
- *     → trigger fires again → calls send-notification again → ∞
- *
- * Solution: callers MUST send `x-trigger-dispatch: 1` header when invoking
- * from `dispatch_notification()`. When that header is present, we SKIP the
- * insert (the trigger already inserted the row before calling us) and
- * only send the Expo push.
- *
- * Direct callers (e.g. other Edge Functions wanting to notify) call
- * WITHOUT the header — we insert the row, the trigger fires, the trigger
- * calls us back WITH the header, and we send the push. One insert, one push.
- *
- * Body: {
- *   recipientId: string,
- *   kind: string,
- *   title: string,
- *   body: string,
- *   refTable?: string,
- *   refId?: string,
- *   important?: boolean,
- * }
+ * Secured with service_role_key verification.
  */
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
@@ -51,6 +23,22 @@ serve(async (req: Request) => {
   }
 
   try {
+    // ── 1. Service Role Authentication Check ───────────────────────────────
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Missing or invalid Authorization header' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const token = authHeader.split(' ')[1];
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    if (token !== serviceKey) {
+      return new Response(JSON.stringify({ error: 'Forbidden: Invalid service key' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const {
       recipientId,
       kind,
@@ -69,7 +57,6 @@ serve(async (req: Request) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
     // ── Recursion guard ────────────────────────────────────────────────

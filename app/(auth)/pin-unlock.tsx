@@ -17,15 +17,39 @@ export default function PinUnlockScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  const { verifyPin, setAuthenticated, profile } = useAuthStore();
+  const { verifyPin, setAuthenticated, profile, checkLockout, pinLockedUntil } = useAuthStore();
 
   const [error, setError] = useState('');
+  const [cooldown, setCooldown] = useState(0);
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
   // Try biometric on mount
   useEffect(() => {
     tryBiometric();
   }, []);
+
+  // Lockout countdown timer
+  useEffect(() => {
+    let interval: any;
+    const runCheck = async () => {
+      const remaining = await checkLockout();
+      setCooldown(remaining);
+      if (remaining > 0) {
+        interval = setInterval(async () => {
+          const rem = await checkLockout();
+          setCooldown(rem);
+          if (rem <= 0) {
+            clearInterval(interval);
+            setError('');
+          }
+        }, 1000);
+      }
+    };
+    runCheck();
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [pinLockedUntil]);
 
   const tryBiometric = async () => {
     const enabled = await safeGetItem('fg_biometric_enabled');
@@ -54,8 +78,13 @@ export default function PinUnlockScreen() {
     if (valid) {
       setAuthenticated(true);
     } else {
-      setError('Wrong PIN. Try again.');
-      shake();
+      const rem = await checkLockout();
+      if (rem > 0) {
+        setError('Too many failed attempts. Screen locked.');
+      } else {
+        setError('Wrong PIN. Try again.');
+        shake();
+      }
     }
   };
 
@@ -75,9 +104,19 @@ export default function PinUnlockScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Animated.View style={{ transform: [{ translateX: shakeAnim }], flex: 1 }}>
-          <PinPad onComplete={handlePinComplete} theme="dark" />
-        </Animated.View>
+        {cooldown > 0 ? (
+          <View style={styles.lockoutContainer}>
+            <Ionicons name="lock-closed-outline" size={64} color={colors.error} />
+            <Text style={styles.lockoutText}>Too many failed attempts.</Text>
+            <Text style={styles.lockoutCountdown}>
+              Try again in {cooldown} seconds
+            </Text>
+          </View>
+        ) : (
+          <Animated.View style={{ transform: [{ translateX: shakeAnim }], flex: 1 }}>
+            <PinPad onComplete={handlePinComplete} theme="dark" />
+          </Animated.View>
+        )}
 
         {/* Bottom options */}
         <View style={[styles.bottomRow, { paddingBottom: insets.bottom + 24 }]}>
@@ -102,6 +141,24 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing['2xl'],
     alignItems: 'center',
+  },
+  lockoutContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+  },
+  lockoutText: {
+    ...typography.h5,
+    color: colors.white,
+    textAlign: 'center',
+    fontFamily: fontFamily.semiBold,
+  },
+  lockoutCountdown: {
+    ...typography.bodyMedium,
+    color: colors.neutral[400],
+    textAlign: 'center',
+    fontFamily: fontFamily.medium,
   },
   title: {
     ...typography.h3,

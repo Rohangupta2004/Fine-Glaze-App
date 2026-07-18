@@ -23,6 +23,7 @@ import {
   useUpdateTaskStatus,
   useCreateTask,
   useMyTasks,
+  useUpdateTaskChecklist,
 } from '../../src/hooks/useTasks';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
@@ -73,6 +74,7 @@ export default function SupervisorTasksScreen() {
   const isRefetching = isRefetchingProject || isRefetchingMine;
   const refetch = () => { refetchProject(); refetchMine(); };
   const updateStatus = useUpdateTaskStatus();
+  const updateChecklist = useUpdateTaskChecklist();
 
   const [filter, setFilter] = useState<TaskStatus | 'all'>('all');
 
@@ -179,6 +181,32 @@ export default function SupervisorTasksScreen() {
                     <Text style={styles.taskMetaText}> · {task.level_zone}</Text>
                   )}
                 </View>
+
+                {/* Checklist Section */}
+                {task.checklist && task.checklist.length > 0 && (
+                  <View style={styles.checklistContainer}>
+                    {task.checklist.map((checkItem: any, index: number) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.checklistItem}
+                        onPress={() => {
+                          const newChecklist = [...task.checklist!];
+                          newChecklist[index] = { ...checkItem, done: !checkItem.done };
+                          updateChecklist.mutate({ taskId: task.id, checklist: newChecklist });
+                        }}
+                      >
+                        <Ionicons
+                          name={checkItem.done ? 'checkmark-circle' : 'square-outline'}
+                          size={18}
+                          color={checkItem.done ? colors.success : colors.neutral[400]}
+                        />
+                        <Text style={[styles.checklistText, checkItem.done && styles.checklistTextDone]}>
+                          {checkItem.text}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
 
               {/* Blocked toggle */}
@@ -339,4 +367,25 @@ const styles = StyleSheet.create({
     color: colors.neutral[600],
   },
   assigneeTextActive: { color: colors.white },
+  checklistContainer: {
+    marginTop: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.neutral[200],
+    gap: spacing.xs,
+  },
+  checklistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 4,
+  },
+  checklistText: {
+    ...typography.bodySmall,
+    color: colors.ink,
+  },
+  checklistTextDone: {
+    textDecorationLine: 'line-through',
+    color: colors.neutral[400],
+  },
 });

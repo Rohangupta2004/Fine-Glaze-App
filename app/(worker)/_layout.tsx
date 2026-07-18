@@ -39,15 +39,13 @@ export default function WorkerLayout() {
   return (
     <Tabs
       screenOptions={({ route }) => {
-        const visibleTabs = ['home', 'tasks', 'dpr', 'attendance', 'more'];
-        const showTabBar = visibleTabs.includes(route.name);
         return {
           headerShown: false,
           tabBarActiveTintColor: '#695030',
           tabBarInactiveTintColor: colors.neutral[400],
           tabBarBackground: () => <TabBarBackground />,
           tabBarStyle: {
-            display: showTabBar ? 'flex' : 'none',
+            display: 'flex',
             position: 'absolute',
             bottom: 16,
             left: 16,
@@ -144,7 +142,7 @@ export default function WorkerLayout() {
           ),
         }}
       />
-      {['my-site', 'documents', 'leave-request', 'safety-checklist', 'messages', 'profile', 'offline-sync', 'new-message', 'conversation'].map((name) => (
+      {['my-site', 'documents', 'leave-request', 'safety-checklist', 'messages', 'profile', 'offline-sync', 'new-message', 'conversation', 'notifications'].map((name) => (
         <Tabs.Screen key={name} name={name} options={{ href: null }} />
       ))}
       <Tabs.Screen name="punch-in/index" options={{ href: null }} />

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as Crypto from 'expo-crypto';
 import { supabase } from '../lib/supabase';
 import type { Conversation, Message } from '../types';
 
@@ -80,10 +81,15 @@ export function useChatContacts() {
   return useQuery({
     queryKey: ['chat_contacts', me?.id],
     queryFn: async (): Promise<Profile[]> => {
+      if (!me?.id) return [];
+      // Clients cannot start direct chats and should not see any contacts
+      if (me.role === 'client') return [];
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .neq('id', me!.id)
+        .neq('id', me.id)
+        .neq('role', 'client') // Exclude client users from internal directory
         .eq('status', 'active')
         .order('full_name');
       if (error) throw error;
@@ -166,19 +172,25 @@ export function useStartDirectConversation() {
       }
 
       // 2. Create a new direct conversation
-      const { data: conv, error: convErr } = await supabase
+      const convId = Crypto.randomUUID();
+      const { error: convErr } = await supabase
         .from('conversations')
-        .insert({ company_id: me.company_id, type: 'direct' })
-        .select()
-        .single();
+        .insert({ id: convId, company_id: me.company_id, type: 'direct' });
       if (convErr) throw convErr;
 
-      const { error: addErr } = await supabase.from('conversation_members').insert([
-        { conversation_id: conv.id, profile_id: me.id },
-        { conversation_id: conv.id, profile_id: otherProfileId },
-      ]);
-      if (addErr) throw addErr;
-      return conv.id as string;
+      // Insert current user first to establish membership (satisfying RLS policies)
+      const { error: addMeErr } = await supabase
+        .from('conversation_members')
+        .insert({ conversation_id: convId, profile_id: me.id });
+      if (addMeErr) throw addMeErr;
+
+      // Now insert the other member (allowed because the current user is a verified member of this conversation)
+      const { error: addOtherErr } = await supabase
+        .from('conversation_members')
+        .insert({ conversation_id: convId, profile_id: otherProfileId });
+      if (addOtherErr) throw addOtherErr;
+
+      return convId;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['conversations'] }),
   });
@@ -207,17 +219,16 @@ export function useJoinProjectConversation() {
           .limit(1);
         if (existing?.length) return existing[0].id;
       }
-      const { data: conv, error } = await supabase
+      const convId = Crypto.randomUUID();
+      const { error } = await supabase
         .from('conversations')
-        .insert({ company_id: me.company_id, type: 'project', project_id: projectId })
-        .select()
-        .single();
+        .insert({ id: convId, company_id: me.company_id, type: 'project', project_id: projectId });
       if (error) throw error;
       const { error: addErr } = await supabase
         .from('conversation_members')
-        .insert({ conversation_id: conv.id, profile_id: me.id });
+        .insert({ conversation_id: convId, profile_id: me.id });
       if (addErr) throw addErr;
-      return conv.id as string;
+      return convId;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['conversations'] }),
   });

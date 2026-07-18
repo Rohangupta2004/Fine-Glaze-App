@@ -50,11 +50,19 @@ export function NewMessageScreen({ conversationRoute }: NewMessageScreenProps) {
 
   const grouped = useMemo(() => {
     const groups: { title: string; data: Profile[] }[] = [];
-    const order = ['owner', 'project_manager', 'hr', 'accounts', 'supervisor', 'worker', 'client'];
-    for (const role of order) {
-      const data = filtered.filter((c) => c.role === role);
-      if (data.length) groups.push({ title: ROLE_LABELS[role] + (data.length > 1 ? 's' : ''), data });
-    }
+
+    const owners = filtered.filter((c) => c.role === 'owner');
+    if (owners.length) groups.push({ title: 'Owners', data: owners });
+
+    const admins = filtered.filter((c) => ['project_manager', 'hr', 'accounts'].includes(c.role));
+    if (admins.length) groups.push({ title: 'Admins', data: admins });
+
+    const supervisors = filtered.filter((c) => c.role === 'supervisor');
+    if (supervisors.length) groups.push({ title: 'Supervisors', data: supervisors });
+
+    const employees = filtered.filter((c) => c.role === 'worker');
+    if (employees.length) groups.push({ title: 'Employees', data: employees });
+
     return groups;
   }, [filtered]);
 
@@ -63,7 +71,7 @@ export function NewMessageScreen({ conversationRoute }: NewMessageScreenProps) {
     setStartingId(person.id);
     try {
       const conversationId = await startChat.mutateAsync({ otherProfileId: person.id });
-      router.replace({ pathname: conversationRoute as any, params: { conversationId, title: person.full_name } });
+      router.navigate({ pathname: conversationRoute as any, params: { conversationId, title: person.full_name } });
     } catch (e: any) {
       Alert.alert('Could not start chat', e?.message || 'Please try again.');
     } finally {

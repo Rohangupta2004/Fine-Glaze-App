@@ -7,14 +7,12 @@ export default function ClientLayout() {
   return (
     <Tabs
       screenOptions={({ route }) => {
-        const visibleTabs = ['home', 'updates', 'documents', 'payments', 'more'];
-        const showTabBar = visibleTabs.includes(route.name);
         return {
           headerShown: false,
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.neutral[400],
           tabBarStyle: {
-            display: showTabBar ? 'flex' : 'none',
+            display: 'flex',
             backgroundColor: colors.white,
             borderTopColor: colors.neutral[200],
             height: 60,

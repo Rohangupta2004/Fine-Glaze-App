@@ -7,9 +7,28 @@ export function useEmployees() {
   return useQuery({
     queryKey: ['employees'],
     queryFn: async (): Promise<Profile[]> => {
-      const { data, error } = await supabase.from('profiles').select('*').order('full_name', { ascending: true });
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          profile_financials:profile_financials!id(*)
+        `)
+        .order('full_name', { ascending: true });
       if (error) throw error;
-      return data as Profile[];
+
+      return (data || []).map((row: any) => {
+        const fin = row.profile_financials;
+        return {
+          ...row,
+          daily_rate: fin?.daily_rate ?? null,
+          bank_details: fin?.bank_details ?? null,
+          bank_account: fin?.bank_account ?? null,
+          bank_ifsc: fin?.bank_ifsc ?? null,
+          pan: fin?.pan ?? null,
+          uan: fin?.uan ?? null,
+          esi_number: fin?.esi_number ?? null,
+        };
+      }) as Profile[];
     },
   });
 }
@@ -32,9 +51,27 @@ export function useEmployee(profileId: string | null | undefined) {
     queryKey: ['employees', profileId],
     queryFn: async (): Promise<Profile | null> => {
       if (!profileId) return null;
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', profileId).single();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          profile_financials:profile_financials!id(*)
+        `)
+        .eq('id', profileId)
+        .single();
       if (error) throw error;
-      return data as Profile;
+
+      const fin = (data as any).profile_financials;
+      return {
+        ...data,
+        daily_rate: fin?.daily_rate ?? null,
+        bank_details: fin?.bank_details ?? null,
+        bank_account: fin?.bank_account ?? null,
+        bank_ifsc: fin?.bank_ifsc ?? null,
+        pan: fin?.pan ?? null,
+        uan: fin?.uan ?? null,
+        esi_number: fin?.esi_number ?? null,
+      } as Profile;
     },
     enabled: !!profileId,
   });
@@ -45,8 +82,35 @@ export function useUpdateEmployee() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Profile> }) => {
-      const { error } = await supabase.from('profiles').update(updates).eq('id', id);
-      if (error) throw error;
+      const {
+        daily_rate,
+        bank_details,
+        bank_account,
+        bank_ifsc,
+        pan,
+        uan,
+        esi_number,
+        ...profileUpdates
+      } = updates as any;
+
+      if (Object.keys(profileUpdates).length > 0) {
+        const { error } = await supabase.from('profiles').update(profileUpdates).eq('id', id);
+        if (error) throw error;
+      }
+
+      const financialUpdates: any = {};
+      if (daily_rate !== undefined) financialUpdates.daily_rate = daily_rate;
+      if (bank_details !== undefined) financialUpdates.bank_details = bank_details;
+      if (bank_account !== undefined) financialUpdates.bank_account = bank_account;
+      if (bank_ifsc !== undefined) financialUpdates.bank_ifsc = bank_ifsc;
+      if (pan !== undefined) financialUpdates.pan = pan;
+      if (uan !== undefined) financialUpdates.uan = uan;
+      if (esi_number !== undefined) financialUpdates.esi_number = esi_number;
+
+      if (Object.keys(financialUpdates).length > 0) {
+        const { error } = await supabase.from('profile_financials').update(financialUpdates).eq('id', id);
+        if (error) throw error;
+      }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employees'] }),
   });

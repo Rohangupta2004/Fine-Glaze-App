@@ -16,6 +16,39 @@ const corsHeaders = {
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
+    // ── 1. Authenticate caller ──────────────────────────────────────────────
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Missing or invalid Authorization header' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const token = authHeader.split(' ')[1];
+    
+    const serviceSupabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    
+    // Validate JWT
+    const { data: { user }, error: userError } = await serviceSupabase.auth.getUser(token);
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Load profile
+    const { data: profile, error: profileError } = await serviceSupabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: Profile not found' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── 2. Load and verify project & authorization ──────────────────────────
     const url = new URL(req.url);
     const projectId = url.searchParams.get('projectId');
     const month = url.searchParams.get('month');
@@ -25,21 +58,70 @@ serve(async (req: Request) => {
       });
     }
 
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { data: project, error: projError } = await serviceSupabase
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .single();
 
-    let query = supabase.from('dprs').select('*').eq('project_id', projectId).order('date');
+    if (projError || !project) {
+      return new Response(JSON.stringify({ error: 'Project not found' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (project.company_id !== profile.company_id) {
+      return new Response(JSON.stringify({ error: 'Forbidden: Access denied' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const isAdmin = ['owner', 'project_manager', 'hr', 'accounts'].includes(profile.role);
+    let authorized = isAdmin;
+
+    if (!authorized && profile.role === 'supervisor') {
+      // Check assignment
+      const { data: assignment } = await serviceSupabase
+        .from('assignments')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('profile_id', user.id)
+        .eq('active', true)
+        .maybeSingle();
+      if (assignment) authorized = true;
+    }
+
+    if (!authorized && profile.role === 'client') {
+      // Check client_org_id match
+      if (project.client_org_id && project.client_org_id === profile.client_org_id) {
+        authorized = true;
+      }
+    }
+
+    if (!authorized) {
+      return new Response(JSON.stringify({ error: 'Forbidden: You do not have access to export this project' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── 3. Query and generate ───────────────────────────────────────────────
+    let query = serviceSupabase.from('dprs').select('*').eq('project_id', projectId).order('date');
     if (month && /^\d{4}-\d{2}$/.test(month)) {
       const [y, m] = month.split('-').map(Number);
       const last = new Date(y, m, 0).getDate();
       query = query.gte('date', `${month}-01`).lte('date', `${month}-${String(last).padStart(2, '0')}`);
     }
+    
+    // If client, only export approved DPRs
+    if (profile.role === 'client') {
+      query = query.eq('status', 'approved');
+    }
+
     const { data: dprs, error } = await query;
     if (error) throw error;
 
-    const { data: project } = await supabase.from('projects').select('name').eq('id', projectId).single();
-
     const submitterIds = [...new Set((dprs || []).map((d: any) => d.submitted_by))];
-    const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', submitterIds.length ? submitterIds : ['00000000-0000-0000-0000-000000000000']);
+    const { data: profiles } = await serviceSupabase.from('profiles').select('id, full_name').in('id', submitterIds.length ? submitterIds : ['00000000-0000-0000-0000-000000000000']);
     const nameMap = new Map((profiles || []).map((p: any) => [p.id, p.full_name]));
 
     const rows = (dprs || []).map((d: any) => ({
@@ -63,12 +145,12 @@ serve(async (req: Request) => {
     const safeName = (project?.name || 'project').replace(/[^a-z0-9]+/gi, '-');
     const fileName = `dpr-register-${safeName}${month ? '-' + month : ''}.xlsx`;
     const storagePath = `exports/${fileName}`;
-    const { error: uploadError } = await supabase.storage.from('documents').upload(storagePath, buf, {
+    const { error: uploadError } = await serviceSupabase.storage.from('documents').upload(storagePath, buf, {
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', upsert: true,
     });
     if (uploadError) throw uploadError;
 
-    const { data: signedData, error: signError } = await supabase.storage.from('documents').createSignedUrl(storagePath, 3600);
+    const { data: signedData, error: signError } = await serviceSupabase.storage.from('documents').createSignedUrl(storagePath, 3600);
     if (signError) throw signError;
 
     return new Response(JSON.stringify({ success: true, downloadUrl: signedData.signedUrl, fileName, count: rows.length }), {

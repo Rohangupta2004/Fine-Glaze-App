@@ -16,15 +16,18 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card } from '../../src/components';
+import { AreaChart } from '../../src/components/SVGCharts';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useProjects } from '../../src/hooks/useProjects';
 import { useEmployees } from '../../src/hooks/useEmployees';
 import { usePendingDprs, usePendingLeave, usePendingMaterialRequests } from '../../src/hooks/useApprovals';
-import { useUnreadCount } from '../../src/hooks/useNotifications';
+import { useUnreadCount, useNotifications } from '../../src/hooks/useNotifications';
 import { useMyTasks } from '../../src/hooks/useTasks';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../../src/lib/supabase';
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -46,6 +49,7 @@ export default function AdminHomeScreen() {
   const { data: pendingLeave } = usePendingLeave();
   const { data: pendingMaterials } = usePendingMaterialRequests();
   const { data: unreadCount } = useUnreadCount(profile?.id);
+  const { data: notifications, refetch: rNotifications } = useNotifications(profile?.id);
   const { data: myTasks } = useMyTasks(profile?.id);
 
   const activeProjects = (projects || []).filter((p) => p.status !== 'completed');
@@ -55,7 +59,54 @@ export default function AdminHomeScreen() {
   // Count tasks assigned to the admin that are not completed
   const pendingTasks = (myTasks || []).filter(t => t.status !== 'done').length;
 
-  const onRefresh = () => { rProjects(); rEmployees(); };
+  const importantCount = (notifications || []).filter((n) => n.important && !n.read_at).length;
+
+  const todayStr = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const { data: attendanceToday, refetch: rAttendance } = useQuery({
+    queryKey: ['attendance-today', todayStr],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('status, location_verified')
+        .eq('date', todayStr);
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  const attendanceAlertsCount = (attendanceToday || []).filter(
+    (a: any) => a.location_verified === false || a.status === 'absent'
+  ).length;
+
+  const { data: dprTrend, refetch: rDprTrend } = useQuery({
+    queryKey: ['admin-dpr-trend'],
+    queryFn: async () => {
+      const dates: string[] = [];
+      const labels: string[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const iso = d.toISOString().slice(0, 10);
+        dates.push(iso);
+        labels.push(d.toLocaleDateString('en-IN', { weekday: 'short' }));
+      }
+
+      const { data, error } = await supabase
+        .from('dprs')
+        .select('created_at')
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+      
+      if (error) throw error;
+
+      const counts = dates.map(date => {
+        return (data || []).filter((d: any) => d.created_at?.slice(0, 10) === date).length;
+      });
+
+      return { labels, counts };
+    }
+  });
+
+  const onRefresh = () => { rProjects(); rEmployees(); rAttendance(); rNotifications(); rDprTrend(); };
 
   return (
     <View style={styles.container}>
@@ -83,26 +134,49 @@ export default function AdminHomeScreen() {
             <TouchableOpacity onPress={() => router.push('/(admin)/global-search' as any)} style={styles.heroBtn}>
               <Ionicons name="search" size={20} color="#1E1815" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/(admin)/notifications' as any)} style={styles.heroBtn}>
-              <Ionicons name="notifications" size={20} color="#1E1815" />
-              {(unreadCount || 0) > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{unreadCount! > 9 ? '9+' : unreadCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
           </View>
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
-          <TopStatCard title="Projects" value={activeProjects.length} icon="folder" onPress={() => router.push('/(admin)/projects')} />
-          <TopStatCard title="Employees" value={activeEmployees.length} icon="people" onPress={() => router.push('/(admin)/employees')} />
-          <TopStatCard title="Tasks" value={pendingTasks} icon="clipboard" onPress={() => router.push('/(admin)/personal-todos')} />
-          <TopStatCard title="Pending" value={totalPending} icon="cash" onPress={() => router.push('/(admin)/approvals')} />
+          <TopStatCard 
+            title="Notifications" 
+            value={unreadCount || 0} 
+            icon="notifications" 
+            iconColor={(unreadCount || 0) > 0 ? '#D97706' : '#6A4E36'}
+            iconBgColor={(unreadCount || 0) > 0 ? 'rgba(217, 119, 6, 0.12)' : 'rgba(255,255,255,0.8)'}
+            onPress={() => router.push('/(admin)/notifications')} 
+          />
+          <TopStatCard 
+            title="DPR Pending" 
+            value={pendingDprs?.length || 0} 
+            icon="document-text" 
+            iconColor={(pendingDprs?.length || 0) > 0 ? '#2563EB' : '#6A4E36'}
+            iconBgColor={(pendingDprs?.length || 0) > 0 ? 'rgba(37, 99, 235, 0.12)' : 'rgba(255,255,255,0.8)'}
+            onPress={() => router.push('/(admin)/approvals')} 
+          />
         </ScrollView>
         </View>
 
       <View style={styles.body}>
+        <SectionHeader 
+          title="Performance Trends" 
+          actionLabel="View detailed" 
+          onAction={() => router.push('/(admin)/analytics')} 
+        />
+        <Card style={styles.chartCard} padding={spacing.lg} variant="elevated">
+          <Text style={styles.chartTitle}>DPR Submissions (Daily)</Text>
+          {dprTrend && (
+            <AreaChart 
+              data={dprTrend.counts} 
+              labels={dprTrend.labels} 
+              width={320} 
+              height={160} 
+              strokeColor="#695030" 
+              fillColor="#8B6840" 
+            />
+          )}
+        </Card>
+
         <SectionHeader title="Workspace" actionLabel="View all" onAction={() => {}} />
         <View style={styles.manageGrid}>
           <ManageCard 
@@ -136,6 +210,13 @@ export default function AdminHomeScreen() {
             icon="document-text" 
             onPress={() => router.push('/(admin)/documents')}
           />
+          <ManageCard 
+            title="Assign Site" 
+            subtitle="Allocate Team & Workers" 
+            icon="people-circle" 
+            fullWidth={true}
+            onPress={() => router.push('/(admin)/assign-site')}
+          />
         </View>
       </View>
     </ScrollView>
@@ -161,18 +242,25 @@ function SectionHeader({ title, actionLabel, onAction }: SectionHeaderProps) {
   );
 }
 
-interface TopStatCardProps { icon: string; value: number | string; title: string; onPress: () => void; colors?: [string, string]; }
-function TopStatCard({ icon, value, title, onPress, colors }: TopStatCardProps) {
+interface TopStatCardProps { 
+  icon: string; 
+  value: number | string; 
+  title: string; 
+  onPress: () => void; 
+  iconColor?: string; 
+  iconBgColor?: string; 
+}
+function TopStatCard({ icon, value, title, onPress, iconColor = '#6A4E36', iconBgColor = 'rgba(255,255,255,0.8)' }: TopStatCardProps) {
   return (
     <Card 
       onPress={onPress} 
-      style={[styles.statCard, { width: 120 }]} 
+      style={[styles.statCard, { width: 130 }]} 
       padding={spacing.md}
       variant="elevated"
     >
       <View style={styles.statCardTop}>
-        <View style={[styles.statIconWrap, { backgroundColor: 'rgba(255,255,255,0.8)' }]}>
-          <Ionicons name={icon as any} size={20} color="#6A4E36" />
+        <View style={[styles.statIconWrap, { backgroundColor: iconBgColor }]}>
+          <Ionicons name={icon as any} size={20} color={iconColor} />
         </View>
       </View>
       <Text style={styles.statValue}>{value}</Text>
@@ -290,4 +378,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   emptyText: { fontSize: 14, color: colors.neutral[400], fontFamily: fontFamily.medium },
+  chartCard: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(105,80,48,0.08)',
+    boxShadow: '0px 4px 14px rgba(0,0,0,0.03)',
+    marginBottom: spacing.md,
+    alignItems: 'center',
+  } as any,
+  chartTitle: {
+    fontSize: 14,
+    fontFamily: fontFamily.bold,
+    color: '#1E1815',
+    alignSelf: 'flex-start',
+    marginBottom: spacing.md,
+  },
 });

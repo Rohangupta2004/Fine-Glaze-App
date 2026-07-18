@@ -70,7 +70,15 @@ export default function SupervisorHomeScreen() {
               {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
             </Text>
           </View>
-          <Avatar name={profile?.full_name || 'S'} uri={profile?.avatar_url} size={48} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+            <TouchableOpacity 
+              style={styles.notificationBell}
+              onPress={() => router.push('/(supervisor)/notifications' as any)}
+            >
+              <Ionicons name="notifications-outline" size={24} color={colors.ink} />
+            </TouchableOpacity>
+            <Avatar name={profile?.full_name || 'S'} uri={profile?.avatar_url} size={48} />
+          </View>
         </View>
 
         {/* Bento Grid — Today's Site & Team Stats */}
@@ -237,6 +245,19 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     flex: 1,
+  },
+  notificationBell: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   greeting: {
     fontSize: 22,

@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Card, Avatar, StatusChip, Button, ProgressRing } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useMyTasks } from '../../src/hooks/useTasks';
+import { usePersonalTodos, useTogglePersonalTodo } from '../../src/hooks/usePersonalTodos';
 import { useMyAssignedProjects } from '../../src/hooks/useAssignedProjects';
 import { useTodayAttendance, usePunchOut } from '../../src/hooks/useAttendance';
 import { colors } from '../../src/theme/colors';
@@ -44,6 +45,8 @@ export default function WorkerHomeScreen() {
   const firstName = profile?.full_name?.split(' ')[0] || 'Worker';
 
   const { data: tasks } = useMyTasks(profile?.id);
+  const { data: todos } = usePersonalTodos(profile?.id);
+  const toggleTodo = useTogglePersonalTodo();
   const { data: projects } = useMyAssignedProjects(profile?.id);
   const { data: todayAttendance } = useTodayAttendance(profile?.id);
   const punchOut = usePunchOut();
@@ -52,8 +55,17 @@ export default function WorkerHomeScreen() {
   const totalTasks = tasks?.length || 0;
   const pendingTasksList = (tasks || []).filter((t) => t.status !== 'done');
   const doneTasks = totalTasks - pendingTasksList.length;
-  const taskProgress = totalTasks > 0 ? (doneTasks / totalTasks) * 100 : 0;
-  const pendingTasks = pendingTasksList.slice(0, 2);
+
+  const totalTodos = todos?.length || 0;
+  const pendingTodosList = (todos || []).filter((t) => !t.completed_at);
+  const doneTodos = totalTodos - pendingTodosList.length;
+
+  const combinedTotal = totalTasks + totalTodos;
+  const combinedDone = doneTasks + doneTodos;
+  const taskProgress = combinedTotal > 0 ? (combinedDone / combinedTotal) * 100 : 0;
+
+  const displayTasks = pendingTasksList.slice(0, 2);
+  const displayTodos = pendingTodosList.slice(0, 2);
 
   const hasPunchedIn = !!todayAttendance?.check_in_at;
   const hasPunchedOut = !!todayAttendance?.check_out_at;
@@ -97,16 +109,24 @@ export default function WorkerHomeScreen() {
               })}
             </Text>
           </View>
-          <TouchableOpacity 
-            style={styles.avatarWrap}
-            onPress={() => router.push('/(worker)/profile' as any)}
-          >
-            <Avatar
-              name={profile?.full_name || 'W'}
-              uri={profile?.avatar_url}
-              size={48}
-            />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+            <TouchableOpacity 
+              style={styles.notificationBell}
+              onPress={() => router.push('/(worker)/notifications' as any)}
+            >
+              <Ionicons name="notifications-outline" size={24} color={colors.ink} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.avatarWrap}
+              onPress={() => router.push('/(worker)/profile' as any)}
+            >
+              <Avatar
+                name={profile?.full_name || 'W'}
+                uri={profile?.avatar_url}
+                size={48}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Bento Grid — Site Info & Punch Row */}
@@ -165,8 +185,8 @@ export default function WorkerHomeScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.bentoLabel}>{t('worker.todaysTasks')}</Text>
               <Text style={styles.taskProgressText}>
-                {totalTasks > 0 
-                  ? `${doneTasks} of ${totalTasks} Completed`
+                {combinedTotal > 0 
+                  ? `${combinedDone} of ${combinedTotal} Completed`
                   : 'No Tasks Today'
                 }
               </Text>
@@ -183,16 +203,43 @@ export default function WorkerHomeScreen() {
 
           <View style={styles.taskDivider} />
 
-          {pendingTasks.length === 0 ? (
+          {displayTasks.length === 0 && displayTodos.length === 0 ? (
             <Text style={styles.emptyTasksText}>{t('worker.noTasksToday', 'No pending tasks')}</Text>
           ) : (
             <View style={styles.taskList}>
-              {pendingTasks.map((task) => (
+              {/* Render Project Tasks */}
+              {displayTasks.map((task) => (
                 <View key={task.id} style={styles.taskListItem}>
                   <View style={[styles.priorityLine, { backgroundColor: PRIORITY_COLOR[task.priority] || colors.neutral[400] }]} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.taskItemTitle} numberOfLines={1}>{task.title}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.taskItemTitle} numberOfLines={1}>{task.title}</Text>
+                      <View style={styles.typeBadgeTask}>
+                        <Text style={styles.typeBadgeText}>Task</Text>
+                      </View>
+                    </View>
                     <Text style={styles.taskItemMeta}>{task.level_zone || 'General'}</Text>
+                  </View>
+                </View>
+              ))}
+
+              {/* Render Personal To-Dos */}
+              {displayTodos.map((todo) => (
+                <View key={todo.id} style={styles.taskListItem}>
+                  <TouchableOpacity
+                    style={{ marginRight: spacing.xs, marginTop: 2 }}
+                    onPress={() => toggleTodo.mutate({ id: todo.id, completed: true })}
+                  >
+                    <Ionicons name="square-outline" size={18} color={colors.neutral[400]} />
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.taskItemTitle} numberOfLines={1}>{todo.title}</Text>
+                      <View style={styles.typeBadgeTodo}>
+                        <Text style={styles.typeBadgeText}>To-Do</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.taskItemMeta}>{todo.due_date ? `Due: ${todo.due_date}` : 'Personal'}</Text>
                   </View>
                 </View>
               ))}
@@ -296,6 +343,19 @@ const styles = StyleSheet.create({
   avatarWrap: {
     boxShadow: '0px 4px 12px rgba(105, 80, 48, 0.15)',
     borderRadius: 24,
+  },
+  notificationBell: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   bentoRow: {
     flexDirection: 'row',
@@ -526,5 +586,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.error,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  typeBadgeTask: {
+    backgroundColor: colors.primary + '15',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  typeBadgeTodo: {
+    backgroundColor: '#3B82F615',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  typeBadgeText: {
+    fontSize: 9,
+    fontFamily: fontFamily.bold,
+    color: colors.ink,
+    textTransform: 'uppercase',
   },
 });

@@ -12,17 +12,50 @@ const corsHeaders = {
 };
 
 const TABLES = [
-  'companies', 'profiles', 'projects', 'assignments', 'attendance',
+  'companies', 'profiles', 'profile_financials', 'projects', 'assignments', 'attendance',
   'recurring_tasks', 'tasks', 'dprs', 'dpr_media', 'leave_requests',
   'advance_requests', 'materials', 'material_requests', 'deliveries',
   'documents', 'document_versions', 'expenses', 'payments',
   'client_approvals', 'client_orgs', 'conversations', 'conversation_members',
-  'messages', 'safety_checks', 'audit_log', 'project_templates',
+  'messages', 'safety_checks', 'audit_log', 'project_templates', 'employee_requests'
 ];
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
+    // ── 1. Authenticate caller ──────────────────────────────────────────────
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Missing or invalid Authorization header' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const token = authHeader.split(' ')[1];
+    
+    const serviceSupabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    
+    // Validate JWT
+    const { data: { user }, error: userError } = await serviceSupabase.auth.getUser(token);
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Load profile
+    const { data: profile, error: profileError } = await serviceSupabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: Profile not found' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── 2. Verify authorization ─────────────────────────────────────────────
     const { companyId } = await req.json();
     if (!companyId) {
       return new Response(JSON.stringify({ error: 'companyId is required' }), {
@@ -30,22 +63,81 @@ serve(async (req: Request) => {
       });
     }
 
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    if (profile.role !== 'owner' || profile.company_id !== companyId) {
+      return new Response(JSON.stringify({ error: 'Forbidden: Owner access only for your own company' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── 3. Resolve tenant ID lists for filtering ────────────────────────────
+    const { data: profiles } = await serviceSupabase.from('profiles').select('id').eq('company_id', companyId);
+    const { data: clientOrgs } = await serviceSupabase.from('client_orgs').select('id').eq('company_id', companyId);
+    const { data: projects } = await serviceSupabase.from('projects').select('id').eq('company_id', companyId);
+    const { data: conversations } = await serviceSupabase.from('conversations').select('id').eq('company_id', companyId);
+    const { data: documents } = await serviceSupabase.from('documents').select('id').eq('company_id', companyId);
+
+    const profileIds = (profiles || []).map(p => p.id);
+    const clientOrgIds = (clientOrgs || []).map(c => c.id);
+    const projectIds = (projects || []).map(p => p.id);
+    const conversationIds = (conversations || []).map(c => c.id);
+    const documentIds = (documents || []).map(d => d.id);
+
+    const secureIds = (ids: string[]) => ids.length > 0 ? ids : ['00000000-0000-0000-0000-000000000000'];
+
+    const { data: dprs } = await serviceSupabase.from('dprs').select('id').in('project_id', secureIds(projectIds));
+    const dprIds = (dprs || []).map(d => d.id);
+
+    // ── 4. Query tables with strict scope ──────────────────────────────────
     const backup: Record<string, any> = { exportedAt: new Date().toISOString(), companyId };
 
     for (const table of TABLES) {
       try {
-        const filterColumn = table === 'companies' ? 'id' : 'company_id';
-        let query = supabase.from(table).select('*');
+        let query = serviceSupabase.from(table).select('*');
+
         if (table === 'companies') {
           query = query.eq('id', companyId);
+        } else if (
+          table === 'profiles' ||
+          table === 'client_orgs' ||
+          table === 'projects' ||
+          table === 'recurring_tasks' ||
+          table === 'leave_requests' ||
+          table === 'advance_requests' ||
+          table === 'documents' ||
+          table === 'conversations' ||
+          table === 'audit_log' ||
+          table === 'project_templates' ||
+          table === 'role_permissions' ||
+          table === 'employee_requests'
+        ) {
+          query = query.eq('company_id', companyId);
+        } else if (table === 'profile_financials') {
+          query = query.in('id', secureIds(profileIds));
+        } else if (
+          table === 'assignments' ||
+          table === 'attendance' ||
+          table === 'tasks' ||
+          table === 'dprs' ||
+          table === 'materials' ||
+          table === 'material_requests' ||
+          table === 'expenses' ||
+          table === 'payments' ||
+          table === 'client_approvals' ||
+          table === 'safety_checks'
+        ) {
+          query = query.in('project_id', secureIds(projectIds));
+        } else if (table === 'dpr_media') {
+          query = query.in('dpr_id', secureIds(dprIds));
+        } else if (table === 'deliveries') {
+          query = query.in('project_id', secureIds(projectIds));
+        } else if (table === 'document_versions') {
+          query = query.in('document_id', secureIds(documentIds));
+        } else if (table === 'conversation_members' || table === 'messages') {
+          query = query.in('conversation_id', secureIds(conversationIds));
         } else {
-          // Not all tables have company_id directly; best-effort filter
-          const { data: sample } = await supabase.from(table).select('*').limit(1);
-          if (sample && sample[0] && 'company_id' in sample[0]) {
-            query = query.eq('company_id', companyId);
-          }
+          query = query.eq('id', '00000000-0000-0000-0000-000000000000');
         }
+
         const { data, error } = await query;
         if (error) {
           backup[table] = { error: error.message };
@@ -61,7 +153,7 @@ serve(async (req: Request) => {
     const fileName = `backup-${companyId}-${Date.now()}.json`;
     const storagePath = `backups/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await serviceSupabase.storage
       .from('documents')
       .upload(storagePath, new TextEncoder().encode(json), {
         contentType: 'application/json',
@@ -69,7 +161,7 @@ serve(async (req: Request) => {
       });
     if (uploadError) throw uploadError;
 
-    const { data: signedData, error: signError } = await supabase.storage
+    const { data: signedData, error: signError } = await serviceSupabase.storage
       .from('documents')
       .createSignedUrl(storagePath, 3600);
     if (signError) throw signError;

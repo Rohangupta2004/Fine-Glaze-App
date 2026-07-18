@@ -1,6 +1,7 @@
 import { create } from 'zustand';
+import * as Crypto from 'expo-crypto';
 import { supabase } from '../lib/supabase';
-import { safeGetItem, safeSetItem } from '../lib/safeStorage';
+import { safeGetItem, safeSetItem, safeDeleteItem } from '../lib/safeStorage';
 import type { Profile, UserRole, UIExperience } from '../types';
 import { getUIExperience } from '../types';
 
@@ -15,6 +16,8 @@ interface AuthState {
   isAuthenticated: boolean;
   /** Loading state */
   loading: boolean;
+  /** Lockout expiration timestamp */
+  pinLockedUntil: number | null;
 
   // ── Computed ──
   role: UserRole | null;
@@ -31,12 +34,16 @@ interface AuthState {
   verifyPin: (pin: string) => Promise<boolean>;
   /** Check if PIN exists */
   checkPinExists: () => Promise<boolean>;
+  /** Check if locked out and get remaining seconds */
+  checkLockout: () => Promise<number>;
   /** Load profile from Supabase */
   loadProfile: () => Promise<void>;
   /** Set authenticated state */
   setAuthenticated: (value: boolean) => void;
   /** Initialize auth (check session) */
   initialize: () => Promise<void>;
+  /** Change password on first login */
+  changePassword: (newPassword: string) => Promise<{ error?: string }>;
 }
 
 /** Map phone number to email: 9876543210 → 9876543210@fineglazeapp.com
@@ -50,16 +57,16 @@ function phoneToEmail(phone: string): string {
 
 
 async function hashPin(pin: string): Promise<string> {
-  // In production, use a proper hash. For now, a simple approach
-  // since SecureStore is already encrypted at rest.
-  let hash = 0;
-  const str = `fgcos_${pin}_salt`;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash |= 0;
+  let salt = await safeGetItem('fg_pin_salt');
+  if (!salt) {
+    salt = Crypto.randomUUID();
+    await safeSetItem('fg_pin_salt', salt);
   }
-  return hash.toString(36);
+  let hashed = pin + salt;
+  for (let i = 0; i < 1000; i++) {
+    hashed = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, hashed);
+  }
+  return hashed;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -68,6 +75,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   hasPin: false,
   isAuthenticated: false,
   loading: true,
+  pinLockedUntil: null,
 
   get role() {
     return get().profile?.role ?? null;
@@ -111,14 +119,57 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setPin: async (pin) => {
     const hashed = await hashPin(pin);
     await safeSetItem('fg_pin_hash', hashed);
-    set({ hasPin: true });
+    await safeDeleteItem('fg_pin_failed_attempts');
+    await safeDeleteItem('fg_pin_locked_until');
+    set({ hasPin: true, pinLockedUntil: null });
   },
 
   verifyPin: async (pin) => {
+    const lockedUntilStr = await safeGetItem('fg_pin_locked_until');
+    if (lockedUntilStr) {
+      const lockedUntil = parseInt(lockedUntilStr, 10);
+      if (Date.now() < lockedUntil) {
+        set({ pinLockedUntil: lockedUntil });
+        return false;
+      }
+    }
+
     const stored = await safeGetItem('fg_pin_hash');
     if (!stored) return false;
     const hashed = await hashPin(pin);
-    return hashed === stored;
+    const isValid = hashed === stored;
+
+    if (isValid) {
+      await safeDeleteItem('fg_pin_failed_attempts');
+      await safeDeleteItem('fg_pin_locked_until');
+      set({ pinLockedUntil: null });
+      return true;
+    } else {
+      const attemptsStr = await safeGetItem('fg_pin_failed_attempts');
+      const attempts = (attemptsStr ? parseInt(attemptsStr, 10) : 0) + 1;
+      await safeSetItem('fg_pin_failed_attempts', String(attempts));
+
+      if (attempts >= 5) {
+        const lockoutSec = 30 * Math.pow(2, attempts - 5);
+        const lockedUntil = Date.now() + lockoutSec * 1000;
+        await safeSetItem('fg_pin_locked_until', String(lockedUntil));
+        set({ pinLockedUntil: lockedUntil });
+      }
+      return false;
+    }
+  },
+
+  checkLockout: async () => {
+    const lockedUntilStr = await safeGetItem('fg_pin_locked_until');
+    if (lockedUntilStr) {
+      const lockedUntil = parseInt(lockedUntilStr, 10);
+      if (Date.now() < lockedUntil) {
+        set({ pinLockedUntil: lockedUntil });
+        return Math.ceil((lockedUntil - Date.now()) / 1000);
+      }
+    }
+    set({ pinLockedUntil: null });
+    return 0;
   },
 
   checkPinExists: async () => {
@@ -139,7 +190,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       .single();
 
     if (!error && data) {
-      set({ profile: data as Profile });
+      const { data: finData } = await supabase
+        .from('profile_financials')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      const combined = {
+        ...data,
+        daily_rate: finData?.daily_rate ?? null,
+        bank_details: finData?.bank_details ?? null,
+        bank_account: finData?.bank_account ?? null,
+        bank_ifsc: finData?.bank_ifsc ?? null,
+        pan: finData?.pan ?? null,
+        uan: finData?.uan ?? null,
+        esi_number: finData?.esi_number ?? null,
+      };
+      set({ profile: combined as Profile });
     }
   },
 
@@ -154,11 +221,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ userId: session.user.id });
         await get().loadProfile();
         await get().checkPinExists();
+        await get().checkLockout();
       }
     } catch (e) {
       console.error('Auth init error:', e);
     } finally {
       set({ loading: false });
+    }
+  },
+
+  changePassword: async (newPassword) => {
+    const { userId, profile } = get();
+    if (!userId || !profile) return { error: 'Not authenticated' };
+    
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) return { error: error.message };
+
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .update({ password_reset_required: false })
+        .eq('id', userId);
+      if (profileErr) return { error: profileErr.message };
+
+      set({ profile: { ...profile, password_reset_required: false } });
+      return {};
+    } catch (e: any) {
+      return { error: e.message || 'Failed to change password' };
     }
   },
 }));

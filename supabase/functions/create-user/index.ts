@@ -57,9 +57,14 @@ function phoneToEmail(phone: string): string {
 
 /** Generate a deterministic-enough temp password. */
 function generateTempPassword(): string {
-  const year = new Date().getFullYear();
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `FG@${year}#${rand}`;
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  const array = new Uint8Array(12);
+  crypto.getRandomValues(array);
+  let password = '';
+  for (let i = 0; i < array.length; i++) {
+    password += chars[array[i] % chars.length];
+  }
+  return password;
 }
 
 serve(async (req: Request) => {
@@ -173,16 +178,28 @@ serve(async (req: Request) => {
       full_name: fullName,
       phone: phone,
       role: role,
-      daily_rate: dailyRate ?? null,
       address: address,
       client_org_id: role === 'client' ? clientOrgId : null,
       status: 'active',
+      password_reset_required: true,
     });
 
     if (insertErr) {
       // Roll back the auth user so we don't leave an orphaned auth row
       await serviceSupabase.auth.admin.deleteUser(newUserId);
       throw insertErr;
+    }
+
+    if (dailyRate !== undefined && dailyRate !== null) {
+      const { error: finErr } = await serviceSupabase
+        .from('profile_financials')
+        .update({ daily_rate: dailyRate })
+        .eq('id', newUserId);
+      if (finErr) {
+        await serviceSupabase.from('profiles').delete().eq('id', newUserId);
+        await serviceSupabase.auth.admin.deleteUser(newUserId);
+        throw finErr;
+      }
     }
 
     // ── 6. Write audit log entry ─────────────────────────────────────────────

@@ -62,15 +62,13 @@ export default function AdminLayout() {
     <>
       <Tabs
         screenOptions={({ route }) => {
-          const visibleTabs = ['home', 'projects', 'add', 'notifications', 'more'];
-          const showTabBar = visibleTabs.includes(route.name);
           return {
             headerShown: false,
             tabBarActiveTintColor: '#695030',
             tabBarInactiveTintColor: colors.neutral[400],
             tabBarBackground: () => <TabBarBackground />,
             tabBarStyle: {
-              display: showTabBar ? 'flex' : 'none',
+              display: 'flex',
               position: 'absolute',
               bottom: 16,
               left: 16,
@@ -154,18 +152,17 @@ export default function AdminLayout() {
           }}
         />
         <Tabs.Screen
-          name="notifications"
+          name="chat"
           options={{
-            title: 'Alerts',
+            title: 'Messages',
             tabBarIcon: ({ color, size, focused }) => (
               <View style={styles.iconWrap}>
-                <Ionicons name={focused ? 'notifications' : 'notifications-outline'} size={22} color={color} />
-                {(unreadCount || 0) > 0 && <View style={styles.badge} />}
+                <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={22} color={color} />
               </View>
             ),
             tabBarLabel: ({ color, focused }) => (
               <View style={styles.labelWrap}>
-                <Text style={[{ color }, styles.labelText]}>Alerts</Text>
+                <Text style={[{ color }, styles.labelText]}>Messages</Text>
                 {focused && <ActiveDot />}
               </View>
             ),
@@ -194,7 +191,7 @@ export default function AdminLayout() {
         <Tabs.Screen name="employee-profile" options={{ href: null }} />
         <Tabs.Screen name="add-employee" options={{ href: null }} />
         <Tabs.Screen name="approvals" options={{ href: null }} />
-        <Tabs.Screen name="chat" options={{ href: null }} />
+        <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="project-workspace" options={{ href: null }} />
         <Tabs.Screen name="create-project" options={{ href: null }} />
         <Tabs.Screen name="recurring-tasks" options={{ href: null }} />

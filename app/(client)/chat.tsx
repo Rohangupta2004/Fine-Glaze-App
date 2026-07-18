@@ -186,9 +186,6 @@ export default function ClientChatScreen() {
             <Text style={styles.headerTitle}>{project?.name ?? 'Project Chat'}</Text>
             <Text style={styles.headerSub}>Project Team</Text>
           </View>
-          <TouchableOpacity onPress={() => router.push('/(client)/new-message' as any)} hitSlop={12}>
-            <Ionicons name="create-outline" size={24} color={colors.primary} />
-          </TouchableOpacity>
         </View>
 
         {/* Message list */}
