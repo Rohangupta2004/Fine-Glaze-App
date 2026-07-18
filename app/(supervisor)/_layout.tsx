@@ -34,15 +34,13 @@ export default function SupervisorLayout() {
   return (
     <Tabs
       screenOptions={({ route }) => {
-        const visibleTabs = ['home', 'tasks', 'materials', 'more'];
-        const showTabBar = visibleTabs.includes(route.name);
         return {
           headerShown: false,
           tabBarActiveTintColor: '#695030',
           tabBarInactiveTintColor: colors.neutral[400],
           tabBarBackground: () => <TabBarBackground />,
           tabBarStyle: {
-            display: showTabBar ? 'flex' : 'none',
+            display: 'flex',
             position: 'absolute',
             bottom: 16,
             left: 16,
@@ -146,6 +144,7 @@ export default function SupervisorLayout() {
       <Tabs.Screen name="new-message" options={{ href: null }} />
       <Tabs.Screen name="conversation" options={{ href: null }} />
       <Tabs.Screen name="request-employee" options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
     </Tabs>
   );
 }

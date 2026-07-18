@@ -33,10 +33,13 @@ export default function ForgotPinScreen() {
     setError('');
 
     try {
-      // Re-authenticate with password to prove identity
-      // Domain must match authStore.ts phoneToEmail() → @fineglazeapp.com
-      const phone = profile?.phone || '';
-      const email = `${phone.replace(/\D/g, '')}@fineglazeapp.com`;
+      const { data: { session } } = await supabase.auth.getSession();
+      const email = session?.user?.email;
+
+      if (!email) {
+        setError('No active session found. Please log in again.');
+        return;
+      }
 
       const { error: authError } = await supabase.auth.signInWithPassword({
         email,

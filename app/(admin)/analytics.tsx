@@ -15,10 +15,25 @@ import { supabase } from '../../src/lib/supabase';
 import { colors } from '../../src/theme/colors';
 import { fontFamily } from '../../src/theme/typography';
 import { spacing } from '../../src/theme/spacing';
+import { AreaChart, BarChart } from '../../src/components/SVGCharts';
 
 interface AnalyticsData {
-  attendanceTrend: { present: number; absent: number; total: number; rate: number };
-  dprCompletion: { submitted: number; approved: number; rejected: number; rate: number };
+  attendanceTrend: {
+    present: number;
+    absent: number;
+    total: number;
+    rate: number;
+    weeklyLabels: string[];
+    weeklyCounts: number[];
+  };
+  dprCompletion: {
+    submitted: number;
+    approved: number;
+    rejected: number;
+    rate: number;
+    weeklyLabels: string[];
+    weeklyCounts: number[];
+  };
   materials: { pending: number; approved: number; rejected: number; ordered: number };
   projectCompletion: { projects: Array<{ name: string; progress: number; status: string }> };
   payments: { totalBilled: number; totalReceived: number; pending: number; rate: number };
@@ -33,8 +48,8 @@ function useAnalytics() {
       const dateStr = thirtyDaysAgo.toISOString().slice(0, 10);
 
       const [attendance, dprs, materials, projects, payments] = await Promise.all([
-        supabase.from('attendance').select('status').gte('date', dateStr).then(r => r.data || []),
-        supabase.from('dprs').select('status').then(r => r.data || []),
+        supabase.from('attendance').select('status, date').gte('date', dateStr).then(r => r.data || []),
+        supabase.from('dprs').select('status, created_at').then(r => r.data || []),
         supabase.from('material_requests').select('status').then(r => r.data || []),
         supabase.from('projects').select('name,progress_pct,status').then(r => r.data || []),
         supabase.from('payments').select('amount,status').then(r => r.data || []),
@@ -55,18 +70,42 @@ function useAnalytics() {
       const totalBilled = payments.reduce((s: number, p: any) => s + Number(p.amount), 0);
       const totalReceived = payments.filter((p: any) => p.status === 'paid').reduce((s: number, p: any) => s + Number(p.amount), 0);
 
+      // Generate last 7 days metrics for charts
+      const weeklyLabels: string[] = [];
+      const weeklyDates: string[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        weeklyDates.push(d.toISOString().slice(0, 10));
+        weeklyLabels.push(d.toLocaleDateString('en-IN', { weekday: 'short' }));
+      }
+
+      const attendanceCounts = weeklyDates.map(date => {
+        const dayRecs = attendance.filter((a: any) => a.date === date);
+        const pres = dayRecs.filter((a: any) => a.status === 'present' || a.status === 'half_day').length;
+        return pres;
+      });
+
+      const dprCounts = weeklyDates.map(date => {
+        return dprs.filter((d: any) => d.created_at?.slice(0, 10) === date).length;
+      });
+
       return {
         attendanceTrend: {
           present,
           absent,
           total: attendance.length,
           rate: attendance.length > 0 ? Math.round((present / attendance.length) * 100) : 0,
+          weeklyLabels,
+          weeklyCounts: attendanceCounts,
         },
         dprCompletion: {
           submitted: dprSubmitted,
           approved: dprApproved,
           rejected: dprRejected,
           rate: dprs.length > 0 ? Math.round((dprApproved / dprs.length) * 100) : 0,
+          weeklyLabels,
+          weeklyCounts: dprCounts,
         },
         materials: {
           pending: matPending,
@@ -181,13 +220,22 @@ export default function AnalyticsScreen() {
             <View style={[styles.chartIcon, { backgroundColor: 'rgba(59,130,246,0.1)' }]}>
               <Ionicons name="people" size={20} color="#3B82F6" />
             </View>
-            <Text style={styles.chartTitle}>Attendance (30 Days)</Text>
+            <Text style={styles.chartTitle}>Attendance Weekly Trend</Text>
           </View>
-          <View style={styles.chartContent}>
-            <CircularProgress value={data?.attendanceTrend.rate ?? 0} color="#10B981" icon="calendar" />
-            <View style={styles.chartLegend}>
-              <LegendItem color="#10B981" label="Present" value={data?.attendanceTrend.present ?? 0} />
-              <LegendItem color="#EF4444" label="Absent" value={data?.attendanceTrend.absent ?? 0} />
+          <View style={styles.chartContentContainer}>
+            {data?.attendanceTrend.weeklyCounts && (
+              <AreaChart
+                data={data.attendanceTrend.weeklyCounts}
+                labels={data.attendanceTrend.weeklyLabels}
+                width={310}
+                height={150}
+                strokeColor="#10B981"
+                fillColor="#10B981"
+              />
+            )}
+            <View style={[styles.chartLegend, { marginTop: spacing.md }]}>
+              <LegendItem color="#10B981" label="Present (30d)" value={data?.attendanceTrend.present ?? 0} />
+              <LegendItem color="#EF4444" label="Absent (30d)" value={data?.attendanceTrend.absent ?? 0} />
               <LegendItem color="#9CA3AF" label="Total Records" value={data?.attendanceTrend.total ?? 0} />
             </View>
           </View>
@@ -199,11 +247,20 @@ export default function AnalyticsScreen() {
             <View style={[styles.chartIcon, { backgroundColor: 'rgba(139,92,246,0.1)' }]}>
               <Ionicons name="document-text" size={20} color="#8B5CF6" />
             </View>
-            <Text style={styles.chartTitle}>DPR Completion Rate</Text>
+            <Text style={styles.chartTitle}>DPR Submissions Trend</Text>
           </View>
-          <View style={styles.chartContent}>
-            <CircularProgress value={data?.dprCompletion.rate ?? 0} color="#8B5CF6" icon="document-text" />
-            <View style={styles.chartLegend}>
+          <View style={styles.chartContentContainer}>
+            {data?.dprCompletion.weeklyCounts && (
+              <AreaChart
+                data={data.dprCompletion.weeklyCounts}
+                labels={data.dprCompletion.weeklyLabels}
+                width={310}
+                height={150}
+                strokeColor="#8B5CF6"
+                fillColor="#8B5CF6"
+              />
+            )}
+            <View style={[styles.chartLegend, { marginTop: spacing.md }]}>
               <LegendItem color="#10B981" label="Approved" value={data?.dprCompletion.approved ?? 0} />
               <LegendItem color="#F59E0B" label="Pending" value={data?.dprCompletion.submitted ?? 0} />
               <LegendItem color="#EF4444" label="Rejected" value={data?.dprCompletion.rejected ?? 0} />
@@ -219,19 +276,19 @@ export default function AnalyticsScreen() {
             </View>
             <Text style={styles.chartTitle}>Material Requests</Text>
           </View>
-          <View style={styles.barGroup}>
-            <BarItem label="Pending" value={data?.materials.pending ?? 0} color="#F59E0B" total={
-              (data?.materials.pending ?? 0) + (data?.materials.approved ?? 0) + (data?.materials.rejected ?? 0) + (data?.materials.ordered ?? 0)
-            } />
-            <BarItem label="Approved" value={data?.materials.approved ?? 0} color="#10B981" total={
-              (data?.materials.pending ?? 0) + (data?.materials.approved ?? 0) + (data?.materials.rejected ?? 0) + (data?.materials.ordered ?? 0)
-            } />
-            <BarItem label="Ordered" value={data?.materials.ordered ?? 0} color="#3B82F6" total={
-              (data?.materials.pending ?? 0) + (data?.materials.approved ?? 0) + (data?.materials.rejected ?? 0) + (data?.materials.ordered ?? 0)
-            } />
-            <BarItem label="Rejected" value={data?.materials.rejected ?? 0} color="#EF4444" total={
-              (data?.materials.pending ?? 0) + (data?.materials.approved ?? 0) + (data?.materials.rejected ?? 0) + (data?.materials.ordered ?? 0)
-            } />
+          <View style={styles.chartContentContainer}>
+            <BarChart
+              data={[
+                data?.materials.pending ?? 0,
+                data?.materials.approved ?? 0,
+                data?.materials.ordered ?? 0,
+                data?.materials.rejected ?? 0
+              ]}
+              labels={['Pending', 'Approved', 'Ordered', 'Rejected']}
+              colors={['#F59E0B', '#10B981', '#3B82F6', '#EF4444']}
+              width={310}
+              height={160}
+            />
           </View>
         </View>
 
@@ -267,6 +324,21 @@ export default function AnalyticsScreen() {
             </View>
             <Text style={styles.chartTitle}>Payment Collection</Text>
           </View>
+          
+          <View style={[styles.chartContentContainer, { marginBottom: spacing.lg }]}>
+            <BarChart
+              data={[
+                data?.payments.totalBilled ?? 0,
+                data?.payments.totalReceived ?? 0,
+                data?.payments.pending ?? 0
+              ]}
+              labels={['Billed', 'Received', 'Pending']}
+              colors={['#695030', '#10B981', '#F59E0B']}
+              width={310}
+              height={160}
+            />
+          </View>
+
           <View style={styles.paymentStats}>
             <View style={styles.paymentStat}>
               <Text style={styles.paymentAmount}>{fmtINR(data?.payments.totalBilled ?? 0)}</Text>
@@ -373,4 +445,5 @@ const styles = StyleSheet.create({
   paymentTrack: { height: 12, backgroundColor: '#F3F4F6', borderRadius: 6, overflow: 'hidden', marginBottom: spacing.sm },
   paymentFill: { height: '100%', backgroundColor: '#10B981', borderRadius: 6 },
   paymentRate: { fontSize: 12, color: colors.neutral[500], fontFamily: fontFamily.semiBold, textAlign: 'center' },
+  chartContentContainer: { alignItems: 'center', width: '100%' },
 });

@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 
 import { Card } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
-import { useMyTasks, useUpdateTaskStatus } from '../../src/hooks/useTasks';
+import { useMyTasks, useUpdateTaskStatus, useUpdateTaskChecklist } from '../../src/hooks/useTasks';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
@@ -28,6 +28,7 @@ export default function TasksScreen() {
   const profile = useAuthStore((s) => s.profile);
   const { data: allTasks, isLoading } = useMyTasks(profile?.id);
   const updateStatus = useUpdateTaskStatus();
+  const updateChecklist = useUpdateTaskChecklist();
 
   const tasks = (allTasks || []).filter((task) =>
     activeTab === 'today' ? task.status !== 'done' : task.status === 'done'
@@ -97,6 +98,32 @@ export default function TasksScreen() {
                     </Text>
                   </View>
                 </View>
+
+                {/* Checklist Section */}
+                {item.checklist && item.checklist.length > 0 && (
+                  <View style={styles.checklistContainer}>
+                    {item.checklist.map((checkItem: any, index: number) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.checklistItem}
+                        onPress={() => {
+                          const newChecklist = [...item.checklist!];
+                          newChecklist[index] = { ...checkItem, done: !checkItem.done };
+                          updateChecklist.mutate({ taskId: item.id, checklist: newChecklist });
+                        }}
+                      >
+                        <Ionicons
+                          name={checkItem.done ? 'checkmark-circle' : 'square-outline'}
+                          size={18}
+                          color={checkItem.done ? colors.success : colors.neutral[400]}
+                        />
+                        <Text style={[styles.checklistText, checkItem.done && styles.checklistTextDone]}>
+                          {checkItem.text}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
             </View>
           </Card>
@@ -218,6 +245,27 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     ...typography.bodyMedium,
+    color: colors.neutral[400],
+  },
+  checklistContainer: {
+    marginTop: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.neutral[200],
+    gap: spacing.xs,
+  },
+  checklistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 4,
+  },
+  checklistText: {
+    ...typography.bodySmall,
+    color: colors.ink,
+  },
+  checklistTextDone: {
+    textDecorationLine: 'line-through',
     color: colors.neutral[400],
   },
 });

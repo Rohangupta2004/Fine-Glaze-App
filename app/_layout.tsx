@@ -84,7 +84,7 @@ function RootLayoutInner() {
     const inAuthGroup = segments[0] === '(auth)';
 
     const currentSegment = (segments as string[])[1];
-    const pinScreens = ['create-pin', 'pin-unlock', 'enable-biometric'];
+    const pinScreens = ['create-pin', 'pin-unlock', 'enable-biometric', 'forgot-pin'];
     const onPinScreen = pinScreens.includes(currentSegment);
     // Post-PIN onboarding screens navigate themselves (enable-biometric →
     // permissions → role home); the guard must not race them to home the
@@ -96,6 +96,11 @@ function RootLayoutInner() {
       // Not logged in → auth flow
       if (!inAuthGroup) {
         router.replace('/(auth)/welcome');
+      }
+    } else if (profile?.password_reset_required) {
+      // First login → force password change
+      if (currentSegment !== 'change-password') {
+        router.replace('/(auth)/change-password' as any);
       }
     } else if (!isAuthenticated) {
       // Logged in but hasn't passed PIN → PIN screen

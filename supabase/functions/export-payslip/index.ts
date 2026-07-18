@@ -1,6 +1,6 @@
 /**
  * Edge Function: export-payslip
- * Generates a single-employee payslip PDF for a given month.
+ * Generates a single-employee payslip PDF/XML for a given month.
  *
  * Complies with Indian labour-law payslip requirements:
  *   - Employee name, ID, designation
@@ -11,11 +11,10 @@
  *   - Overtime pay
  *   - Advances deducted
  *   - Net payable
- *   - Note on PF/ESI/PT (computed at fixed rates if employee is eligible;
- *     admin can override via profile columns)
+ *   - Note on PF/ESI/PT (computed at fixed rates if employee is eligible)
  *
  * GET /export-payslip?profileId=...&month=YYYY-MM-DD
- *   → application/pdf
+ *   → application/pdf or application/xml
  *
  * Optional: ?download=1 to send as Content-Disposition: attachment
  */
@@ -29,7 +28,6 @@ const corsHeaders = {
 };
 
 // ── Indian compliance rates (illustrative defaults) ───────────────────────
-// Admin should override via the profiles table for actual rates per employee.
 const PF_RATE = 0.12;            // 12% of basic (employee share)
 const ESI_RATE = 0.0075;         // 0.75% of gross (employee share, applies if gross ≤ ₹21,000/mo)
 const PT_RATE_MONTHLY = 200;     // ₹200/month Maharashtra Professional Tax (flat for salaried)
@@ -184,97 +182,156 @@ serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  const url = new URL(req.url);
-  const profileId = url.searchParams.get('profileId');
-  const monthParam = url.searchParams.get('month'); // YYYY-MM-DD (any day in the month)
-  const download = url.searchParams.get('download') === '1';
+  try {
+    const url = new URL(req.url);
+    const profileId = url.searchParams.get('profileId');
+    const monthParam = url.searchParams.get('month'); // YYYY-MM-DD (any day in the month)
+    const download = url.searchParams.get('download') === '1';
 
-  if (!profileId || !monthParam) {
+    if (!profileId || !monthParam) {
+      return new Response(
+        JSON.stringify({ error: 'profileId and month (YYYY-MM-DD) are required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ── 1. Authenticate Caller ──────────────────────────────────────────────
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Missing or invalid Authorization header' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const token = authHeader.split(' ')[1];
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, serviceKey);
+
+    // Validate JWT
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Load caller profile
+    const { data: callerProfile, error: callerProfileErr } = await supabase
+      .from('profiles')
+      .select('id, role, company_id')
+      .eq('id', user.id)
+      .single();
+
+    if (callerProfileErr || !callerProfile) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: Caller profile not found' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── 2. Load target profile + company info ─────────────────────────────────
+    const { data: targetProfile, error: targetProfileErr } = await supabase
+      .from('profiles')
+      .select(`
+        id, full_name, phone, role, company_id,
+        companies(name)
+      `)
+      .eq('id', profileId)
+      .single();
+
+    if (targetProfileErr || !targetProfile) {
+      return new Response(
+        JSON.stringify({ error: 'Employee not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ── 3. Access Authorization Check ───────────────────────────────────────
+    const isSelf = user.id === profileId;
+    const isCompanyAdmin = ['owner', 'project_manager', 'hr', 'accounts'].includes(callerProfile.role) && 
+                           callerProfile.company_id === targetProfile.company_id;
+
+    if (!isSelf && !isCompanyAdmin) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: Insufficient privileges' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ── 4. Fetch target financial details from profile_financials ──────────
+    const { data: financials, error: finErr } = await supabase
+      .from('profile_financials')
+      .select('daily_rate, bank_account, bank_ifsc, pan, uan, esi_number')
+      .eq('id', profileId)
+      .single();
+
+    const dailyRate = financials?.daily_rate || 0;
+    const bankAccount = financials?.bank_account || null;
+    const bankIfsc = financials?.bank_ifsc || null;
+    const pan = financials?.pan || null;
+    const uan = financials?.uan || null;
+    const esiNumber = financials?.esi_number || null;
+
+    // ── 5. Fetch monthly salary view ─────────────────────────────────────────
+    const monthDate = new Date(monthParam);
+    const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+    const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1);
+
+    const { data: salaryRows, error: salaryErr } = await supabase
+      .from('monthly_salary')
+      .select('*')
+      .eq('profile_id', profileId)
+      .gte('month', monthStart.toISOString())
+      .lt('month', monthEnd.toISOString())
+      .limit(1);
+
+    if (salaryErr) throw salaryErr;
+
+    const salary = (salaryRows || [])[0] || {
+      present_days: 0,
+      half_days: 0,
+      ot_hours: 0,
+      advances_taken: 0,
+      payable: 0,
+    };
+
+    // ── 6. Build payslip data ────────────────────────────────────────────────
+    const payslipData: PayslipData = {
+      full_name: targetProfile.full_name,
+      phone: targetProfile.phone || '—',
+      role: targetProfile.role || '—',
+      daily_rate: dailyRate,
+      month: monthStart.toISOString(),
+      present_days: salary.present_days || 0,
+      half_days: salary.half_days || 0,
+      ot_hours: salary.ot_hours || 0,
+      advances_taken: salary.advances_taken || 0,
+      payable: salary.payable || 0,
+      bank_account: bankAccount,
+      bank_ifsc: bankIfsc,
+      pan: pan,
+      uan: uan,
+      esi_number: esiNumber,
+      company_name: (targetProfile.companies as any)?.name || 'Fine Glaze',
+    };
+
+    // ── 7. Generate XML output ───────────────────────────────────────────────
+    const xml = buildPdfXml(payslipData, monthStart);
+
+    const headers: Record<string, string> = {
+      ...corsHeaders,
+      'Content-Type': download ? 'application/octet-stream' : 'application/xml',
+    };
+    if (download) {
+      const fileName = `payslip_${targetProfile.full_name.replace(/\s+/g, '_')}_${monthStart.toISOString().slice(0, 7)}.xml`;
+      headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
+    }
+
+    return new Response(xml, { headers });
+  } catch (error: any) {
     return new Response(
-      JSON.stringify({ error: 'profileId and month (YYYY-MM-DD) are required' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const supabase = createClient(supabaseUrl, serviceKey);
-
-  // ── 1. Fetch profile + salary data ─────────────────────────────────────
-  const { data: profile, error: profileErr } = await supabase
-    .from('profiles')
-    .select(`
-      id, full_name, phone, role, daily_rate, company_id,
-      bank_account, bank_ifsc, pan, uan, esi_number,
-      companies(name)
-    `)
-    .eq('id', profileId)
-    .single();
-
-  if (profileErr || !profile) {
-    return new Response(
-      JSON.stringify({ error: 'Employee not found' }),
-      { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  // ── 2. Fetch monthly salary view ───────────────────────────────────────
-  const monthDate = new Date(monthParam);
-  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1);
-
-  const { data: salaryRows, error: salaryErr } = await supabase
-    .from('monthly_salary')
-    .select('*')
-    .eq('profile_id', profileId)
-    .gte('month', monthStart.toISOString())
-    .lt('month', monthEnd.toISOString())
-    .limit(1);
-
-  if (salaryErr) throw salaryErr;
-
-  const salary = (salaryRows || [])[0] || {
-    present_days: 0,
-    half_days: 0,
-    ot_hours: 0,
-    advances_taken: 0,
-    payable: 0,
-  };
-
-  // ── 3. Build payslip data ──────────────────────────────────────────────
-  const payslipData: PayslipData = {
-    full_name: profile.full_name,
-    phone: profile.phone || '—',
-    role: profile.role || '—',
-    daily_rate: profile.daily_rate || 0,
-    month: monthStart.toISOString(),
-    present_days: salary.present_days || 0,
-    half_days: salary.half_days || 0,
-    ot_hours: salary.ot_hours || 0,
-    advances_taken: salary.advances_taken || 0,
-    payable: salary.payable || 0,
-    bank_account: profile.bank_account || null,
-    bank_ifsc: profile.bank_ifsc || null,
-    pan: profile.pan || null,
-    uan: profile.uan || null,
-    esi_number: profile.esi_number || null,
-    company_name: (profile.companies as any)?.name || 'Fine Glaze',
-  };
-
-  // ── 4. Generate XML (callers can render with a PDF library if needed) ──
-  // For Deno Deploy we return XML; in a full Supabase Edge runtime, swap in
-  // a PDF generator like jsPDF or pdfkit. The XML is structured so a thin
-  // wrapper can convert to actual PDF bytes.
-  const xml = buildPdfXml(payslipData, monthStart);
-
-  const headers: Record<string, string> = {
-    ...corsHeaders,
-    'Content-Type': download ? 'application/octet-stream' : 'application/xml',
-  };
-  if (download) {
-    const fileName = `payslip_${profile.full_name.replace(/\s+/g, '_')}_${monthStart.toISOString().slice(0, 7)}.xml`;
-    headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
-  }
-
-  return new Response(xml, { headers });
 });

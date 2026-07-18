@@ -33,6 +33,7 @@ export function useCreateTask() {
       windowStart?: string | null;
       windowEnd?: string | null;
       createdBy: string;
+      checklist?: any[];
     }) => {
       const { data, error } = await supabase.from('tasks').insert({
         project_id: params.projectId || null,
@@ -44,6 +45,7 @@ export function useCreateTask() {
         window_end: params.windowEnd || null,
         status: 'pending',
         created_by: params.createdBy,
+        checklist: params.checklist || [],
       }).select();
       
       if (error) throw error;
@@ -92,6 +94,23 @@ export function useUpdateTaskStatus() {
       const { error } = await supabase
         .from('tasks')
         .update({ status })
+        .eq('id', taskId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
+/** Update a task's checklist. */
+export function useUpdateTaskChecklist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, checklist }: { taskId: string; checklist: any[] }) => {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ checklist })
         .eq('id', taskId);
       if (error) throw error;
     },

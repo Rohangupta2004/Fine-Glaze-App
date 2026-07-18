@@ -22,6 +22,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Picker } from '@react-native-picker/picker';
 
 import { Card, StatusChip, Avatar, Button, GradientCard, ProgressRing } from '../../src/components';
 import { useProject } from '../../src/hooks/useProjects';
@@ -319,6 +320,7 @@ function TasksTab({
   const [showAdd, setShowAdd] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newPriority, setNewPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [newAssignee, setNewAssignee] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'done' | 'blocked'>('all');
 
   const filtered = filterStatus === 'all' ? tasks : tasks.filter(t => t.status === filterStatus);
@@ -336,8 +338,10 @@ function TasksTab({
         title: newTitle.trim(),
         priority: newPriority,
         createdBy: currentUserId,
+        assignedTo: newAssignee || null,
       });
       setNewTitle('');
+      setNewAssignee('');
       setShowAdd(false);
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to create task');
@@ -404,8 +408,21 @@ function TasksTab({
                 </TouchableOpacity>
               ))}
             </View>
+            <Text style={[typography.caption, { color: colors.neutral[500], marginBottom: spacing.sm }]}>Assign To</Text>
+            <View style={[styles.pickerContainer, { marginBottom: spacing.lg }]}>
+              <Picker
+                selectedValue={newAssignee}
+                onValueChange={(val: string) => setNewAssignee(val)}
+                style={styles.picker}
+              >
+                <Picker.Item label="Unassigned" value="" color={colors.neutral[500]} />
+                {employees.map(emp => (
+                  <Picker.Item key={emp.id} label={emp.full_name} value={emp.id} color={colors.ink} />
+                ))}
+              </Picker>
+            </View>
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <Button title="Cancel" variant="tertiary" onPress={() => setShowAdd(false)} style={{ flex: 1 }} />
+              <Button title="Cancel" variant="tertiary" onPress={() => { setShowAdd(false); setNewAssignee(''); }} style={{ flex: 1 }} />
               <Button title="Add Task" onPress={handleAdd} loading={createTask.isPending} style={{ flex: 1 }} />
             </View>
           </View>
@@ -1370,6 +1387,10 @@ export default function ProjectWorkspaceScreen() {
   const { data: expenses = [] } = useProjectExpenses(id);
 
   const [tab, setTab] = useState<Tab>('Overview');
+  const [showMoreTabs, setShowMoreTabs] = useState(false);
+
+  const VISIBLE_TABS = TABS.slice(0, 3);
+  const EXTRA_TABS = TABS.slice(3) as Tab[];
 
   if (!project) {
     return (
@@ -1408,9 +1429,9 @@ export default function ProjectWorkspaceScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.tabBar}
-            contentContainerStyle={{ gap: 6, paddingHorizontal: 5, paddingVertical: 5 }}
+            contentContainerStyle={{ gap: 8, paddingHorizontal: spacing.lg, paddingVertical: 4 }}
           >
-            {TABS.map((t) => (
+            {VISIBLE_TABS.map((t) => (
               <TouchableOpacity
                 key={t}
                 style={[styles.tabPill, tab === t && styles.tabPillActive]}
@@ -1419,6 +1440,15 @@ export default function ProjectWorkspaceScreen() {
                 <Text style={[styles.tabPillText, tab === t && styles.tabPillTextActive]}>{t}</Text>
               </TouchableOpacity>
             ))}
+            
+            <TouchableOpacity
+              style={[styles.tabPill, EXTRA_TABS.includes(tab) && styles.tabPillActive]}
+              onPress={() => setShowMoreTabs(true)}
+            >
+              <Text style={[styles.tabPillText, EXTRA_TABS.includes(tab) && styles.tabPillTextActive]}>
+                {EXTRA_TABS.includes(tab) ? `${tab} ▾` : 'More ▾'}
+              </Text>
+            </TouchableOpacity>
           </ScrollView>
         </View>
       </LinearGradient>
@@ -1489,6 +1519,24 @@ export default function ProjectWorkspaceScreen() {
           />
         )}
       </ScrollView>
+
+      {/* More Tabs Modal */}
+      <Modal visible={showMoreTabs} transparent animationType="fade" onRequestClose={() => setShowMoreTabs(false)}>
+        <TouchableOpacity style={styles.moreOverlay} activeOpacity={1} onPress={() => setShowMoreTabs(false)}>
+          <View style={styles.moreDropdown}>
+            {EXTRA_TABS.map(t => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.moreOption, tab === t && styles.moreOptionActive]}
+                onPress={() => { setTab(t); setShowMoreTabs(false); }}
+              >
+                <Text style={[styles.moreOptionText, tab === t && styles.moreOptionTextActive]}>{t}</Text>
+                {tab === t && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -1523,13 +1571,13 @@ const styles = StyleSheet.create({
   statusTextTop: { fontSize: 11.5, fontFamily: fontFamily.bold, color: '#3FA65B' },
 
   // Tab bar
-  tabsWrapper: { marginTop: 20, zIndex: 1 },
-  tabBar: { backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 14 },
+  tabsWrapper: { marginTop: 20, zIndex: 1, marginHorizontal: -spacing.lg },
+  tabBar: { },
   tabPill: {
-    paddingHorizontal: 15, paddingVertical: 9, borderRadius: 10,
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 100,
   },
   tabPillActive: { backgroundColor: '#fff', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 14 },
-  tabPillText: { fontSize: 12.5, fontFamily: fontFamily.semiBold, color: 'rgba(255,255,255,0.68)' },
+  tabPillText: { fontSize: 13, fontFamily: fontFamily.semiBold, color: 'rgba(255,255,255,0.75)' },
   tabPillTextActive: { color: '#3E2A18' },
 
   // Overview
@@ -1625,6 +1673,22 @@ const styles = StyleSheet.create({
   // Empty
   empty: { alignItems: 'center', paddingVertical: spacing['4xl'], gap: spacing.sm },
   emptyText: { ...typography.bodyMedium, color: colors.neutral[400], textAlign: 'center' },
+  pickerContainer: {
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+    overflow: 'hidden',
+  },
+  picker: { height: 50 },
+
+  // More Dropdown
+  moreOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
+  moreDropdown: { width: 220, backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing.sm, ...shadows.lg },
+  moreOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderRadius: radius.md },
+  moreOptionActive: { backgroundColor: colors.neutral[100] },
+  moreOptionText: { ...typography.bodyMedium, color: colors.ink },
+  moreOptionTextActive: { fontFamily: fontFamily.semiBold, color: colors.primary },
 });
 
 // ── Payments Tab — Gradient & Glow Styles ────────────────────────────────────

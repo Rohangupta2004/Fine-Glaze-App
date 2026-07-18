@@ -1,9 +1,126 @@
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
-import { useRouter } from 'expo-router'; import { useSafeAreaInsets } from 'react-native-safe-area-context'; import { Ionicons } from '@expo/vector-icons'; import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Card } from '../../src/components'; import { supabase } from '../../src/lib/supabase'; import { useAuthStore } from '../../src/stores/authStore'; import { colors } from '../../src/theme/colors'; import { spacing } from '../../src/theme/spacing'; import { typography, fontFamily } from '../../src/theme/typography';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { Card } from '../../src/components';
+import { supabase } from '../../src/lib/supabase';
+import { useAuthStore } from '../../src/stores/authStore';
+import { colors } from '../../src/theme/colors';
+import { spacing } from '../../src/theme/spacing';
+import { typography, fontFamily } from '../../src/theme/typography';
 import { showAlert } from '../../src/utils/alert';
-const ITEMS=[['task_updates','Task Updates','Assignments, due dates and status changes','list'],['dpr_updates','DPR Updates','Submissions, approvals and change requests','document-text'],['leave_updates','Leave & Advances','Request decisions and payment advances','calendar'],['material_updates','Materials & Deliveries','Requests, approvals and deliveries','cube'],['payment_updates','Payments','Milestones, dues and receipts','cash'],['chat_updates','Messages','Project chat and direct messages','chatbubbles']];
-const defaults={task_updates:true,dpr_updates:true,leave_updates:true,material_updates:true,payment_updates:true,chat_updates:true,push_enabled:true};
-export default function NotificationSettings(){const router=useRouter();const insets=useSafeAreaInsets();const profile=useAuthStore(s=>s.profile);const qc=useQueryClient();const{data:prefs=defaults}=useQuery({queryKey:['notification-preferences',profile?.id],enabled:!!profile?.id,queryFn:async()=>{const{data,error}=await supabase.from('notification_preferences').select('*').eq('profile_id',profile!.id).maybeSingle();if(error)throw error;return data||defaults;}});const update=useMutation({mutationFn:async(next:any)=>{const{error}=await supabase.from('notification_preferences').upsert({profile_id:profile!.id,...prefs,...next,updated_at:new Date().toISOString()});if(error)throw error;},onSuccess:()=>qc.invalidateQueries({queryKey:['notification-preferences']}),onError:(e:any)=>showAlert('Could not update',e.message)});return <View style={[styles.container,{paddingTop:insets.top+spacing.md}]}><View style={styles.header}><TouchableOpacity onPress={()=>router.back()}><Ionicons name="arrow-back" size={24} color={colors.ink}/></TouchableOpacity><Text style={styles.title}>Notification Settings</Text><View style={{width:24}}/></View><ScrollView contentContainerStyle={styles.content}><Card style={styles.master}><View style={styles.row}><View style={[styles.icon,{backgroundColor:colors.primary+'15'}]}><Ionicons name="notifications" size={21} color={colors.primary}/></View><View style={{flex:1}}><Text style={styles.itemTitle}>Push Notifications</Text><Text style={styles.desc}>Receive alerts on this device</Text></View><Switch value={prefs.push_enabled} onValueChange={v=>update.mutate({push_enabled:v})} trackColor={{true:colors.tertiary}} thumbColor={prefs.push_enabled?colors.primary:colors.neutral[300]}/></View></Card><Text style={styles.section}>Categories</Text><Card style={styles.list}>{ITEMS.map(([key,title,desc,icon],i)=><React.Fragment key={key}><View style={styles.item}><View style={styles.icon}><Ionicons name={icon as any} size={20} color={colors.primary}/></View><View style={{flex:1}}><Text style={styles.itemTitle}>{title}</Text><Text style={styles.desc}>{desc}</Text></View><Switch disabled={!prefs.push_enabled} value={prefs.push_enabled&&prefs[key]!==false} onValueChange={v=>update.mutate({[key]:v})} trackColor={{true:colors.tertiary}} thumbColor={prefs[key]!==false?colors.primary:colors.neutral[300]}/></View>{i<ITEMS.length-1&&<View style={styles.divider}/>}</React.Fragment>)}</Card><Card style={styles.note}><Ionicons name="information-circle" size={20} color={colors.info}/><Text style={styles.noteText}>Important security and account alerts cannot be disabled.</Text></Card></ScrollView></View>}
-const styles=StyleSheet.create({container:{flex:1,backgroundColor:colors.background},header:{height:56,paddingHorizontal:spacing.lg,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},title:{...typography.h4,color:colors.ink},content:{padding:spacing.lg,paddingBottom:spacing['5xl']},master:{padding:spacing.lg},section:{...typography.caption,fontFamily:fontFamily.semiBold,color:colors.neutral[500],textTransform:'uppercase',letterSpacing:1,marginTop:spacing.xl,marginBottom:spacing.sm},list:{padding:0,overflow:'hidden'},row:{flexDirection:'row',alignItems:'center',gap:spacing.md},item:{padding:spacing.lg,flexDirection:'row',alignItems:'center',gap:spacing.md},icon:{width:40,height:40,borderRadius:11,backgroundColor:colors.tertiary+'20',alignItems:'center',justifyContent:'center'},itemTitle:{...typography.bodyMedium,fontFamily:fontFamily.semiBold,color:colors.ink},desc:{...typography.caption,color:colors.neutral[500],marginTop:2},divider:{height:1,backgroundColor:colors.divider,marginLeft:spacing.lg+52},note:{padding:spacing.md,marginTop:spacing.lg,flexDirection:'row',gap:spacing.sm},noteText:{flex:1,...typography.bodySmall,color:colors.neutral[600]}});
+
+const ITEMS = [
+  ['task_updates', 'Task Updates', 'Assignments, due dates and status changes', 'list'],
+  ['dpr_updates', 'DPR Updates', 'Submissions, approvals and change requests', 'document-text'],
+  ['leave_updates', 'Leave & Advances', 'Request decisions and payment advances', 'calendar'],
+  ['material_updates', 'Materials & Deliveries', 'Requests, approvals and deliveries', 'cube'],
+  ['payment_updates', 'Payments', 'Milestones, dues and receipts', 'cash'],
+  ['chat_updates', 'Messages', 'Project chat and direct messages', 'chatbubbles']
+];
+
+const defaults = {
+  task_updates: true,
+  dpr_updates: true,
+  leave_updates: true,
+  material_updates: true,
+  payment_updates: true,
+  chat_updates: true,
+  push_enabled: true
+};
+
+export default function NotificationSettings() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const profile = useAuthStore(s => s.profile);
+  const qc = useQueryClient();
+
+  const { data: prefs = defaults } = useQuery({
+    queryKey: ['notification-preferences', profile?.id],
+    enabled: !!profile?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('profile_id', profile!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data || defaults;
+    }
+  });
+
+  const update = useMutation({
+    mutationFn: async (next: any) => {
+      const { error } = await supabase.from('notification_preferences').upsert({
+        profile_id: profile!.id,
+        ...prefs,
+        ...next,
+        updated_at: new Date().toISOString()
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notification-preferences'] }),
+    onError: (e: any) => showAlert('Could not update', e.message)
+  });
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top + spacing.md }]}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color={colors.ink} />
+        </TouchableOpacity>
+        <Text style={styles.title}>Notification Settings</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.section}>Categories</Text>
+        <Card style={styles.list}>
+          {ITEMS.map(([key, title, desc, icon], i) => (
+            <React.Fragment key={key}>
+              <View style={styles.item}>
+                <View style={styles.icon}>
+                  <Ionicons name={icon as any} size={20} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.itemTitle}>{title}</Text>
+                  <Text style={styles.desc}>{desc}</Text>
+                </View>
+                <Switch
+                  value={prefs[key] !== false}
+                  onValueChange={v => update.mutate({ [key]: v })}
+                  trackColor={{ true: colors.tertiary }}
+                  thumbColor={prefs[key] !== false ? colors.primary : colors.neutral[300]}
+                />
+              </View>
+              {i < ITEMS.length - 1 && <View style={styles.divider} />}
+            </React.Fragment>
+          ))}
+        </Card>
+        <Card style={styles.note}>
+          <Ionicons name="information-circle" size={20} color={colors.info} />
+          <Text style={styles.noteText}>Important security and account alerts cannot be disabled.</Text>
+        </Card>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  header: { height: 56, paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title: { ...typography.h4, color: colors.ink },
+  content: { padding: spacing.lg, paddingBottom: spacing['5xl'] },
+  section: { ...typography.caption, fontFamily: fontFamily.semiBold, color: colors.neutral[500], textTransform: 'uppercase', letterSpacing: 1, marginTop: spacing.xl, marginBottom: spacing.sm },
+  list: { padding: 0, overflow: 'hidden' },
+  item: { padding: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  icon: { width: 40, height: 40, borderRadius: 11, backgroundColor: colors.tertiary + '20', alignItems: 'center', justifyContent: 'center' },
+  itemTitle: { ...typography.bodyMedium, fontFamily: fontFamily.semiBold, color: colors.ink },
+  desc: { ...typography.caption, color: colors.neutral[500], marginTop: 2 },
+  divider: { height: 1, backgroundColor: colors.divider, marginLeft: spacing.lg + 52 },
+  note: { padding: spacing.md, marginTop: spacing.lg, flexDirection: 'row', gap: spacing.sm },
+  noteText: { flex: 1, ...typography.bodySmall, color: colors.neutral[600] }
+});

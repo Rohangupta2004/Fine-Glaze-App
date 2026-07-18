@@ -58,6 +58,8 @@ export default function CreateTaskScreen() {
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [projectId, setProjectId] = useState('');
   const [isVisible, setIsVisible] = useState(true);
+  const [checklist, setChecklist] = useState<string[]>([]);
+  const [newChecklistItem, setNewChecklistItem] = useState('');
 
   // Client role guard
   useEffect(() => {
@@ -117,6 +119,7 @@ export default function CreateTaskScreen() {
         priority,
         projectId: projectId || null,
         createdBy: profile?.id!,
+        checklist: checklist.map(text => ({ text, done: false })),
       });
       showAlert(
         'Success', 
@@ -249,6 +252,51 @@ export default function CreateTaskScreen() {
                 </View>
               </View>
 
+              {/* Task Checklist Items */}
+              <View style={styles.inputWrap}>
+                <Text style={styles.label}>Checklist Items</Text>
+                
+                <View style={styles.checklistInputRow}>
+                  <TextInput
+                    style={[styles.textInput, { flex: 1, minHeight: 44, maxHeight: 44, paddingVertical: 10 }]}
+                    placeholder="Add item to checklist..."
+                    placeholderTextColor={colors.neutral[400]}
+                    value={newChecklistItem}
+                    onChangeText={setNewChecklistItem}
+                  />
+                  <TouchableOpacity
+                    style={styles.addChecklistItemBtn}
+                    onPress={() => {
+                      const trimmed = newChecklistItem.trim();
+                      if (trimmed) {
+                        setChecklist((prev) => [...prev, trimmed]);
+                        setNewChecklistItem('');
+                      }
+                    }}
+                  >
+                    <Ionicons name="add" size={24} color={colors.white} />
+                  </TouchableOpacity>
+                </View>
+
+                {checklist.length > 0 && (
+                  <View style={styles.checklistFormItems}>
+                    {checklist.map((item, index) => (
+                      <View key={index} style={styles.checklistFormRow}>
+                        <Ionicons name="ellipse" size={8} color={colors.primary} />
+                        <Text style={styles.checklistFormText}>{item}</Text>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setChecklist((prev) => prev.filter((_, i) => i !== index));
+                          }}
+                        >
+                          <Ionicons name="trash-outline" size={16} color={colors.error} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
             </ScrollView>
 
             {/* Footer */}
@@ -359,5 +407,36 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderTopWidth: 1,
     borderTopColor: colors.neutral[200],
+  },
+  checklistInputRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  addChecklistItemBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checklistFormItems: {
+    backgroundColor: colors.neutral[100],
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  checklistFormRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  checklistFormText: {
+    flex: 1,
+    ...typography.bodySmall,
+    color: colors.ink,
   },
 });

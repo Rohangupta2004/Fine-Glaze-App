@@ -29,7 +29,7 @@ export default function AdminProjectsScreen() {
   const [search, setSearch] = useState('');
 
   const filtered = (projects || []).filter((p) => {
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.city?.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !(p.city || '').toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 

@@ -97,6 +97,7 @@ export interface Profile {
   bank_details: Record<string, any> | null;
   client_org_id?: string | null;
   push_token?: string | null;
+  password_reset_required?: boolean;
 }
 
 export interface Project {
@@ -158,6 +159,7 @@ export interface Task {
   status: TaskStatus;
   created_by: string;
   recurring_task_id: string | null;
+  checklist?: any[];
 }
 
 export interface Dpr {

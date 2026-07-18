@@ -1,34 +1,7 @@
 /**
  * Edge Function: send-whatsapp
  * Sends a WhatsApp message via WhatsApp Cloud API (Meta Business).
- *
- * Use case: Indian construction sites run on WhatsApp. Workers may not
- * check the app daily, so critical notifications (salary credited, leave
- * approved, payment milestone added, evening site reminder) should also
- * be delivered via WhatsApp.
- *
- * Required env vars (set in Supabase Project Settings → Edge Functions):
- *   WHATSAPP_TOKEN         — Meta Cloud API access token
- *   WHATSAPP_PHONE_NUMBER_ID — WhatsApp Business phone number ID
- *   WHATSAPP_BUSINESS_NS   — Optional: namespace for templates
- *
- * POST /send-whatsapp
- * Body:
- *   {
- *     "to": "919876543210",          // E.164 without +
- *     "template": "salary_credited", // template name (pre-approved by Meta)
- *     "params": ["Rohan", "15000"],  // positional template params
- *     "fallbackSms": "..."           // optional: text to send if WhatsApp fails
- *   }
- *
- * Templates needed (must be pre-approved in WhatsApp Manager):
- *   - salary_credited       — "Salary credited" notification
- *   - leave_approved        — Leave request approved
- *   - leave_rejected        — Leave request rejected
- *   - payment_milestone     — New payment milestone added to project
- *   - site_reminder         — Tomorrow's site assignment reminder
- *   - task_assigned         — New task assigned
- *   - otp_for_login         — Reserved (PRD locks out OTP, but template kept)
+ * Secured with service_role_key verification.
  */
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
@@ -50,7 +23,6 @@ interface SendRequest {
 
 interface TemplateConfig {
   language: string;
-  // Some templates may use a different namespace; default is the business one.
   namespace?: string;
 }
 
@@ -68,7 +40,6 @@ const TEMPLATE_DEFAULTS: Record<string, TemplateConfig> = {
 function normalizePhone(raw: string): string | null {
   if (!raw) return null;
   let p = raw.replace(/[^\d]/g, '');
-  // India default — strip leading 0 and prepend 91 if 10 digits
   if (p.length === 10) p = '91' + p;
   else if (p.length === 11 && p.startsWith('0')) p = '91' + p.slice(1);
   else if (p.length === 12 && p.startsWith('91')) p = p;
@@ -137,10 +108,6 @@ async function sendWhatsApp(req: SendRequest): Promise<{ success: boolean; messa
   }
 }
 
-/**
- * Optional: send SMS fallback via a configured SMS gateway.
- * In production, wire this to MSG91 / Textlocal / Twilio.
- */
 async function sendSmsFallback(phone: string, message: string): Promise<boolean> {
   const smsUrl = Deno.env.get('SMS_GATEWAY_URL');
   const smsToken = Deno.env.get('SMS_GATEWAY_TOKEN');
@@ -149,7 +116,6 @@ async function sendSmsFallback(phone: string, message: string): Promise<boolean>
   try {
     const to = normalizePhone(phone);
     if (!to) return false;
-    // Generic SMS gateway POST — adapt to your provider (MSG91, Textlocal, etc.)
     await fetch(smsUrl, {
       method: 'POST',
       headers: {
@@ -171,6 +137,22 @@ serve(async (req: Request) => {
   }
 
   try {
+    // ── 1. Service Role Authentication Check ───────────────────────────────
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Missing or invalid Authorization header' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const token = authHeader.split(' ')[1];
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    if (token !== serviceKey) {
+      return new Response(JSON.stringify({ error: 'Forbidden: Invalid service key' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const body: SendRequest = await req.json();
 
     if (!body.to || !body.template) {
@@ -182,7 +164,6 @@ serve(async (req: Request) => {
 
     const result = await sendWhatsApp(body);
 
-    // Fallback to SMS if WhatsApp failed AND fallback text was provided
     let smsSent = false;
     if (!result.success && body.fallbackSms) {
       smsSent = await sendSmsFallback(body.to, body.fallbackSms);
