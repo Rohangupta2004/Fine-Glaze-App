@@ -14,6 +14,7 @@ import { Card, StatusChip } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useProjects } from '../../src/hooks/useProjects';
 import { useAllPayments } from '../../src/hooks/usePayments';
+import { useFacadeSections, useProjectVariations } from '../../src/hooks/useContractorFeatures';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius, shadows } from '../../src/theme/spacing';
@@ -25,6 +26,8 @@ export default function ClientDashboard() {
   const { data: projects, refetch, isRefetching } = useProjects();
   const { data: payments } = useAllPayments();
   const project = (projects || [])[0];
+  const { data: sections = [] } = useFacadeSections(project?.id);
+  const { data: variations = [] } = useProjectVariations(project?.id);
 
   const totalBilled = (payments || []).reduce((s, p) => s + p.amount, 0);
   const totalPaid = (payments || []).filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
@@ -132,6 +135,47 @@ export default function ClientDashboard() {
               <Text style={styles.progressLabel}>{paidPct}% collected</Text>
             </LinearGradient>
           </View>
+
+          {/* Elevation Progress Map */}
+          {sections.length > 0 && (
+            <Card style={{ padding: spacing.md, marginTop: spacing.md, backgroundColor: '#FFFDF9', borderWidth: 1, borderColor: '#EAE6DF' }}>
+              <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 12 }}>
+                Elevation Progress Map
+              </Text>
+              <View style={{ gap: 6 }}>
+                {['L4', 'L3', 'L2', 'L1'].map(level => (
+                  <View key={level} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ width: 20, fontSize: 11, fontFamily: fontFamily.bold, color: colors.neutral[600] }}>{level}</Text>
+                    <View style={{ flex: 1, flexDirection: 'row', gap: 6 }}>
+                      {['BayA', 'BayB', 'BayC', 'BayD'].map(bay => {
+                        const label = `${level}-${bay}`;
+                        const sec = sections.find(s => s.label === label);
+                        const statusColor = sec?.status === 'completed' ? '#16A34A' : (sec?.status === 'in_progress' ? '#CA8A04' : '#DC2626');
+                        const statusBg = sec?.status === 'completed' ? 'rgba(22, 163, 74, 0.15)' : (sec?.status === 'in_progress' ? 'rgba(202, 138, 4, 0.15)' : 'rgba(220, 38, 38, 0.15)');
+                        return (
+                          <View
+                            key={bay}
+                            style={{
+                              flex: 1,
+                              height: 36,
+                              backgroundColor: statusBg,
+                              borderWidth: 1,
+                              borderColor: statusColor,
+                              borderRadius: 6,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <Text style={{ fontSize: 9, fontFamily: fontFamily.bold, color: colors.neutral[700] }}>{bay.replace('Bay', '')}</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </Card>
+          )}
         </>
       ) : (
         <Card style={styles.emptyCard}>

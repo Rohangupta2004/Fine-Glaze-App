@@ -17,6 +17,8 @@ import { Card, Button, GradientButton, Input } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useProjects } from '../../src/hooks/useProjects';
 import { useMyDprs, useSubmitDpr } from '../../src/hooks/useDpr';
+import { useProjectBOQ } from '../../src/hooks/useBOQ';
+import { supabase } from '../../src/lib/supabase';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius, shadows, TOUCH_TARGET } from '../../src/theme/spacing';
@@ -39,26 +41,47 @@ export default function SupervisorDprScreen() {
   const { data: projects } = useProjects();
   const activeProject = (projects || [])[0];
   const { data: dprs, refetch, isRefetching } = useMyDprs(profile?.id);
+  const { data: boqItems = [] } = useProjectBOQ(activeProject?.id);
   const submitDpr = useSubmitDpr();
 
   const [mode, setMode] = useState<ViewMode>('list');
   const [workType, setWorkType] = useState('');
   const [levelZone, setLevelZone] = useState('');
   const [workDone, setWorkDone] = useState('');
+  const [reportedQuantities, setReportedQuantities] = useState<Record<string, string>>({});
 
   const handleSubmit = async () => {
     if (!workType.trim() || !workDone.trim() || !profile?.id || !activeProject?.id) return;
     try {
-      await submitDpr.mutateAsync({
+      const dpr = await submitDpr.mutateAsync({
         projectId: activeProject.id,
         submittedBy: profile.id,
         workType: workType.trim(),
         levelZone: levelZone.trim(),
         workDone: workDone.trim(),
       });
+
+      // Filter and insert BOQ items reported today
+      const boqPayload = Object.entries(reportedQuantities)
+        .map(([itemId, qtyStr]) => ({
+          dpr_id: dpr.id,
+          project_boq_item_id: itemId,
+          quantity_reported: parseFloat(qtyStr),
+        }))
+        .filter((item) => !isNaN(item.quantity_reported) && item.quantity_reported > 0);
+
+      if (boqPayload.length > 0) {
+        const { error: boqErr } = await supabase
+          .from('dpr_boq_items')
+          .insert(boqPayload);
+        if (boqErr) throw boqErr;
+      }
+
       showAlert('Submitted', 'Daily Progress Report submitted successfully.');
       setWorkType(''); setLevelZone(''); setWorkDone('');
+      setReportedQuantities({});
       setMode('list');
+      refetch();
     } catch (e: any) {
       showAlert('Error', e?.message || 'Failed to submit DPR');
     }
@@ -120,6 +143,40 @@ export default function SupervisorDprScreen() {
                   onChangeText={setLevelZone}
                 />
               </View>
+
+              {/* Quantities Installed Today Section */}
+              {boqItems.length > 0 && (
+                <View style={[styles.field, { marginTop: spacing.md, gap: spacing.sm }]}>
+                  <Text style={styles.sectionLabel}>Quantities Installed Today (Optional)</Text>
+                  {boqItems.map((item) => (
+                    <View key={item.id} style={styles.boqRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.boqItemName}>{item.item_name}</Text>
+                        <Text style={styles.boqItemDetail}>
+                          Installed: {item.completed_quantity} / {item.quantity} {item.unit}
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <TextInput
+                          style={styles.boqInput}
+                          keyboardType="numeric"
+                          placeholder="0"
+                          placeholderTextColor={colors.neutral[300]}
+                          value={reportedQuantities[item.id] || ''}
+                          onChangeText={(text) => {
+                            setReportedQuantities((prev) => ({
+                              ...prev,
+                              [item.id]: text,
+                            }));
+                          }}
+                        />
+                        <Text style={styles.boqUnit}>{item.unit}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
               <View style={styles.field}>
                 <Text style={styles.textAreaLabel}>Work Done *</Text>
                 <TextInput
@@ -251,6 +308,51 @@ const styles = StyleSheet.create({
   },
   field: { 
     marginBottom: spacing.md,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontFamily: fontFamily.semiBold,
+    color: colors.neutral[700],
+    marginBottom: spacing.xs,
+  },
+  boqRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FAF9F6',
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.neutral[100],
+    marginBottom: spacing.xs,
+  },
+  boqItemName: {
+    fontSize: 13,
+    fontFamily: fontFamily.semiBold,
+    color: colors.neutral[800],
+  },
+  boqItemDetail: {
+    fontSize: 11,
+    color: colors.neutral[500],
+    marginTop: 2,
+  },
+  boqInput: {
+    borderWidth: 1,
+    borderColor: colors.neutral[200],
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    width: 60,
+    textAlign: 'center',
+    fontSize: 13,
+    fontFamily: fontFamily.medium,
+    backgroundColor: '#fff',
+    color: colors.ink,
+  },
+  boqUnit: {
+    fontSize: 12,
+    color: colors.neutral[500],
+    width: 30,
   },
   textAreaLabel: {
     ...typography.label,

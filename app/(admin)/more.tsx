@@ -45,6 +45,7 @@ const SECTIONS: { title: string; items: MenuItem[]; gradient: string[] }[] = [
       { icon: 'people-circle', label: 'Assign Site & Workers', route: '/(admin)/assign-site', color: '#2563EB' },
       { icon: 'person-add', label: 'Employee Requests', route: '/(admin)/employee-requests', color: '#D97706' },
       { icon: 'repeat', label: 'Recurring Tasks', route: '/(admin)/recurring-tasks', color: '#059669' },
+      { icon: 'document-attach', label: 'Upload BOQ', route: '/(admin)/import-boq', color: '#695030' },
       { icon: 'qr-code', label: 'Project QR Codes', route: '/(admin)/project-qr', color: '#695030' },
     ],
   },

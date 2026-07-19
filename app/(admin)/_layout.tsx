@@ -198,6 +198,7 @@ export default function AdminLayout() {
         <Tabs.Screen name="project-qr" options={{ href: null }} />
         <Tabs.Screen name="assign-site" options={{ href: null }} />
         <Tabs.Screen name="employee-requests" options={{ href: null }} />
+        <Tabs.Screen name="import-boq" options={{ href: null }} />
         <Tabs.Screen name="global-search" options={{ href: null }} />
         <Tabs.Screen name="calendar" options={{ href: null }} />
         <Tabs.Screen name="dpr-management" options={{ href: null }} />
