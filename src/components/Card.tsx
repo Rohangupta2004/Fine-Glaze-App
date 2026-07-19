@@ -31,34 +31,34 @@ export function Card({
 }: CardProps) {
   // Flatten style object to inspect and filter properties
   const flattenedStyle = StyleSheet.flatten(style) || {};
-  
+
   // Extract background color override if any, to avoid solid colors breaking glassmorphism
-  const { 
+  const {
     backgroundColor,
-    width, height, minWidth, minHeight, flex, 
+    width, height, minWidth, minHeight, flex,
     margin, marginHorizontal, marginVertical, marginTop, marginBottom, marginLeft, marginRight,
     position, top, bottom, left, right, zIndex,
     ...innerStyle
   } = flattenedStyle;
 
-  const outerStyle = { 
-    width, height, minWidth, minHeight, flex, 
+  const outerStyle = {
+    width, height, minWidth, minHeight, flex,
     margin, marginHorizontal, marginVertical, marginTop, marginBottom, marginLeft, marginRight,
-    position, top, bottom, left, right, zIndex 
+    position, top, bottom, left, right, zIndex
   };
 
   const cardStyle = [
     styles.base,
-    variant === 'elevated'    && styles.elevated,
+    variant === 'elevated' && styles.elevated,
     variant === 'interactive' && styles.interactive,
-    variant === 'flat'        && styles.flat,
-    variant === 'glow'        && styles.glow,
+    variant === 'flat' && styles.flat,
+    variant === 'glow' && styles.glow,
     outerStyle,
   ];
 
   // Colors for glassmorphic soft gradient background
-  const defaultGradientColors = variant === 'flat' 
-    ? ['rgba(255,255,255,1)', 'rgba(255,255,255,0.4)'] 
+  const defaultGradientColors = variant === 'flat'
+    ? ['rgba(255,255,255,1)', 'rgba(255,255,255,0.4)']
     : ['#FFFFFF', 'rgba(255,255,255,0.7)'];
 
   const finalGradientColors = gradientColors || defaultGradientColors;
@@ -69,7 +69,7 @@ export function Card({
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[
-        styles.gradientContent, 
+        styles.gradientContent,
         { padding },
         innerStyle,
         accentColor ? { borderLeftWidth: 4, borderLeftColor: accentColor } : null

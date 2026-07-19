@@ -11,8 +11,13 @@ ALTER TABLE public.inventory_ledger ADD CONSTRAINT inventory_ledger_transaction_
 -- We replace it with a direct query that bypasses RLS using a SECURITY DEFINER function
 CREATE OR REPLACE FUNCTION public.get_my_company_id_safe()
 RETURNS UUID AS $$
-  SELECT company_id FROM public.profiles WHERE id = auth.uid() LIMIT 1;
-$$ LANGUAGE sql SECURITY DEFINER SET search_path = '';
+DECLARE
+  v_company_id UUID;
+BEGIN
+  SELECT company_id INTO v_company_id FROM public.profiles WHERE id = auth.uid() LIMIT 1;
+  RETURN v_company_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 DROP POLICY IF EXISTS "profiles_select_policy" ON public.profiles;
 CREATE POLICY "profiles_select_policy" ON public.profiles FOR SELECT TO authenticated
@@ -20,6 +25,15 @@ CREATE POLICY "profiles_select_policy" ON public.profiles FOR SELECT TO authenti
 
 -- Ensure the other duplicate policies don't conflict
 DROP POLICY IF EXISTS "See profiles in company" ON public.profiles;
+
+-- Fix infinite recursion caused by the write policy applying to ALL commands
+DROP POLICY IF EXISTS "profiles_write_policy" ON public.profiles;
+CREATE POLICY "profiles_update_policy" ON public.profiles FOR UPDATE TO authenticated
+  USING (id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
+  WITH CHECK (id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+
+CREATE POLICY "profiles_delete_policy" ON public.profiles FOR DELETE TO authenticated
+  USING (id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
 
 -- 3. Secure SECURITY DEFINER functions with search_path = '' and schema qualifications
 CREATE OR REPLACE FUNCTION public.add_material_alias(p_material_id UUID, p_new_alias TEXT)

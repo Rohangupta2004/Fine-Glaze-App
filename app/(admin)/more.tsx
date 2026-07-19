@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Avatar } from '../../src/components';
+import { Avatar, Card } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { usePermissions } from '../../src/hooks/usePermissions';
 import { colors } from '../../src/theme/colors';
@@ -91,30 +91,22 @@ export default function AdminMoreScreen() {
       contentContainerStyle={{ paddingBottom: 100 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Gradient Profile Hero */}
-      <LinearGradient
-        colors={['#695030', '#8B6840', '#A8824E']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.profileHero, { paddingTop: insets.top + spacing.lg }]}
-      >
-        <View style={styles.heroBubble} />
-        <TouchableOpacity
-          style={styles.profileRow}
-          activeOpacity={0.85}
-          onPress={() => router.push('/(admin)/my-profile' as any)}
-        >
-          <Avatar name={profile?.full_name || 'Admin'} uri={profile?.avatar_url} size={60} />
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{profile?.full_name || 'Admin'}</Text>
-            <Text style={styles.profileRole}>{profile?.role?.replace('_', ' ') || 'Admin'}</Text>
-            <Text style={styles.profilePhone}>{profile?.phone || ''}</Text>
+      {/* Profile Card Header */}
+      <View style={[styles.profileHero, { paddingTop: insets.top + spacing.lg }]}>
+        <Card onPress={() => router.push('/(admin)/my-profile' as any)}>
+          <View style={styles.profileRow}>
+            <Avatar name={profile?.full_name || 'Admin'} uri={profile?.avatar_url} size={60} />
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>{profile?.full_name || 'Admin'}</Text>
+              <Text style={styles.profileRole}>{profile?.role?.replace('_', ' ') || 'Admin'}</Text>
+              <Text style={styles.profilePhone}>{profile?.phone || ''}</Text>
+            </View>
+            <View style={styles.profileArrow}>
+              <Ionicons name="chevron-forward" size={16} color={colors.neutral[500]} />
+            </View>
           </View>
-          <View style={styles.profileArrow}>
-            <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.8)" />
-          </View>
-        </TouchableOpacity>
-      </LinearGradient>
+        </Card>
+      </View>
 
       {/* Menu Sections */}
       <View style={styles.body}>
@@ -171,14 +163,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#EDE8E1' },
 
   // Profile Hero
-  profileHero: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, overflow: 'hidden' },
-  heroBubble: { position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.08)' },
+  profileHero: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   profileInfo: { flex: 1 },
-  profileName: { fontSize: 18, fontFamily: fontFamily.bold, color: '#fff' },
-  profileRole: { fontSize: 12, color: 'rgba(255,255,255,0.75)', textTransform: 'capitalize', marginTop: 2, fontFamily: fontFamily.medium },
-  profilePhone: { fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2, fontFamily: fontFamily.regular },
-  profileArrow: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  profileName: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink },
+  profileRole: { fontSize: 12, color: colors.neutral[500], textTransform: 'capitalize', marginTop: 2, fontFamily: fontFamily.medium },
+  profilePhone: { fontSize: 12, color: colors.neutral[400], marginTop: 2, fontFamily: fontFamily.regular },
+  profileArrow: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.neutral[100], alignItems: 'center', justifyContent: 'center' },
 
   // Body
   body: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },

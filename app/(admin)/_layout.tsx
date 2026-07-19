@@ -76,10 +76,6 @@ export default function AdminLayout() {
               backgroundColor: 'transparent',
               borderTopWidth: 0,
               elevation: 15,
-              shadowColor: '#8B6840',
-              shadowOpacity: 0.15,
-              shadowRadius: 20,
-              shadowOffset: { width: 0, height: 6 },
               height: 72,
               paddingBottom: 12,
               paddingTop: 10,
@@ -193,7 +189,7 @@ export default function AdminLayout() {
         <Tabs.Screen name="approvals" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="project-workspace" options={{ href: null }} />
-        <Tabs.Screen name="create-project" options={{ href: null }} />
+        <Tabs.Screen name="create-project" options={{ href: null, tabBarStyle: { display: 'none' } }} />
         <Tabs.Screen name="recurring-tasks" options={{ href: null }} />
         <Tabs.Screen name="project-qr" options={{ href: null }} />
         <Tabs.Screen name="assign-site" options={{ href: null }} />

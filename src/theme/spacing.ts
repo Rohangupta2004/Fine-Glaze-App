@@ -32,31 +32,19 @@ export const radius = {
 /** Shadow tokens — neutral */
 export const shadows = {
   sm: {
-    shadowColor: '#1E1815',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    boxShadow: '0px 1px 2px rgba(30, 24, 21, 0.05)',
     elevation: 1,
   },
   md: {
-    shadowColor: '#695030',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.06,
-    shadowRadius: 20,
+    boxShadow: '0px 8px 20px rgba(105, 80, 48, 0.06)',
     elevation: 4,
   },
   lg: {
-    shadowColor: '#695030',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.08,
-    shadowRadius: 32,
+    boxShadow: '0px 12px 32px rgba(105, 80, 48, 0.08)',
     elevation: 6,
   },
   xl: {
-    shadowColor: '#695030',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.1,
-    shadowRadius: 48,
+    boxShadow: '0px 16px 48px rgba(105, 80, 48, 0.1)',
     elevation: 8,
   },
 } as const;
@@ -65,34 +53,22 @@ export const shadows = {
 export const glowShadows = {
   /** Subtle bronze lift — default card glow */
   sm: {
-    shadowColor: '#695030',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 8,
+    boxShadow: '0px 2px 8px rgba(105, 80, 48, 0.10)',
     elevation: 3,
   },
   /** Medium bronze glow — interactive / hover cards */
   md: {
-    shadowColor: '#695030',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
+    boxShadow: '0px 4px 16px rgba(105, 80, 48, 0.14)',
     elevation: 6,
   },
   /** Strong bronze glow — hero cards, CTAs */
   lg: {
-    shadowColor: '#695030',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
+    boxShadow: '0px 8px 24px rgba(105, 80, 48, 0.18)',
     elevation: 10,
   },
   /** Gold accent glow — premium badges, gradient buttons */
   gold: {
-    shadowColor: '#918050',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 20,
+    boxShadow: '0px 4px 20px rgba(145, 128, 80, 0.22)',
     elevation: 8,
   },
 } as const;
