@@ -19,6 +19,8 @@ import {
   ActivityIndicator,
   Platform,
   Switch,
+  Linking,
+  Image,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1079,6 +1081,10 @@ function PhotosTab({ dprs }: { dprs: Dpr[] }) {
 
 // Documents
 function DocumentsTab({ documents }: { documents: DocumentRow[] }) {
+  const [selectedDoc, setSelectedDoc] = useState<DocumentRow | null>(null);
+  const [loadingFile, setLoadingFile] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+
   const grouped = useMemo(() => {
     const g: Record<string, DocumentRow[]> = {};
     documents.forEach(d => {
@@ -1089,29 +1095,117 @@ function DocumentsTab({ documents }: { documents: DocumentRow[] }) {
     return g;
   }, [documents]);
 
+  const handleOpenDoc = async (doc: DocumentRow) => {
+    setLoadingFile(true);
+    try {
+      // 1. Fetch versions
+      const { data: versions, error: verErr } = await supabase
+        .from('document_versions')
+        .select('*')
+        .eq('document_id', doc.id)
+        .order('rev_no', { ascending: false });
+
+      if (verErr) throw verErr;
+
+      if (!versions || versions.length === 0) {
+        Alert.alert('Info', 'No uploaded file versions found for this document record.');
+        setLoadingFile(false);
+        return;
+      }
+
+      const latestVersion = versions[0];
+
+      // 2. Fetch signed URL
+      const { data, error: signErr } = await supabase
+        .storage
+        .from('documents')
+        .createSignedUrl(latestVersion.storage_path, 3600);
+
+      if (signErr) throw signErr;
+
+      if (data?.signedUrl) {
+        setViewerUrl(data.signedUrl);
+        setSelectedDoc(doc);
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to open document file link');
+    } finally {
+      setLoadingFile(false);
+    }
+  };
+
+  const isImageFile = (url: string | null) => {
+    if (!url) return false;
+    const cleanUrl = url.split('?')[0].toLowerCase();
+    return cleanUrl.endsWith('.png') || cleanUrl.endsWith('.jpg') || cleanUrl.endsWith('.jpeg') || cleanUrl.endsWith('.webp') || cleanUrl.endsWith('.gif');
+  };
+
   return (
     <>
       <SectionHeader title={`Documents (${documents.length})`} />
+      {loadingFile && (
+        <View style={{ padding: spacing.md, alignItems: 'center' }}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={{ fontSize: 11, color: colors.neutral[500], marginTop: 4 }}>Retrieving secure attachment link...</Text>
+        </View>
+      )}
       {documents.length === 0 && <EmptyState icon="folder-open-outline" text="No documents uploaded yet" />}
       {Object.entries(grouped).map(([cat, docs]) => (
         <View key={cat}>
           <Text style={styles.groupLabel}>{cat.replace('_', ' ').toUpperCase()}</Text>
           {docs.map(doc => (
-            <Card key={doc.id} style={styles.listCard}>
-              <View style={styles.listRow}>
-                <View style={[styles.iconBox, { backgroundColor: colors.infoBg }]}>
-                  <Ionicons name="document-text" size={20} color={colors.info} />
+            <TouchableOpacity key={doc.id} onPress={() => handleOpenDoc(doc)} activeOpacity={0.7}>
+              <Card style={styles.listCard}>
+                <View style={styles.listRow}>
+                  <View style={[styles.iconBox, { backgroundColor: colors.infoBg }]}>
+                    <Ionicons name="document-text" size={20} color={colors.info} />
+                  </View>
+                  <View style={styles.listInfo}>
+                    <Text style={styles.listTitle}>{doc.title}</Text>
+                    <Text style={styles.listSubtitle}>{doc.category}</Text>
+                  </View>
+                  <Ionicons name="eye-outline" size={18} color={colors.neutral[400]} />
                 </View>
-                <View style={styles.listInfo}>
-                  <Text style={styles.listTitle}>{doc.title}</Text>
-                  <Text style={styles.listSubtitle}>{doc.category}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.neutral[300]} />
-              </View>
-            </Card>
+              </Card>
+            </TouchableOpacity>
           ))}
         </View>
       ))}
+
+      {/* In-app Document Viewer Modal */}
+      <Modal visible={!!selectedDoc} animationType="slide" onRequestClose={() => setSelectedDoc(null)}>
+        <View style={{ flex: 1, backgroundColor: '#1E293B' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderColor: '#334155', backgroundColor: '#0F172A' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#fff', fontSize: 14, fontFamily: fontFamily.bold }} numberOfLines={1}>{selectedDoc?.title}</Text>
+              <Text style={{ color: '#94A3B8', fontSize: 10 }}>Category: {selectedDoc?.category}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setSelectedDoc(null)} style={{ padding: 6 }}>
+              <Ionicons name="close-circle" size={26} color="#94A3B8" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A', padding: spacing.md }}>
+            {viewerUrl && isImageFile(viewerUrl) ? (
+              <Image source={{ uri: viewerUrl }} style={{ width: '100%', height: '100%', resizeMode: 'contain' }} />
+            ) : (
+              <View style={{ alignItems: 'center', gap: spacing.md }}>
+                <Ionicons name="document-attach-outline" size={80} color="#64748B" />
+                <Text style={{ color: '#E2E8F0', fontSize: 14, fontFamily: fontFamily.semiBold }}>Non-Image Document Format</Text>
+                <Text style={{ color: '#94A3B8', fontSize: 11, textAlign: 'center', paddingHorizontal: spacing.xl }}>
+                  PDF and CAD blueprints are opened externally in secure viewing frames.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => viewerUrl && Linking.openURL(viewerUrl)}
+                  style={{ backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8, marginTop: spacing.md }}
+                >
+                  <Text style={{ color: '#fff', fontFamily: fontFamily.bold, fontSize: 13 }}>Open Document Externally</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
