@@ -5,6 +5,7 @@
  *       Materials · Expenses · Payments · Communication · Timeline · Reports
  */
 import React, { useState, useMemo } from 'react';
+import { supabase } from '../../src/lib/supabase';
 import {
   View,
   Text,
@@ -17,6 +18,7 @@ import {
   Modal,
   ActivityIndicator,
   Platform,
+  Switch,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,7 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Picker } from '@react-native-picker/picker';
 
-import { Card, StatusChip, Avatar, Button, GradientCard, ProgressRing } from '../../src/components';
+import { Card, StatusChip, Avatar, Button, GradientCard, ProgressRing, SearchBar, Input } from '../../src/components';
 import { useProject } from '../../src/hooks/useProjects';
 import { useEmployees } from '../../src/hooks/useEmployees';
 import { useProjectDprs } from '../../src/hooks/useDpr';
@@ -36,6 +38,27 @@ import { useProjectTasks, useUpdateTaskStatus, useCreateTask } from '../../src/h
 import { useProjectExpenses, useAddExpense } from '../../src/hooks/useExpenses';
 import { useMyConversations } from '../../src/hooks/useConversations';
 import { useAuthStore } from '../../src/stores/authStore';
+import { useProjectBOQ, useUpdateBOQItemQuantity, useMaterialMaster } from '../../src/hooks/useBOQ';
+import {
+  useProjectVariations,
+  useCreateVariation,
+  useApproveVariation,
+  useInventoryLedger,
+  useCreateInventoryLedgerEntry,
+  useFacadeSections,
+  useInitializeFacadeSections,
+  useUpdateFacadeSectionStatus,
+  FacadeSection,
+  useSuppliers,
+  useMaterialStock,
+  useProjectEvents,
+  useIssueMaterialRequest,
+  ProjectEvent,
+  usePurchaseOrders,
+  useCreatePurchaseOrder,
+  useGoodsReceivedNotes,
+  useCreateGoodsReceivedNote,
+} from '../../src/hooks/useContractorFeatures';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius, shadows } from '../../src/theme/spacing';
@@ -44,8 +67,8 @@ import type { Task, Dpr, DocumentRow, Expense, Payment, MaterialRequest, Attenda
 // ── Tab Definition ────────────────────────────────────────────────────────────
 
 const TABS = [
-  'Overview', 'Tasks', 'Employees', 'Attendance',
-  'DPR', 'Photos', 'Documents', 'Materials',
+  'Overview', 'BOQ', 'Tasks', 'Employees', 'Attendance',
+  'DPR', 'Photos', 'Documents', 'Materials', 'Variations', 'Facade Map', 'Procurement',
   'Expenses', 'Payments', 'Communication', 'Timeline', 'Reports',
 ] as const;
 type Tab = typeof TABS[number];
@@ -139,6 +162,336 @@ function StatusBadge({ status, map }: { status: string; map?: Record<string, { c
 
 // ── Tab Sections ──────────────────────────────────────────────────────────────
 
+// BOQ Tab Component
+function BOQTab({ projectId, projectName }: { projectId: string; projectName: string }) {
+  const router = useRouter();
+  const { data: boqItems = [], isLoading } = useProjectBOQ(projectId);
+  const updateBOQQtyMutation = useUpdateBOQItemQuantity();
+  const [search, setSearch] = useState('');
+
+  if (isLoading) {
+    return <ActivityIndicator color="#7E6144" style={{ marginTop: spacing.xl }} />;
+  }
+
+  const filtered = boqItems.filter(item =>
+    item.item_name.toLowerCase().includes(search.toLowerCase()) ||
+    (item.description && item.description.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const totalCount = boqItems.length;
+  const totalAmount = boqItems.reduce((acc, item) => acc + (item.amount || 0), 0);
+  const completedAmount = boqItems.reduce((acc, item) => acc + ((item.completed_quantity || 0) * (item.rate || 0)), 0);
+  const progressPct = totalAmount > 0 
+    ? Math.round((completedAmount / totalAmount) * 100)
+    : (totalCount > 0 
+        ? Math.round(boqItems.reduce((acc, item) => acc + (item.completed_quantity / item.quantity), 0) / totalCount * 100)
+        : 0
+      );
+
+  return (
+    <View style={boqStyles.container}>
+      {totalCount === 0 ? (
+        <Card style={boqStyles.emptyCard}>
+          <Ionicons name="document-text-outline" size={48} color={colors.neutral[300]} style={{ marginBottom: spacing.md }} />
+          <Text style={boqStyles.emptyTitle}>No BOQ Imported Yet</Text>
+          <Text style={boqStyles.emptyDesc}>
+            Upload an Excel sheet to establish the official material quantity list, tracking, and billing for this project.
+          </Text>
+          <Button
+            title="Import BOQ from Excel"
+            onPress={() => router.push({
+              pathname: '/(admin)/import-boq',
+              params: { projectId, projectName }
+            } as any)}
+            variant="primary"
+            style={{ backgroundColor: '#7E6144', marginTop: spacing.lg }}
+          />
+        </Card>
+      ) : (
+        <View style={{ gap: spacing.lg }}>
+          {/* Dashboard Summary Card */}
+          <Card style={boqStyles.summaryCard}>
+            <View style={boqStyles.summaryHeader}>
+              <View>
+                <Text style={boqStyles.summaryLabel}>BOQ Progress</Text>
+                <Text style={boqStyles.summaryVal}>{progressPct}% Physical Progress</Text>
+              </View>
+              <Text style={boqStyles.progressText}>{progressPct}%</Text>
+            </View>
+            <View style={boqStyles.progressBarBg}>
+              <View style={[boqStyles.progressBarFill, { width: `${progressPct}%` }]} />
+            </View>
+            <View style={boqStyles.summaryFooter}>
+              <Text style={boqStyles.summaryFooterLabel}>Total BOQ Value:</Text>
+              <Text style={boqStyles.summaryFooterVal}>₹{totalAmount.toLocaleString('en-IN')}</Text>
+            </View>
+          </Card>
+
+          {/* Search bar & Upload button row */}
+          <View style={boqStyles.filterRow}>
+            <View style={{ flex: 1 }}>
+              <SearchBar
+                value={search}
+                onChangeText={setSearch}
+                placeholder="Search BOQ items..."
+              />
+            </View>
+            <TouchableOpacity
+              onPress={() => router.push({
+                pathname: '/(admin)/import-boq',
+                params: { projectId, projectName }
+              } as any)}
+              style={boqStyles.uploadBtn}
+            >
+              <Ionicons name="cloud-upload" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {/* BOQ Items list */}
+          {filtered.map(item => {
+            const isFullyDone = item.completed_quantity >= item.quantity;
+            return (
+              <Card key={item.id} style={[boqStyles.itemCard, isFullyDone && boqStyles.itemCardDone]}>
+                <View style={boqStyles.itemHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[boqStyles.itemName, isFullyDone && boqStyles.itemNameDone]}>{item.item_name}</Text>
+                    {item.description ? <Text style={boqStyles.itemDesc}>{item.description}</Text> : null}
+                  </View>
+
+                  {/* Quantity adjustment input */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <TextInput
+                      style={{
+                        borderWidth: 1,
+                        borderColor: colors.neutral[200],
+                        borderRadius: 6,
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        width: 70,
+                        textAlign: 'center',
+                        fontSize: 14,
+                        fontFamily: fontFamily.medium,
+                        backgroundColor: '#FAF9F6',
+                        color: colors.ink,
+                      }}
+                      keyboardType="numeric"
+                      defaultValue={item.completed_quantity.toString()}
+                      onSubmitEditing={(e) => {
+                        const val = parseFloat(e.nativeEvent.text);
+                        if (isNaN(val) || val < 0 || val > item.quantity) {
+                          Alert.alert('Invalid quantity', `Please enter a value between 0 and ${item.quantity}`);
+                          return;
+                        }
+                        updateBOQQtyMutation.mutate({ id: item.id, completed_quantity: val });
+                      }}
+                    />
+                    <Text style={{ fontSize: 13, color: colors.neutral[500] }}>/ {item.quantity} {item.unit}</Text>
+                  </View>
+                </View>
+
+                <View style={boqStyles.itemDivider} />
+
+                <View style={boqStyles.itemMetaGrid}>
+                  <View>
+                    <Text style={boqStyles.metaLabel}>Unit Rate</Text>
+                    <Text style={boqStyles.metaVal}>₹{(item.rate || 0).toLocaleString('en-IN')}</Text>
+                  </View>
+                  <View>
+                    <Text style={boqStyles.metaLabel}>Installed Value</Text>
+                    <Text style={boqStyles.metaVal}>₹{((item.completed_quantity || 0) * (item.rate || 0)).toLocaleString('en-IN')}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={boqStyles.metaLabel}>Total BOQ Value</Text>
+                    <Text style={[boqStyles.metaVal, { color: colors.neutral[800], fontFamily: fontFamily.semiBold }]}>
+                      ₹{(item.amount || 0).toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                </View>
+              </Card>
+            );
+          })}
+
+          {filtered.length === 0 && (
+            <Text style={boqStyles.emptySearchText}>No BOQ items match your filter.</Text>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const boqStyles = StyleSheet.create({
+  container: {
+    gap: spacing.md,
+  },
+  emptyCard: {
+    padding: spacing['2xl'],
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderColor: colors.neutral[200],
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    backgroundColor: '#fff',
+    marginTop: spacing.lg,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontFamily: fontFamily.semiBold,
+    color: colors.neutral[700],
+    marginBottom: spacing.xs,
+  },
+  emptyDesc: {
+    fontSize: 13,
+    fontFamily: fontFamily.regular,
+    color: colors.neutral[400],
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 260,
+  },
+  summaryCard: {
+    backgroundColor: '#fff',
+    padding: spacing.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: '#7E6144',
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    fontFamily: fontFamily.medium,
+    color: colors.neutral[400],
+    textTransform: 'uppercase',
+  },
+  summaryVal: {
+    fontSize: 16,
+    fontFamily: fontFamily.semiBold,
+    color: colors.neutral[800],
+  },
+  progressText: {
+    fontSize: 24,
+    fontFamily: fontFamily.bold,
+    color: '#7E6144',
+  },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: colors.neutral[100],
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: spacing.md,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#7E6144',
+    borderRadius: 4,
+  },
+  summaryFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: colors.neutral[100],
+    paddingTop: spacing.sm,
+  },
+  summaryFooterLabel: {
+    fontSize: 13,
+    fontFamily: fontFamily.medium,
+    color: colors.neutral[500],
+  },
+  summaryFooterVal: {
+    fontSize: 14,
+    fontFamily: fontFamily.semiBold,
+    color: colors.neutral[800],
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  uploadBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    backgroundColor: '#7E6144',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  itemCard: {
+    backgroundColor: '#fff',
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.neutral[100],
+  },
+  itemCardDone: {
+    borderColor: 'rgba(74, 222, 128, 0.3)',
+    backgroundColor: 'rgba(240, 253, 244, 0.5)',
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  itemName: {
+    fontSize: 15,
+    fontFamily: fontFamily.semiBold,
+    color: colors.neutral[800],
+    marginBottom: 2,
+  },
+  itemNameDone: {
+    color: colors.neutral[600],
+    textDecorationLine: 'line-through',
+  },
+  itemDesc: {
+    fontSize: 12,
+    fontFamily: fontFamily.regular,
+    color: colors.neutral[400],
+  },
+  switchContainer: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  switchLabel: {
+    fontSize: 9,
+    fontFamily: fontFamily.bold,
+    color: colors.neutral[400],
+  },
+  itemDivider: {
+    height: 1,
+    backgroundColor: colors.neutral[100],
+    marginVertical: spacing.md,
+  },
+  itemMetaGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  metaLabel: {
+    fontSize: 10,
+    fontFamily: fontFamily.medium,
+    color: colors.neutral[400],
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  metaVal: {
+    fontSize: 13,
+    fontFamily: fontFamily.medium,
+    color: colors.neutral[600],
+  },
+  emptySearchText: {
+    textAlign: 'center',
+    color: colors.neutral[400],
+    fontFamily: fontFamily.medium,
+    paddingVertical: spacing.xl,
+  },
+});
+
 // Overview
 function OverviewTab({
   project,
@@ -155,14 +508,70 @@ function OverviewTab({
   tasks: Task[];
   onTabChange: (tab: any) => void;
 }) {
+  const { data: boqItems = [] } = useProjectBOQ(project.id);
+  const { data: variations = [] } = useProjectVariations(project.id);
+
+  const approvedVars = variations
+    .filter(v => v.status === 'approved')
+    .reduce((acc, v) => acc + v.extra_amount, 0);
+
+  const originalBOQVal = boqItems.reduce((acc, item) => acc + (item.amount || 0), 0);
+  const totalValue = originalBOQVal + approvedVars;
   const totalBilled = payments.reduce((s, p) => s + p.amount, 0);
   const totalPaid = payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
-  const pendingMaterials = materialReqs.filter(m => m.status === 'pending');
-  const openTasks = tasks.filter(t => t.status === 'pending');
   const payPct = totalBilled > 0 ? Math.round(totalPaid / totalBilled * 100) : 0;
+
+  const financialProgress = totalValue > 0 ? Math.round(totalBilled / totalValue * 100) : 0;
+
+  const totalIssued = materialReqs.filter(m => m.status === 'ordered').reduce((acc, m) => acc + m.qty, 0);
+  const totalBOQQty = boqItems.reduce((acc, item) => acc + item.quantity, 0);
+  const materialIssuedPct = totalBOQQty > 0 ? Math.round(totalIssued / totalBOQQty * 100) : 0;
+
+  const pendingSnags = tasks.filter(t => t.status === 'pending').length;
+
+  const daysLeft = project.expected_end_date 
+    ? Math.max(0, Math.ceil((new Date(project.expected_end_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24))) 
+    : 0;
+
+  const openTasks = tasks.filter(t => t.status === 'pending');
+  const pendingMaterials = materialReqs.filter(m => m.status === 'pending');
 
   return (
     <View style={ovStyles.content}>
+      {/* 6 core Health Check KPIs */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.md }}>
+        <Card style={{ flex: 1, minWidth: '45%', padding: spacing.md, alignItems: 'center' }}>
+          <Ionicons name="trending-up" size={20} color={colors.primary} />
+          <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 }}>{project.progress_pct || 0}%</Text>
+          <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Physical Progress</Text>
+        </Card>
+        <Card style={{ flex: 1, minWidth: '45%', padding: spacing.md, alignItems: 'center' }}>
+          <Ionicons name="cash" size={20} color={colors.success} />
+          <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 }}>{financialProgress}%</Text>
+          <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Financial Progress</Text>
+        </Card>
+        <Card style={{ flex: 1, minWidth: '45%', padding: spacing.md, alignItems: 'center' }}>
+          <Ionicons name="cube" size={20} color={colors.info} />
+          <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 }}>{materialIssuedPct}%</Text>
+          <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Materials Issued</Text>
+        </Card>
+        <Card style={{ flex: 1, minWidth: '45%', padding: spacing.md, alignItems: 'center' }}>
+          <Ionicons name="document-text" size={20} color="#7C3AED" />
+          <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 }}>₹{approvedVars.toLocaleString('en-IN')}</Text>
+          <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Approved Variations</Text>
+        </Card>
+        <Card style={{ flex: 1, minWidth: '45%', padding: spacing.md, alignItems: 'center' }}>
+          <Ionicons name="alert-circle" size={20} color={colors.error} />
+          <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 }}>{pendingSnags}</Text>
+          <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Pending Tasks / Snags</Text>
+        </Card>
+        <Card style={{ flex: 1, minWidth: '45%', padding: spacing.md, alignItems: 'center' }}>
+          <Ionicons name="time" size={20} color={colors.warning} />
+          <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 }}>{daysLeft} Days</Text>
+          <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Days Remaining</Text>
+        </Card>
+      </View>
+
       {/* Hero: ring on top, meta grid below */}
       <View style={ovStyles.glassCard}>
         <View style={ovStyles.heroCard}>
@@ -708,7 +1117,96 @@ function DocumentsTab({ documents }: { documents: DocumentRow[] }) {
 }
 
 // Materials
-function MaterialsTab({ materialReqs }: { materialReqs: MaterialRequest[] }) {
+function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs: MaterialRequest[]; projectId: string; currentUserId: string }) {
+  const [subTab, setSubTab] = useState<'requests' | 'ledger'>('requests');
+  const { data: ledger = [], refetch: refetchLedger } = useInventoryLedger(projectId);
+  const { data: stockItems = [], refetch: refetchStock } = useMaterialStock(projectId);
+  const { data: suppliers = [] } = useSuppliers();
+  const { data: materialsMaster = [] } = useMaterialMaster();
+
+  const createLedgerEntryMutation = useCreateInventoryLedgerEntry();
+  const issueMutation = useIssueMaterialRequest();
+
+  // Transaction form states
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedMaterialId, setSelectedMaterialId] = useState('');
+  const [txType, setTxType] = useState<'OPENING' | 'PURCHASE_RECEIVED' | 'SITE_ISSUE' | 'RETURN' | 'TRANSFER' | 'ADJUSTMENT' | 'WASTAGE' | 'SCRAP'>('PURCHASE_RECEIVED');
+  const [qty, setQty] = useState('');
+  const [notes, setNotes] = useState('');
+  const [batchNumber, setBatchNumber] = useState('');
+  const [supplierId, setSupplierId] = useState('');
+
+  // Issue modal states
+  const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<MaterialRequest | null>(null);
+  const [issueQty, setIssueQty] = useState('');
+  const [issueBatch, setIssueBatch] = useState('');
+
+  const handleSaveEntry = async () => {
+    if (!selectedMaterialId || !qty) {
+      Alert.alert('Error', 'Please select material and enter quantity.');
+      return;
+    }
+    try {
+      await createLedgerEntryMutation.mutateAsync({
+        projectId,
+        materialMasterId: selectedMaterialId,
+        transactionType: txType,
+        quantity: parseFloat(qty),
+        notes: notes.trim(),
+        createdBy: currentUserId,
+        batchNumber: batchNumber.trim() || undefined,
+        supplierId: supplierId || undefined,
+      });
+      setIsModalOpen(false);
+      setSelectedMaterialId('');
+      setQty('');
+      setNotes('');
+      setBatchNumber('');
+      setSupplierId('');
+      Alert.alert('Success', 'Inventory ledger transaction logged.');
+      refetchLedger();
+      refetchStock();
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to log transaction');
+    }
+  };
+
+  const handleIssueRequest = async () => {
+    if (!selectedRequest || !issueQty || !issueBatch) {
+      Alert.alert('Error', 'Please enter quantity and batch number.');
+      return;
+    }
+
+    // Try to resolve material master id
+    const mat = materialsMaster.find(m => m.name.toLowerCase() === selectedRequest.material_name.toLowerCase());
+    if (!mat) {
+      Alert.alert('Error', 'Could not resolve material master item in database');
+      return;
+    }
+
+    try {
+      await issueMutation.mutateAsync({
+        requestId: selectedRequest.id,
+        projectId,
+        materialMasterId: mat.id,
+        materialName: selectedRequest.material_name,
+        qty: parseFloat(issueQty),
+        batchNumber: issueBatch.trim(),
+        issuerId: currentUserId,
+      });
+      setIsIssueModalOpen(false);
+      setSelectedRequest(null);
+      setIssueQty('');
+      setIssueBatch('');
+      Alert.alert('Success', 'Material issued successfully.');
+      refetchLedger();
+      refetchStock();
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to issue material');
+    }
+  };
+
   const grouped = useMemo(() => {
     const g: Record<string, MaterialRequest[]> = {};
     materialReqs.forEach(m => {
@@ -719,39 +1217,606 @@ function MaterialsTab({ materialReqs }: { materialReqs: MaterialRequest[] }) {
     return g;
   }, [materialReqs]);
 
-  const statusIcon: Record<string, string> = {
-    pending: 'time',
-    approved: 'checkmark-circle',
-    rejected: 'close-circle',
-    ordered: 'cart',
+  return (
+    <View style={{ gap: spacing.md }}>
+      {/* Segmented Control */}
+      <View style={{ flexDirection: 'row', backgroundColor: '#EAE6DF', padding: 4, borderRadius: 12 }}>
+        <TouchableOpacity
+          onPress={() => setSubTab('requests')}
+          style={{ flex: 1, paddingVertical: 8, alignItems: 'center', backgroundColor: subTab === 'requests' ? '#fff' : 'transparent', borderRadius: 10 }}
+        >
+          <Text style={{ fontFamily: fontFamily.semiBold, fontSize: 13, color: subTab === 'requests' ? colors.ink : colors.neutral[600] }}>Requests</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setSubTab('ledger')}
+          style={{ flex: 1, paddingVertical: 8, alignItems: 'center', backgroundColor: subTab === 'ledger' ? '#fff' : 'transparent', borderRadius: 10 }}
+        >
+          <Text style={{ fontFamily: fontFamily.semiBold, fontSize: 13, color: subTab === 'ledger' ? colors.ink : colors.neutral[600] }}>Inventory Ledger</Text>
+        </TouchableOpacity>
+      </View>
+
+      {subTab === 'requests' ? (
+        <>
+          <SectionHeader title={`Material Requests (${materialReqs.length})`} />
+          {materialReqs.length === 0 && <EmptyState icon="cube-outline" text="No material requests yet" />}
+          {Object.entries(grouped).map(([status, items]) => (
+            <View key={status}>
+              <Text style={styles.groupLabel}>{status.toUpperCase()} ({items.length})</Text>
+              {items.map(m => (
+                <Card key={m.id} style={styles.listCard}>
+                  <View style={{ gap: 8 }}>
+                    <View style={styles.listRow}>
+                      <StatusBadge status={m.status} />
+                      <View style={styles.listInfo}>
+                        <Text style={styles.listTitle}>{m.material_name}</Text>
+                        <Text style={styles.listSubtitle}>
+                          Qty: {m.qty}
+                          {m.spec ? ` · ${m.spec}` : ''}
+                          {m.needed_by ? ` · Need by ${fmtShort(m.needed_by)}` : ''}
+                        </Text>
+                        {m.notes ? <Text style={styles.listSubtitle}>{m.notes}</Text> : null}
+                      </View>
+                    </View>
+                    {m.status === 'pending' && (
+                      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', borderTopWidth: 1, borderColor: '#F0EBE1', paddingTop: 8 }}>
+                        <Button
+                          title="Issue Stock"
+                          onPress={() => {
+                            setSelectedRequest(m);
+                            setIssueQty(m.qty.toString());
+                            setIsIssueModalOpen(true);
+                          }}
+                          variant="primary"
+                          style={{ paddingVertical: 4, paddingHorizontal: 12 }}
+                        />
+                      </View>
+                    )}
+                  </View>
+                </Card>
+              ))}
+            </View>
+          ))}
+        </>
+      ) : (
+        <>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink }}>Current Stock Balance</Text>
+            <Button
+              title="Add Transaction"
+              onPress={() => setIsModalOpen(true)}
+              variant="primary"
+              style={{ paddingVertical: 6, paddingHorizontal: 12 }}
+            />
+          </View>
+
+          {/* Stock summary card list */}
+          {stockItems.length === 0 && <EmptyState icon="cube" text="No stock items registered." />}
+          {stockItems.map(item => {
+            const isOutOfStock = item.available_quantity <= 0;
+            const isBelowMin = item.available_quantity < item.minimum_stock;
+            const statusLabel = isOutOfStock ? '❌ Out of Stock' : (isBelowMin ? '⚠ Below Minimum' : '✔ Healthy');
+            const statusColor = isOutOfStock ? colors.error : (isBelowMin ? colors.warning : colors.success);
+            
+            return (
+              <Card key={item.id} style={{ padding: spacing.md, gap: 4 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink }}>{item.material_name}</Text>
+                  <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: statusColor }}>{statusLabel}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                  <View>
+                    <Text style={{ fontSize: 10, color: colors.neutral[500] }}>Current Qty</Text>
+                    <Text style={{ fontSize: 12, fontFamily: fontFamily.semiBold, color: colors.ink }}>{item.current_quantity} {item.material_unit}</Text>
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 10, color: colors.neutral[500] }}>Reserved Qty</Text>
+                    <Text style={{ fontSize: 12, fontFamily: fontFamily.semiBold, color: colors.warning }}>{item.reserved_quantity}</Text>
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 10, color: colors.neutral[500] }}>Min Limit</Text>
+                    <Text style={{ fontSize: 12, fontFamily: fontFamily.semiBold, color: colors.neutral[600] }}>{item.minimum_stock}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 10, color: colors.neutral[500], fontFamily: fontFamily.bold }}>Available</Text>
+                    <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: colors.primary }}>{item.available_quantity} {item.material_unit}</Text>
+                  </View>
+                </View>
+              </Card>
+            );
+          })}
+
+          {ledger.length > 0 && (
+            <>
+              <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, marginTop: spacing.md }}>Ledger Timeline Log</Text>
+              {ledger.slice(0, 10).map(entry => {
+                const isDeduction = entry.transaction_type === 'SITE_ISSUE' || entry.transaction_type === 'WASTAGE' || entry.transaction_type === 'SCRAP';
+                return (
+                  <Card key={entry.id} style={{ padding: spacing.md, borderLeftWidth: 3, borderLeftColor: isDeduction ? colors.error : colors.success }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 13, fontFamily: fontFamily.semiBold, color: colors.ink }}>{entry.material_name}</Text>
+                      <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: isDeduction ? colors.error : colors.success }}>
+                        {isDeduction ? '-' : '+'}{entry.quantity}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                      <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Type: {entry.transaction_type.replace('_', ' ')}</Text>
+                      <Text style={{ fontSize: 11, color: colors.neutral[400] }}>{new Date(entry.created_at).toLocaleDateString('en-IN')}</Text>
+                    </View>
+                    {entry.batch_number ? (
+                      <Text style={{ fontSize: 10, color: colors.neutral[500] }}>Batch: {entry.batch_number} {entry.supplier_name ? ` · Supplier: ${entry.supplier_name}` : ''}</Text>
+                    ) : null}
+                    {entry.notes ? <Text style={{ fontSize: 11, color: colors.neutral[600], fontStyle: 'italic', marginTop: 4 }}>"{entry.notes}"</Text> : null}
+                  </Card>
+                );
+              })}
+            </>
+          )}
+
+          {/* Add Ledger Transaction Modal */}
+          <Modal visible={isModalOpen} animationType="slide" onRequestClose={() => setIsModalOpen(false)}>
+            <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.md }}>
+              <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink }}>Log Material Transaction</Text>
+
+              <Picker
+                selectedValue={selectedMaterialId}
+                onValueChange={(val) => setSelectedMaterialId(val)}
+                style={{ backgroundColor: '#FAF9F6', borderRadius: 8 }}
+              >
+                <Picker.Item label="-- Select Material Master --" value="" />
+                {materialsMaster.map(m => (
+                  <Picker.Item key={m.id} label={m.name} value={m.id} />
+                ))}
+              </Picker>
+
+              <Text style={{ fontSize: 13, fontFamily: fontFamily.semiBold, color: colors.neutral[700] }}>Transaction Type</Text>
+              <Picker
+                selectedValue={txType}
+                onValueChange={(val) => setTxType(val as any)}
+                style={{ backgroundColor: '#FAF9F6', borderRadius: 8 }}
+              >
+                <Picker.Item label="OPENING" value="OPENING" />
+                <Picker.Item label="PURCHASE RECEIVED" value="PURCHASE_RECEIVED" />
+                <Picker.Item label="SITE ISSUE" value="SITE_ISSUE" />
+                <Picker.Item label="RETURN" value="RETURN" />
+                <Picker.Item label="TRANSFER" value="TRANSFER" />
+                <Picker.Item label="ADJUSTMENT" value="ADJUSTMENT" />
+                <Picker.Item label="WASTAGE" value="WASTAGE" />
+                <Picker.Item label="SCRAP" value="SCRAP" />
+              </Picker>
+
+              {txType === 'PURCHASE_RECEIVED' && (
+                <>
+                  <Text style={{ fontSize: 13, fontFamily: fontFamily.semiBold, color: colors.neutral[700] }}>Supplier</Text>
+                  <Picker
+                    selectedValue={supplierId}
+                    onValueChange={(val) => setSupplierId(val)}
+                    style={{ backgroundColor: '#FAF9F6', borderRadius: 8 }}
+                  >
+                    <Picker.Item label="-- Select Supplier --" value="" />
+                    {suppliers.map(s => (
+                      <Picker.Item key={s.id} label={s.name} value={s.id} />
+                    ))}
+                  </Picker>
+                </>
+              )}
+
+              <Input label="Batch / Lot Number" placeholder="e.g. B-012" value={batchNumber} onChangeText={setBatchNumber} />
+              <Input label="Quantity" keyboardType="numeric" placeholder="0" value={qty} onChangeText={setQty} />
+              <Input label="Notes / Reference Details" placeholder="e.g. Unloaded from truck MH-12" value={notes} onChangeText={setNotes} />
+
+              <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
+                <Button title="Cancel" onPress={() => setIsModalOpen(false)} variant="secondary" style={{ flex: 1 }} />
+                <Button title="Save Entry" onPress={handleSaveEntry} variant="primary" style={{ flex: 1 }} />
+              </View>
+            </ScrollView>
+          </Modal>
+
+          {/* Issue Material Request Modal */}
+          <Modal visible={isIssueModalOpen} animationType="slide" onRequestClose={() => setIsIssueModalOpen(false)}>
+            <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.md }}>
+              <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink }}>Issue Material Request</Text>
+              <Text style={{ fontSize: 13, color: colors.neutral[600] }}>
+                Material: {selectedRequest?.material_name} (Requested: {selectedRequest?.qty})
+              </Text>
+
+              <Input label="Issue Quantity" keyboardType="numeric" placeholder="0" value={issueQty} onChangeText={setIssueQty} />
+              <Input label="Allocated Batch Number" placeholder="e.g. B-012" value={issueBatch} onChangeText={setIssueBatch} />
+
+              <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
+                <Button title="Cancel" onPress={() => setIsIssueModalOpen(false)} variant="secondary" style={{ flex: 1 }} />
+                <Button title="Issue Stock" onPress={handleIssueRequest} variant="primary" style={{ flex: 1 }} />
+              </View>
+            </ScrollView>
+          </Modal>
+        </>
+      )}
+    </View>
+  );
+}
+
+// Variations
+function VariationsTab({ projectId, currentUserId }: { projectId: string; currentUserId: string }) {
+  const { data: variations = [], refetch } = useProjectVariations(projectId);
+  const { data: materialsMaster = [] } = useMaterialMaster();
+  const createVariationMutation = useCreateVariation();
+  const approveVariationMutation = useApproveVariation();
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [items, setItems] = useState<{ material_master_id: string | null; item_name: string; quantity: number; unit: string; rate: number }[]>([]);
+
+  const [selectedMaterialId, setSelectedMaterialId] = useState('');
+  const [customItemName, setCustomItemName] = useState('');
+  const [qty, setQty] = useState('');
+  const [unit, setUnit] = useState('sqm');
+  const [rate, setRate] = useState('');
+
+  const handleAddItem = () => {
+    let name = customItemName.trim();
+    let matId: string | null = null;
+    if (selectedMaterialId) {
+      const mat = materialsMaster.find(m => m.id === selectedMaterialId);
+      if (mat) {
+        name = mat.name;
+        matId = mat.id;
+      }
+    }
+
+    if (!name || !qty || !rate) {
+      Alert.alert('Error', 'Please fill item name/material, quantity, and rate.');
+      return;
+    }
+
+    setItems(prev => [
+      ...prev,
+      {
+        material_master_id: matId,
+        item_name: name,
+        quantity: parseFloat(qty),
+        unit,
+        rate: parseFloat(rate),
+      }
+    ]);
+
+    setSelectedMaterialId('');
+    setCustomItemName('');
+    setQty('');
+    setRate('');
   };
 
+  const handleSaveVariation = async () => {
+    if (!title.trim() || items.length === 0) {
+      Alert.alert('Error', 'Please enter a title and add at least one item.');
+      return;
+    }
+    try {
+      await createVariationMutation.mutateAsync({
+        projectId,
+        title: title.trim(),
+        description: description.trim(),
+        items,
+      });
+      setIsModalOpen(false);
+      setTitle('');
+      setDescription('');
+      setItems([]);
+      Alert.alert('Success', 'Variation created successfully.');
+      refetch();
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to create variation');
+    }
+  };
+
+  const totalExtra = variations
+    .filter(v => v.status === 'approved')
+    .reduce((acc, v) => acc + v.extra_amount, 0);
+
   return (
-    <>
-      <SectionHeader title={`Material Requests (${materialReqs.length})`} />
-      {materialReqs.length === 0 && <EmptyState icon="cube-outline" text="No material requests yet" />}
-      {Object.entries(grouped).map(([status, items]) => (
-        <View key={status}>
-          <Text style={styles.groupLabel}>{status.toUpperCase()} ({items.length})</Text>
-          {items.map(m => (
-            <Card key={m.id} style={styles.listCard}>
-              <View style={styles.listRow}>
-                <StatusBadge status={m.status} />
-                <View style={styles.listInfo}>
-                  <Text style={styles.listTitle}>{m.material_name}</Text>
-                  <Text style={styles.listSubtitle}>
-                    Qty: {m.qty}
-                    {m.spec ? ` · ${m.spec}` : ''}
-                    {m.needed_by ? ` · Need by ${fmtShort(m.needed_by)}` : ''}
-                  </Text>
-                  {m.notes ? <Text style={styles.listSubtitle}>{m.notes}</Text> : null}
+    <View style={{ gap: spacing.md }}>
+      <Card style={{ backgroundColor: '#FAF9F6', padding: spacing.md, borderWidth: 1, borderColor: colors.neutral[200] }}>
+        <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: colors.neutral[500], textTransform: 'uppercase' }}>
+          Total Approved Variations Value
+        </Text>
+        <Text style={{ fontSize: 22, fontFamily: fontFamily.bold, color: colors.success, marginTop: 4 }}>
+          ₹{totalExtra.toLocaleString('en-IN')}
+        </Text>
+      </Card>
+
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={{ fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink }}>
+          Variations / Change Orders
+        </Text>
+        <Button
+          title="+ Add Variation"
+          onPress={() => setIsModalOpen(true)}
+          variant="primary"
+          style={{ paddingVertical: 6, paddingHorizontal: 12 }}
+        />
+      </View>
+
+      {variations.length === 0 ? (
+        <EmptyState icon="document-text-outline" text="No variations or change orders recorded yet." />
+      ) : (
+        variations.map(v => (
+          <Card key={v.id} style={{ padding: spacing.md, gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View>
+                <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink }}>
+                  Variation #{v.number}: {v.title}
+                </Text>
+                {v.description ? <Text style={{ fontSize: 11, color: colors.neutral[500] }}>{v.description}</Text> : null}
+              </View>
+              <StatusBadge status={v.status} />
+            </View>
+
+            <View style={{ height: 1, backgroundColor: colors.neutral[100], marginVertical: 4 }} />
+
+            {v.items?.map((it, idx) => (
+              <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 }}>
+                <Text style={{ color: colors.neutral[700], fontSize: 12 }}>• {it.item_name} ({it.quantity} {it.unit} @ ₹{it.rate})</Text>
+                <Text style={{ fontFamily: fontFamily.semiBold, color: colors.ink, fontSize: 12 }}>₹{it.amount.toLocaleString('en-IN')}</Text>
+              </View>
+            ))}
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+              <Text style={{ fontSize: 12, fontFamily: fontFamily.semiBold, color: colors.neutral[600] }}>Total Extra Cost:</Text>
+              <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink }}>₹{v.extra_amount.toLocaleString('en-IN')}</Text>
+            </View>
+
+            {v.status === 'pending' && (
+              <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm }}>
+                <TouchableOpacity
+                  onPress={() => approveVariationMutation.mutate({ variationId: v.id, status: 'approved', approverId: currentUserId })}
+                  style={{ flex: 1, backgroundColor: colors.successBg, paddingVertical: 8, borderRadius: radius.md, alignItems: 'center' }}
+                >
+                  <Text style={{ color: colors.success, fontFamily: fontFamily.bold, fontSize: 12 }}>Approve</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => approveVariationMutation.mutate({ variationId: v.id, status: 'rejected', approverId: currentUserId })}
+                  style={{ flex: 1, backgroundColor: colors.errorBg, paddingVertical: 8, borderRadius: radius.md, alignItems: 'center' }}
+                >
+                  <Text style={{ color: colors.error, fontFamily: fontFamily.bold, fontSize: 12 }}>Reject</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </Card>
+        ))
+      )}
+
+      {/* Add Variation Modal */}
+      <Modal visible={isModalOpen} animationType="slide" onRequestClose={() => setIsModalOpen(false)}>
+        <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.md }}>
+          <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink }}>Create New Variation</Text>
+
+          <Input label="Title / Heading" placeholder="e.g. Additional bay glass installation" value={title} onChangeText={setTitle} />
+          <Input label="Description" placeholder="Provide reason or client directive details" value={description} onChangeText={setDescription} />
+
+          <View style={{ height: 1, backgroundColor: colors.neutral[200], marginVertical: 8 }} />
+
+          <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: colors.neutral[700] }}>Add Variation Material/Item</Text>
+
+          <Picker
+            selectedValue={selectedMaterialId}
+            onValueChange={(val) => setSelectedMaterialId(val)}
+            style={{ backgroundColor: '#FAF9F6', borderRadius: 8 }}
+          >
+            <Picker.Item label="-- Select Material Master (Optional) --" value="" />
+            {materialsMaster.map(m => (
+              <Picker.Item key={m.id} label={`${m.name} (${m.unit})`} value={m.id} />
+            ))}
+          </Picker>
+
+          {!selectedMaterialId && (
+            <Input label="Or Enter Custom Item Name" placeholder="e.g. Special brackets" value={customItemName} onChangeText={setCustomItemName} />
+          )}
+
+          <View style={{ flexDirection: 'row', gap: spacing.md }}>
+            <View style={{ flex: 1 }}>
+              <Input label="Quantity" keyboardType="numeric" placeholder="100" value={qty} onChangeText={setQty} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Input label="Unit" placeholder="m2" value={unit} onChangeText={setUnit} />
+            </View>
+          </View>
+
+          <Input label="Unit Rate (₹)" keyboardType="numeric" placeholder="1500" value={rate} onChangeText={setRate} />
+
+          <Button title="+ Add Item to List" onPress={handleAddItem} variant="secondary" />
+
+          {items.length > 0 && (
+            <Card style={{ padding: spacing.md, marginTop: spacing.sm, gap: 4 }}>
+              <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: colors.neutral[500] }}>Items Added:</Text>
+              {items.map((it, idx) => (
+                <Text key={idx} style={{ fontSize: 12, color: colors.neutral[700] }}>
+                  {it.item_name}: {it.quantity} {it.unit} @ ₹{it.rate}
+                </Text>
+              ))}
+            </Card>
+          )}
+
+          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
+            <Button title="Cancel" onPress={() => setIsModalOpen(false)} variant="secondary" style={{ flex: 1 }} />
+            <Button title="Save Variation" onPress={handleSaveVariation} variant="primary" style={{ flex: 1 }} />
+          </View>
+        </ScrollView>
+      </Modal>
+    </View>
+  );
+}
+
+// Facade Elevation Progress Map
+function OldFacadeMapTab({ projectId }: { projectId: string }) {
+  const { data: sections = [], refetch } = useFacadeSections(projectId);
+  const initSections = useInitializeFacadeSections();
+  const updateSectionStatus = useUpdateFacadeSectionStatus();
+
+  const [selectedSection, setSelectedSection] = useState<FacadeSection | null>(null);
+
+  const handleInitMap = async () => {
+    try {
+      await initSections.mutateAsync(projectId);
+      Alert.alert('Success', 'Elevation matrix initialized successfully (Level 1 to 4, Bays A to D).');
+      refetch();
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to initialize elevation matrix');
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    if (status === 'completed') return '#16A34A'; // Green
+    if (status === 'in_progress') return '#CA8A04'; // Yellow
+    return '#DC2626'; // Red
+  };
+
+  const getStatusBg = (status: string) => {
+    if (status === 'completed') return 'rgba(22, 163, 74, 0.15)';
+    if (status === 'in_progress') return 'rgba(202, 138, 4, 0.15)';
+    return 'rgba(220, 38, 38, 0.15)';
+  };
+
+  const levels = ['L4', 'L3', 'L2', 'L1'];
+  const bays = ['BayA', 'BayB', 'BayC', 'BayD'];
+
+  const gridMap = useMemo(() => {
+    const map: Record<string, FacadeSection> = {};
+    sections.forEach(s => {
+      map[s.label] = s;
+    });
+    return map;
+  }, [sections]);
+
+  return (
+    <View style={{ gap: spacing.md }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={{ fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink }}>Facade Elevation Progress Map</Text>
+        {sections.length > 0 && (
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#DC2626' }} />
+              <Text style={{ fontSize: 10, color: colors.neutral[500] }}>Pending</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#CA8A04' }} />
+              <Text style={{ fontSize: 10, color: colors.neutral[500] }}>Active</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#16A34A' }} />
+              <Text style={{ fontSize: 10, color: colors.neutral[500] }}>Done</Text>
+            </View>
+          </View>
+        )}
+      </View>
+
+      {sections.length === 0 ? (
+        <Card style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.md }}>
+          <Ionicons name="images-outline" size={48} color={colors.neutral[300]} />
+          <Text style={{ fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink }}>No Elevation Map Initialized</Text>
+          <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center' }}>
+            Auto-generate a default grid representing building floors and bays to track panel installation status visually.
+          </Text>
+          <Button title="Initialize Grid Map" onPress={handleInitMap} variant="primary" loading={initSections.isPending} />
+        </Card>
+      ) : (
+        <Card style={{ padding: spacing.md, backgroundColor: '#FFFDF9', borderWidth: 1, borderColor: '#EAE6DF' }}>
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: colors.neutral[400], textAlign: 'center', marginBottom: 12, letterSpacing: 1 }}>
+            BUILDING ELEVATION VIEW
+          </Text>
+          
+          <View style={{ gap: 8 }}>
+            {levels.map(level => (
+              <View key={level} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ width: 24, fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[600] }}>{level}</Text>
+                
+                <View style={{ flex: 1, flexDirection: 'row', gap: 8 }}>
+                  {bays.map(bay => {
+                    const label = `${level}-${bay}`;
+                    const sec = gridMap[label];
+                    if (!sec) return <View key={bay} style={{ flex: 1, height: 50, backgroundColor: colors.neutral[100], borderRadius: 6 }} />;
+                    
+                    return (
+                      <TouchableOpacity
+                        key={bay}
+                        onPress={() => setSelectedSection(sec)}
+                        style={{
+                          flex: 1,
+                          height: 50,
+                          backgroundColor: getStatusBg(sec.status),
+                          borderWidth: 1.5,
+                          borderColor: getStatusColor(sec.status),
+                          borderRadius: 8,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          elevation: 1,
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontFamily: fontFamily.bold, color: colors.neutral[800] }}>{bay.replace('Bay', '')}</Text>
+                        <Text style={{ fontSize: 8, color: colors.neutral[500], textTransform: 'uppercase', marginTop: 1 }}>{sec.status.replace('_', ' ')}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
-            </Card>
-          ))}
-        </View>
-      ))}
-    </>
+            ))}
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}>
+            <View style={{ width: 24 }} />
+            <View style={{ flex: 1, flexDirection: 'row', gap: 8 }}>
+              {bays.map(bay => (
+                <Text key={bay} style={{ flex: 1, fontSize: 10, fontFamily: fontFamily.bold, color: colors.neutral[500], textAlign: 'center' }}>
+                  {bay}
+                </Text>
+              ))}
+            </View>
+          </View>
+        </Card>
+      )}
+
+      {selectedSection && (
+        <Modal visible={!!selectedSection} animationType="slide" transparent>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: spacing.xl }}>
+            <View style={{ backgroundColor: '#fff', borderRadius: radius.xl, padding: spacing.xl, gap: spacing.md }}>
+              <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink }}>
+                Segment Detail: {selectedSection.label}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.neutral[500] }}>
+                Track execution status and logs for this specific elevation panel.
+              </Text>
+
+              <View style={{ height: 1, backgroundColor: colors.neutral[200] }} />
+
+              <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700] }}>Set Progress Status</Text>
+              <View style={{ flexDirection: 'row', gap: 6, backgroundColor: '#EAE6DF', padding: 4, borderRadius: 8 }}>
+                {(['not_started', 'in_progress', 'completed'] as const).map((st) => (
+                  <TouchableOpacity
+                    key={st}
+                    onPress={async () => {
+                      try {
+                        await updateSectionStatus.mutateAsync({ sectionId: selectedSection.id, status: st, projectId });
+                        setSelectedSection((prev: FacadeSection | null) => prev ? { ...prev, status: st } : null);
+                        refetch();
+                      } catch (e: any) {
+                        Alert.alert('Error', e.message || 'Failed to update status');
+                      }
+                    }}
+                    style={{ flex: 1, paddingVertical: 8, alignItems: 'center', backgroundColor: selectedSection.status === st ? '#fff' : 'transparent', borderRadius: 6 }}
+                  >
+                    <Text style={{ fontSize: 10, fontFamily: fontFamily.semiBold, color: selectedSection.status === st ? colors.ink : colors.neutral[600] }}>
+                      {st.toUpperCase().replace('_', ' ')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.md }}>
+                <Button title="Close" onPress={() => setSelectedSection(null)} variant="primary" style={{ flex: 1 }} />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+    </View>
   );
 }
 
@@ -1236,52 +2301,121 @@ function CommunicationTab({
 }
 
 // Timeline
-function TimelineTab({ project, dprs, tasks, payments }: { project: any; dprs: Dpr[]; tasks: Task[]; payments: Payment[] }) {
-  type TLEvent = { date: string; label: string; icon: string; color: string };
-  const events: TLEvent[] = [];
+function TimelineTab({ projectId }: { projectId: string }) {
+  const { data: events = [], isLoading } = useProjectEvents(projectId);
+  const [filter, setFilter] = useState<'All' | 'DPR' | 'Inventory' | 'QA' | 'Variations' | 'BOQ' | 'Photos'>('All');
+  const [selectedEvent, setSelectedEvent] = useState<ProjectEvent | null>(null);
 
-  if (project.start_date) {
-    events.push({ date: project.start_date, label: 'Project Started', icon: 'flag', color: colors.primary });
+  if (isLoading) {
+    return <ActivityIndicator color="#7E6144" style={{ marginTop: spacing.xl }} />;
   }
 
-  dprs.slice(0, 5).forEach(d => {
-    events.push({ date: d.date, label: `DPR: ${d.work_done.substring(0, 40)}${d.work_done.length > 40 ? '…' : ''}`, icon: 'document-text', color: colors.info });
-  });
-
-  payments.filter(p => p.status === 'paid').forEach(p => {
-    if (p.paid_at) {
-      events.push({ date: p.paid_at, label: `Payment: ${p.milestone_name} — ${fmtINR(p.amount)}`, icon: 'cash', color: colors.success });
+  const getEventMeta = (type: string) => {
+    switch (type) {
+      case 'BOQ_IMPORTED': return { label: 'BOQ', icon: 'document-text', color: '#4F46E5' };
+      case 'DPR_SUBMITTED': return { label: 'DPR', icon: 'document', color: '#F59E0B' };
+      case 'DPR_APPROVED': return { label: 'DPR', icon: 'checkmark-circle', color: '#10B981' };
+      case 'VARIATION_APPROVED': return { label: 'Variations', icon: 'trending-up', color: '#10B981' };
+      case 'QA_PASSED': return { label: 'QA', icon: 'shield-checkmark', color: '#10B981' };
+      case 'SNAG_CREATED': return { label: 'QA', icon: 'alert-circle', color: '#EF4444' };
+      case 'MATERIAL_ISSUED': return { label: 'Inventory', icon: 'cube-outline', color: '#6B7280' };
+      case 'STOCK_RECEIVED': return { label: 'Inventory', icon: 'cloud-download', color: '#3B82F6' };
+      default: return { label: 'Other', icon: 'flag', color: colors.primary };
     }
+  };
+
+  const filteredEvents = events.filter(ev => {
+    if (filter === 'All') return true;
+    const meta = getEventMeta(ev.event_type);
+    if (filter === 'Photos') {
+      return ev.metadata && ev.metadata.photos && ev.metadata.photos.length > 0;
+    }
+    return meta.label.toLowerCase() === filter.toLowerCase();
   });
-
-  tasks.filter(t => t.status === 'done' && t.window_end).forEach(t => {
-    events.push({ date: t.window_end!, label: `Task done: ${t.title}`, icon: 'checkmark-circle', color: colors.success });
-  });
-
-  if (project.expected_end_date) {
-    events.push({ date: project.expected_end_date, label: 'Expected Completion', icon: 'trophy', color: colors.secondary });
-  }
-
-  events.sort((a, b) => a.date.localeCompare(b.date));
 
   return (
     <>
-      <SectionHeader title="Project Timeline" />
-      {events.length === 0 && <EmptyState icon="time-outline" text="No timeline events yet" />}
-      {events.map((ev, i) => (
-        <View key={i} style={styles.timelineRow}>
-          <View style={styles.timelineLeft}>
-            <View style={[styles.timelineDot, { backgroundColor: ev.color }]}>
-              <Ionicons name={ev.icon as any} size={12} color={colors.white} />
+      <SectionHeader title="Project Activity Log" />
+
+      {/* Filter Row */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: spacing.md }}>
+        {['All', 'DPR', 'Inventory', 'QA', 'Variations', 'BOQ', 'Photos'].map((cat) => (
+          <TouchableOpacity
+            key={cat}
+            onPress={() => setFilter(cat as any)}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 20,
+              backgroundColor: filter === cat ? colors.primary : '#EAE6DF',
+            }}
+          >
+            <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: filter === cat ? '#fff' : colors.neutral[700] }}>
+              {cat}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {filteredEvents.length === 0 && <EmptyState icon="time-outline" text={`No ${filter === 'All' ? '' : filter.toLowerCase() + ' '}activity events logged.`} />}
+      {filteredEvents.map((ev, i) => {
+        const meta = getEventMeta(ev.event_type);
+        return (
+          <TouchableOpacity
+            key={ev.id}
+            onPress={() => setSelectedEvent(ev)}
+            style={styles.timelineRow}
+            activeOpacity={0.7}
+          >
+            <View style={styles.timelineLeft}>
+              <View style={[styles.timelineDot, { backgroundColor: meta.color }]}>
+                <Ionicons name={meta.icon as any} size={12} color={colors.white} />
+              </View>
+              {i < filteredEvents.length - 1 && <View style={styles.timelineLine} />}
             </View>
-            {i < events.length - 1 && <View style={styles.timelineLine} />}
-          </View>
-          <View style={styles.timelineContent}>
-            <Text style={styles.timelineDate}>{fmt(ev.date, { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
-            <Text style={styles.timelineLabel}>{ev.label}</Text>
-          </View>
+            <View style={[styles.timelineContent, { backgroundColor: '#FFFDF9', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#F0EBE1' }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: meta.color }}>{meta.label.toUpperCase()}</Text>
+                <Text style={{ fontSize: 9, color: colors.neutral[400] }}>{new Date(ev.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</Text>
+              </View>
+              <Text style={[styles.timelineLabel, { fontSize: 12, marginTop: 2 }]}>{ev.description}</Text>
+              {ev.created_name ? (
+                <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 4 }}>By: {ev.created_name}</Text>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+
+      {/* Details Modal */}
+      <Modal visible={!!selectedEvent} animationType="slide" onRequestClose={() => setSelectedEvent(null)}>
+        <View style={{ padding: spacing.xl, gap: spacing.md, flex: 1, backgroundColor: '#FAF9F6' }}>
+          <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink }}>Event Details</Text>
+          {selectedEvent && (
+            <Card style={{ padding: spacing.md, gap: spacing.sm }}>
+              <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: getEventMeta(selectedEvent.event_type).color }}>
+                {selectedEvent.event_type.replace('_', ' ')}
+              </Text>
+              <Text style={{ fontSize: 14, color: colors.ink }}>{selectedEvent.description}</Text>
+              <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                Logged at: {new Date(selectedEvent.created_at).toLocaleString('en-IN')}
+              </Text>
+              {selectedEvent.created_name && (
+                <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Operator: {selectedEvent.created_name}</Text>
+              )}
+              {selectedEvent.metadata && (
+                <View style={{ marginTop: spacing.md, borderTopWidth: 1, borderColor: '#F0EBE1', paddingTop: spacing.md }}>
+                  <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Metadata Payload</Text>
+                  <Text style={{ fontSize: 11, fontFamily: fontFamily.medium, color: colors.neutral[600], backgroundColor: '#EAE6DF', padding: 8, borderRadius: 6 }}>
+                    {JSON.stringify(selectedEvent.metadata, null, 2)}
+                  </Text>
+                </View>
+              )}
+            </Card>
+          )}
+          <Button title="Close" onPress={() => setSelectedEvent(null)} variant="primary" style={{ marginTop: 'auto' }} />
         </View>
-      ))}
+      </Modal>
     </>
   );
 }
@@ -1366,6 +2500,587 @@ function ReportRow({ label, value }: { label: string; value: string }) {
       <Text style={styles.reportLabel}>{label}</Text>
       <Text style={styles.reportValue}>{value}</Text>
     </View>
+  );
+}
+
+// Procurement Tab
+function ProcurementTab({ projectId, companyId }: { projectId: string; companyId: string }) {
+  const [activeSubTab, setActiveSubTab] = useState<'PO' | 'GRN'>('PO');
+  const { data: pos = [], isLoading: poLoading } = usePurchaseOrders(projectId);
+  const { data: grns = [], isLoading: grnLoading } = useGoodsReceivedNotes(projectId);
+  const { data: suppliers = [] } = useSuppliers();
+  const { data: materials = [] } = useMaterialMaster();
+
+  const createPO = useCreatePurchaseOrder();
+  const createGRN = useCreateGoodsReceivedNote();
+
+  // PO Form states
+  const [showPOModal, setShowPOModal] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState('');
+  const [poNumber, setPoNumber] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [poRemarks, setPoRemarks] = useState('');
+  const [poTerms, setPoTerms] = useState('');
+  const [poItems, setPoItems] = useState<{ material_master_id: string; qty_ordered: number; rate: number }[]>([]);
+
+  // Item builder states
+  const [selectedMaterial, setSelectedMaterial] = useState('');
+  const [itemQty, setItemQty] = useState('');
+  const [itemRate, setItemRate] = useState('');
+
+  // GRN Form states
+  const [showGRNModal, setShowGRNModal] = useState(false);
+  const [selectedPO, setSelectedPO] = useState<any>(null);
+  const [grnNumber, setGrnNumber] = useState('');
+  const [deliveryChallan, setDeliveryChallan] = useState('');
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [vehicleNumber, setVehicleNumber] = useState('');
+  const [driverName, setDriverName] = useState('');
+  const [driverPhone, setDriverPhone] = useState('');
+  const [inspectionStatus, setInspectionStatus] = useState<'passed' | 'failed' | 'partial'>('passed');
+  const [grnItems, setGrnItems] = useState<{ purchase_order_item_id: string; qty_received: number; qty_accepted: number; qty_rejected: number; rejection_reason?: string; batch_number: string }[]>([]);
+
+  const handleAddPOItem = () => {
+    if (!selectedMaterial || !itemQty || !itemRate) return;
+    setPoItems([...poItems, {
+      material_master_id: selectedMaterial,
+      qty_ordered: parseFloat(itemQty),
+      rate: parseFloat(itemRate),
+    }]);
+    setSelectedMaterial('');
+    setItemQty('');
+    setItemRate('');
+  };
+
+  const handleCreatePOSubmit = async () => {
+    if (!selectedSupplier || !poNumber || poItems.length === 0) {
+      alert('Please fill required details and add at least one item');
+      return;
+    }
+    const currentUserId = (await supabase.auth.getUser()).data.user?.id || '';
+    
+    await createPO.mutateAsync({
+      projectId,
+      companyId,
+      supplierId: selectedSupplier,
+      poNumber,
+      expectedDeliveryDate: deliveryDate || null,
+      deliveryAddress: deliveryAddress || null,
+      currency: 'INR',
+      remarks: poRemarks || null,
+      termsConditions: poTerms || null,
+      items: poItems,
+      createdBy: currentUserId,
+    });
+
+    setShowPOModal(false);
+    setSelectedSupplier('');
+    setPoNumber('');
+    setDeliveryDate('');
+    setDeliveryAddress('');
+    setPoRemarks('');
+    setPoTerms('');
+    setPoItems([]);
+  };
+
+  const handleCreateGRNSubmit = async () => {
+    if (!selectedPO || !grnNumber || grnItems.length === 0) {
+      alert('Please fill required details');
+      return;
+    }
+    const invalidItem = grnItems.find(it => it.qty_accepted + it.qty_rejected !== it.qty_received);
+    if (invalidItem) {
+      alert('Accepted quantity + Rejected quantity must equal Received quantity.');
+      return;
+    }
+
+    const currentUserId = (await supabase.auth.getUser()).data.user?.id || '';
+
+    await createGRN.mutateAsync({
+      companyId,
+      purchaseOrderId: selectedPO.id,
+      grnNumber,
+      receivedBy: currentUserId,
+      deliveryChallan: deliveryChallan || null,
+      invoiceNumber: invoiceNumber || null,
+      vehicleNumber: vehicleNumber || null,
+      driverName: driverName || null,
+      driverPhone: driverPhone || null,
+      inspectionStatus,
+      items: grnItems,
+    });
+
+    setShowGRNModal(false);
+    setSelectedPO(null);
+    setGrnNumber('');
+    setDeliveryChallan('');
+    setInvoiceNumber('');
+    setVehicleNumber('');
+    setDriverName('');
+    setDriverPhone('');
+    setInspectionStatus('passed');
+    setGrnItems([]);
+  };
+
+  return (
+    <>
+      <SectionHeader title="Procurement & GRN" />
+
+      {/* Sub-tab navigation */}
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+        <TouchableOpacity
+          onPress={() => setActiveSubTab('PO')}
+          style={{
+            flex: 1,
+            paddingVertical: 10,
+            borderRadius: 8,
+            backgroundColor: activeSubTab === 'PO' ? colors.primary : '#EAE6DF',
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ fontFamily: fontFamily.bold, color: activeSubTab === 'PO' ? '#fff' : colors.neutral[700], fontSize: 13 }}>
+            Purchase Orders
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveSubTab('GRN')}
+          style={{
+            flex: 1,
+            paddingVertical: 10,
+            borderRadius: 8,
+            backgroundColor: activeSubTab === 'GRN' ? colors.primary : '#EAE6DF',
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ fontFamily: fontFamily.bold, color: activeSubTab === 'GRN' ? '#fff' : colors.neutral[700], fontSize: 13 }}>
+            Goods Received Notes
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {activeSubTab === 'PO' ? (
+        <>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+            <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: colors.neutral[800] }}>POs Directory</Text>
+            <TouchableOpacity onPress={() => setShowPOModal(true)} style={{ backgroundColor: '#7E6144', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}>
+              <Text style={{ color: '#fff', fontSize: 11, fontFamily: fontFamily.bold }}>+ New PO</Text>
+            </TouchableOpacity>
+          </View>
+
+          {poLoading && <ActivityIndicator color="#7E6144" />}
+          {pos.length === 0 && <EmptyState icon="document-text-outline" text="No purchase orders raised yet" />}
+          {pos.map((po) => (
+            <Card key={po.id} style={{ padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: '#F0EBE1', backgroundColor: '#FFFDF9' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, fontFamily: fontFamily.bold }}>{po.po_number}</Text>
+                <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, backgroundColor: po.status === 'fully_received' ? '#D1FAE5' : '#FEF3C7' }}>
+                  <Text style={{ fontSize: 9, fontFamily: fontFamily.bold, color: po.status === 'fully_received' ? '#065F46' : '#92400E' }}>
+                    {po.status.replace('_', ' ').toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 12, color: colors.neutral[600], marginTop: 4 }}>Supplier: {po.supplier_name}</Text>
+              <Text style={{ fontSize: 12, color: colors.neutral[700], fontFamily: fontFamily.semiBold, marginTop: 4 }}>Total: ₹{po.total_amount.toLocaleString('en-IN')}</Text>
+              {po.expected_delivery_date && (
+                <Text style={{ fontSize: 11, color: colors.neutral[500], marginTop: 4 }}>Expected Delivery: {po.expected_delivery_date}</Text>
+              )}
+              {po.items && po.items.length > 0 && (
+                <View style={{ borderTopWidth: 1, borderColor: '#F0EBE1', marginTop: 8, paddingTop: 8 }}>
+                  <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: colors.neutral[700] }}>Items Ordered:</Text>
+                  {po.items.map((it: any) => (
+                    <Text key={it.id} style={{ fontSize: 11, color: colors.neutral[600] }}>
+                      • {it.material_name} : {it.qty_ordered} units @ ₹{it.rate}/unit (Received: {it.qty_received})
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </Card>
+          ))}
+        </>
+      ) : (
+        <>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+            <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: colors.neutral[800] }}>GRNs History</Text>
+            <TouchableOpacity onPress={() => setShowGRNModal(true)} style={{ backgroundColor: '#7E6144', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}>
+              <Text style={{ color: '#fff', fontSize: 11, fontFamily: fontFamily.bold }}>+ Add GRN Receipt</Text>
+            </TouchableOpacity>
+          </View>
+
+          {grnLoading && <ActivityIndicator color="#7E6144" />}
+          {grns.length === 0 && <EmptyState icon="cloud-download-outline" text="No goods received receipts logged" />}
+          {grns.map((grn) => (
+            <Card key={grn.id} style={{ padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: '#F0EBE1', backgroundColor: '#FFFDF9' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, fontFamily: fontFamily.bold }}>GRN: {grn.grn_number}</Text>
+                <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, backgroundColor: grn.inspection_status === 'passed' ? '#D1FAE5' : '#FEE2E2' }}>
+                  <Text style={{ fontSize: 9, fontFamily: fontFamily.bold, color: grn.inspection_status === 'passed' ? '#065F46' : '#991B1B' }}>
+                    {grn.inspection_status.toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 11, color: colors.neutral[500], marginTop: 2 }}>Received Date: {grn.received_date}</Text>
+              {grn.vehicle_number && (
+                <Text style={{ fontSize: 11, color: colors.neutral[600], marginTop: 2 }}>Vehicle: {grn.vehicle_number} | Driver: {grn.driver_name} ({grn.driver_phone})</Text>
+              )}
+            </Card>
+          ))}
+        </>
+      )}
+
+      {/* New PO Modal */}
+      <Modal visible={showPOModal} animationType="slide">
+        <ScrollView style={{ padding: spacing.xl, backgroundColor: '#FAF9F6' }}>
+          <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: spacing.md }}>Create Purchase Order</Text>
+          
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Select Supplier *</Text>
+          <View style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, backgroundColor: '#fff', marginBottom: spacing.sm }}>
+            <Picker selectedValue={selectedSupplier} onValueChange={(v) => setSelectedSupplier(v)}>
+              <Picker.Item label="Choose Supplier" value="" />
+              {suppliers.map(s => <Picker.Item key={s.id} label={s.name} value={s.id} />)}
+            </Picker>
+          </View>
+
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>PO Number *</Text>
+          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 10, backgroundColor: '#fff', marginBottom: spacing.sm }} value={poNumber} onChangeText={setPoNumber} placeholder="PO-1002" />
+
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Expected Delivery Date</Text>
+          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 10, backgroundColor: '#fff', marginBottom: spacing.sm }} value={deliveryDate} onChangeText={setDeliveryDate} placeholder="YYYY-MM-DD" />
+
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Delivery Address</Text>
+          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 10, backgroundColor: '#fff', marginBottom: spacing.sm }} value={deliveryAddress} onChangeText={setDeliveryAddress} placeholder="Warehouse Location" />
+
+          {/* PO items builder */}
+          <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: colors.neutral[800], marginTop: spacing.md }}>Add PO Items</Text>
+          <Card style={{ padding: spacing.md, marginTop: 4, gap: spacing.xs, backgroundColor: '#FFFDF9' }}>
+            <Text style={{ fontSize: 11, fontFamily: fontFamily.bold }}>Material *</Text>
+            <View style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, backgroundColor: '#fff' }}>
+              <Picker selectedValue={selectedMaterial} onValueChange={(v) => setSelectedMaterial(v)}>
+                <Picker.Item label="Choose Material" value="" />
+                {materials.map(m => <Picker.Item key={m.id} label={m.name} value={m.id} />)}
+              </Picker>
+            </View>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, fontFamily: fontFamily.bold }}>Quantity *</Text>
+                <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 8, backgroundColor: '#fff' }} value={itemQty} onChangeText={setItemQty} placeholder="100" keyboardType="numeric" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, fontFamily: fontFamily.bold }}>Rate (₹/unit) *</Text>
+                <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 8, backgroundColor: '#fff' }} value={itemRate} onChangeText={setItemRate} placeholder="450" keyboardType="numeric" />
+              </View>
+            </View>
+            <TouchableOpacity onPress={handleAddPOItem} style={{ backgroundColor: '#7E6144', padding: 8, borderRadius: 6, alignItems: 'center', marginTop: spacing.xs }}>
+              <Text style={{ color: '#fff', fontFamily: fontFamily.bold, fontSize: 11 }}>+ Add Line Item</Text>
+            </TouchableOpacity>
+          </Card>
+
+          {poItems.length > 0 && (
+            <View style={{ marginTop: spacing.sm }}>
+              <Text style={{ fontSize: 12, fontFamily: fontFamily.bold }}>Staged Items:</Text>
+              {poItems.map((it, idx) => {
+                const name = materials.find(m => m.id === it.material_master_id)?.name || 'Unknown';
+                return (
+                  <Text key={idx} style={{ fontSize: 11, color: colors.neutral[600] }}>
+                    {idx + 1}. {name} — {it.qty_ordered} units @ ₹{it.rate}
+                  </Text>
+                );
+              })}
+            </View>
+          )}
+
+          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl, marginBottom: spacing.xl }}>
+            <Button title="Cancel" onPress={() => setShowPOModal(false)} variant="secondary" style={{ flex: 1 }} />
+            <Button title="Submit PO" onPress={handleCreatePOSubmit} variant="primary" style={{ flex: 1 }} />
+          </View>
+        </ScrollView>
+      </Modal>
+
+      {/* New GRN Modal */}
+      <Modal visible={showGRNModal} animationType="slide">
+        <ScrollView style={{ padding: spacing.xl, backgroundColor: '#FAF9F6' }}>
+          <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: spacing.md }}>Goods Received Note</Text>
+          
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Select PO *</Text>
+          <View style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, backgroundColor: '#fff', marginBottom: spacing.sm }}>
+            <Picker selectedValue={selectedPO?.id} onValueChange={(val) => {
+              const matched = pos.find(p => p.id === val);
+              setSelectedPO(matched);
+              if (matched && matched.items) {
+                setGrnItems(matched.items.map((it: any) => ({
+                  purchase_order_item_id: it.id,
+                  qty_received: it.qty_ordered - it.qty_received,
+                  qty_accepted: it.qty_ordered - it.qty_received,
+                  qty_rejected: 0,
+                  batch_number: `B-${new Date().getTime().toString().slice(-4)}`,
+                })));
+              }
+            }}>
+              <Picker.Item label="Choose PO Reference" value="" />
+              {pos.filter(p => p.status !== 'fully_received').map(p => <Picker.Item key={p.id} label={p.po_number} value={p.id} />)}
+            </Picker>
+          </View>
+
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>GRN Number *</Text>
+          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 10, backgroundColor: '#fff', marginBottom: spacing.sm }} value={grnNumber} onChangeText={setGrnNumber} placeholder="GRN-1002" />
+
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Vehicle Number</Text>
+          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 10, backgroundColor: '#fff', marginBottom: spacing.sm }} value={vehicleNumber} onChangeText={setVehicleNumber} placeholder="DL-3C-YA-1234" />
+
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Driver Name</Text>
+          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 10, backgroundColor: '#fff', marginBottom: spacing.sm }} value={driverName} onChangeText={setDriverName} placeholder="Ramesh Singh" />
+
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Driver Phone</Text>
+          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 10, backgroundColor: '#fff', marginBottom: spacing.sm }} value={driverPhone} onChangeText={setDriverPhone} placeholder="9876543210" />
+
+          {selectedPO && grnItems.length > 0 && (
+            <View style={{ marginTop: spacing.md }}>
+              <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, marginBottom: spacing.xs }}>Fulfill Staged Items</Text>
+              {grnItems.map((item, idx) => {
+                const poItem = selectedPO.items.find((it: any) => it.id === item.purchase_order_item_id);
+                return (
+                  <Card key={idx} style={{ padding: spacing.sm, marginBottom: spacing.sm, gap: 4 }}>
+                    <Text style={{ fontSize: 12, fontFamily: fontFamily.bold }}>Item: {poItem?.material_name}</Text>
+                    <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Pending to Receive: {poItem?.qty_ordered - poItem?.qty_received}</Text>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10 }}>Received</Text>
+                        <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 6, padding: 4, backgroundColor: '#fff', fontSize: 11 }} value={String(item.qty_received)} onChangeText={(val) => {
+                          const updated = [...grnItems];
+                          updated[idx].qty_received = parseFloat(val) || 0;
+                          setGrnItems(updated);
+                        }} keyboardType="numeric" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10 }}>Accepted</Text>
+                        <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 6, padding: 4, backgroundColor: '#fff', fontSize: 11 }} value={String(item.qty_accepted)} onChangeText={(val) => {
+                          const updated = [...grnItems];
+                          updated[idx].qty_accepted = parseFloat(val) || 0;
+                          setGrnItems(updated);
+                        }} keyboardType="numeric" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10 }}>Rejected</Text>
+                        <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 6, padding: 4, backgroundColor: '#fff', fontSize: 11 }} value={String(item.qty_rejected)} onChangeText={(val) => {
+                          const updated = [...grnItems];
+                          updated[idx].qty_rejected = parseFloat(val) || 0;
+                          setGrnItems(updated);
+                        }} keyboardType="numeric" />
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10 }}>Batch Number</Text>
+                        <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 6, padding: 4, backgroundColor: '#fff', fontSize: 11 }} value={item.batch_number} onChangeText={(val) => {
+                          const updated = [...grnItems];
+                          updated[idx].batch_number = val;
+                          setGrnItems(updated);
+                        }} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10 }}>Rejection Reason</Text>
+                        <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 6, padding: 4, backgroundColor: '#fff', fontSize: 11 }} value={item.rejection_reason || ''} onChangeText={(val) => {
+                          const updated = [...grnItems];
+                          updated[idx].rejection_reason = val;
+                          setGrnItems(updated);
+                        }} />
+                      </View>
+                    </View>
+                  </Card>
+                );
+              })}
+            </View>
+          )}
+
+          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl, marginBottom: spacing.xl }}>
+            <Button title="Cancel" onPress={() => setShowGRNModal(false)} variant="secondary" style={{ flex: 1 }} />
+            <Button title="Submit GRN" onPress={handleCreateGRNSubmit} variant="primary" style={{ flex: 1 }} />
+          </View>
+        </ScrollView>
+      </Modal>
+    </>
+  );
+}
+
+// Facade Map Tab
+function FacadeMapTab({ projectId }: { projectId: string }) {
+  const { data: boqItems = [] } = useProjectBOQ(projectId);
+  
+  const [zones, setZones] = useState<any[]>([
+    { id: '1', label: 'L5-North-01', status: 'completed', floor: 'Level 5', elevation: 'North', points: [{x: 0.1, y: 0.1}, {x: 0.3, y: 0.1}, {x: 0.3, y: 0.3}, {x: 0.1, y: 0.3}], boq_names: ['12mm Glass', 'Aluminium Mullions'] },
+    { id: '2', label: 'L5-North-02', status: 'in_progress', floor: 'Level 5', elevation: 'North', points: [{x: 0.4, y: 0.1}, {x: 0.6, y: 0.1}, {x: 0.6, y: 0.3}, {x: 0.4, y: 0.3}], boq_names: ['10mm Glass', 'Silicon Sealant'] },
+    { id: '3', label: 'L6-North-01', status: 'not_started', floor: 'Level 6', elevation: 'North', points: [{x: 0.1, y: 0.4}, {x: 0.3, y: 0.4}, {x: 0.3, y: 0.6}, {x: 0.1, y: 0.6}], boq_names: ['Transoms', 'Brackets'] },
+  ]);
+
+  const [showAddZone, setShowAddZone] = useState(false);
+  const [newLabel, setNewLabel] = useState('');
+  const [newFloor, setNewFloor] = useState('');
+  const [newElevation, setNewElevation] = useState('');
+  const [selectedBOQItems, setSelectedBOQItems] = useState<string[]>([]);
+  const [drawPoints, setDrawPoints] = useState<{ x: number; y: number }[]>([]);
+
+  const handleDrawTap = (x: number, y: number) => {
+    setDrawPoints([...drawPoints, { x, y }]);
+  };
+
+  const handleSaveZone = () => {
+    if (!newLabel || drawPoints.length < 3) {
+      alert('Please enter a label and tap at least 3 points to define the polygon shape.');
+      return;
+    }
+    const selectedNames = selectedBOQItems.map(id => boqItems.find(b => b.id === id)?.item_name || 'Item');
+    const newZone = {
+      id: String(zones.length + 1),
+      label: newLabel,
+      floor: newFloor || 'Level 1',
+      elevation: newElevation || 'North',
+      status: 'not_started',
+      points: drawPoints,
+      boq_names: selectedNames,
+    };
+    setZones([...zones, newZone]);
+    setShowAddZone(false);
+    setNewLabel('');
+    setNewFloor('');
+    setNewElevation('');
+    setDrawPoints([]);
+    setSelectedBOQItems([]);
+  };
+
+  const getStatusColor = (status: string) => {
+    if (status === 'completed') return '#10B981';
+    if (status === 'in_progress') return '#F59E0B';
+    return '#EF4444';
+  };
+
+  return (
+    <>
+      <SectionHeader title="Interactive Elevation Progress Map" />
+
+      {/* Blueprint Canvas */}
+      <View style={{ backgroundColor: '#1E293B', borderRadius: 8, height: 260, position: 'relative', overflow: 'hidden', padding: 8, borderWidth: 1, borderColor: '#334155' }}>
+        <Text style={{ color: '#94A3B8', fontSize: 10, fontFamily: fontFamily.bold, marginBottom: 4 }}>ELEVATION MAP DRAWING OVERVIEW</Text>
+        <View style={{ position: 'absolute', top: 50, left: 20, right: 20, bottom: 20, borderStyle: 'dashed', borderWidth: 1, borderColor: '#475569', opacity: 0.4 }} />
+
+        {zones.map((z) => {
+          const xs = z.points.map((p: any) => p.x);
+          const ys = z.points.map((p: any) => p.y);
+          const minX = Math.min(...xs) * 100;
+          const minY = Math.min(...ys) * 100;
+          const width = (Math.max(...xs) - Math.min(...xs)) * 100;
+          const height = (Math.max(...ys) - Math.min(...ys)) * 100;
+
+          return (
+            <TouchableOpacity
+              key={z.id}
+              style={{
+                position: 'absolute',
+                left: `${minX}%`,
+                top: `${minY + 20}%`,
+                width: `${width}%`,
+                height: `${height}%`,
+                backgroundColor: getStatusColor(z.status),
+                opacity: 0.6,
+                borderWidth: 2,
+                borderColor: '#fff',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+              onPress={() => {
+                alert(`Zone Details:\nLabel: ${z.label}\nFloor: ${z.floor}\nElevation: ${z.elevation}\nLinked Items: ${z.boq_names.join(', ')}\nStatus: ${z.status}`);
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 9, fontFamily: fontFamily.bold, textAlign: 'center' }}>{z.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+
+        {showAddZone && drawPoints.map((pt, idx) => (
+          <View key={idx} style={{ position: 'absolute', left: `${pt.x * 100}%`, top: `${pt.y * 100}%`, width: 8, height: 8, borderRadius: 4, backgroundColor: '#3B82F6', transform: [{ translateX: -4 }, { translateY: -4 }] }} />
+        ))}
+      </View>
+
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md }}>
+        <Text style={{ fontSize: 13, fontFamily: fontFamily.bold }}>Elevation Zones Register</Text>
+        <TouchableOpacity onPress={() => setShowAddZone(true)} style={{ backgroundColor: '#7E6144', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}>
+          <Text style={{ color: '#fff', fontSize: 11, fontFamily: fontFamily.bold }}>+ Draw Zone</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={{ marginTop: spacing.sm, maxHeight: 300 }}>
+        {zones.map((z) => (
+          <Card key={z.id} style={{ padding: spacing.sm, marginBottom: spacing.xs, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFFDF9' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12, fontFamily: fontFamily.bold }}>{z.label} ({z.floor} • {z.elevation})</Text>
+              <Text style={{ fontSize: 11, color: colors.neutral[500], marginTop: 2 }}>BOQs: {z.boq_names.join(', ')}</Text>
+            </View>
+            <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: getStatusColor(z.status) }}>
+              <Text style={{ color: '#fff', fontSize: 9, fontFamily: fontFamily.bold }}>{z.status.toUpperCase()}</Text>
+            </View>
+          </Card>
+        ))}
+      </ScrollView>
+
+      <Modal visible={showAddZone} animationType="slide">
+        <ScrollView style={{ padding: spacing.xl, backgroundColor: '#FAF9F6' }}>
+          <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: spacing.md }}>Draw Elevation Zone</Text>
+          <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 4 }}>Tap on the canvas below to set at least 3 points of your zone polygon.</Text>
+          
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={(e) => {
+              const { locationX, locationY } = e.nativeEvent;
+              const x = Math.min(1, Math.max(0, locationX / 300));
+              const y = Math.min(1, Math.max(0, locationY / 180));
+              handleDrawTap(x, y);
+            }}
+            style={{ width: '100%', height: 180, backgroundColor: '#1E293B', borderRadius: 8, position: 'relative', overflow: 'hidden', borderWidth: 1, borderColor: '#334155' }}
+          >
+            {drawPoints.map((pt, idx) => (
+              <View key={idx} style={{ position: 'absolute', left: `${pt.x * 100}%`, top: `${pt.y * 100}%`, width: 8, height: 8, borderRadius: 4, backgroundColor: '#3B82F6', transform: [{ translateX: -4 }, { translateY: -4 }] }} />
+            ))}
+            <Text style={{ color: '#94A3B8', fontSize: 10, padding: 8 }}>TAP CANVAS TO PLOT COORDINATES ({drawPoints.length} points set)</Text>
+          </TouchableOpacity>
+
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginTop: spacing.md, marginBottom: 4 }}>Zone Label *</Text>
+          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 10, backgroundColor: '#fff', marginBottom: spacing.sm }} value={newLabel} onChangeText={setNewLabel} placeholder="L5-North-03" />
+
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Floor / Level</Text>
+          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 10, backgroundColor: '#fff', marginBottom: spacing.sm }} value={newFloor} onChangeText={setNewFloor} placeholder="Level 5" />
+
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Elevation Orientation</Text>
+          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 10, backgroundColor: '#fff', marginBottom: spacing.sm }} value={newElevation} onChangeText={setNewElevation} placeholder="North Facade" />
+
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginTop: spacing.sm, marginBottom: 4 }}>Link BOQ Materials</Text>
+          {boqItems.map(item => {
+            const isSelected = selectedBOQItems.includes(item.id);
+            return (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => {
+                  if (isSelected) {
+                    setSelectedBOQItems(selectedBOQItems.filter(id => id !== item.id));
+                  } else {
+                    setSelectedBOQItems([...selectedBOQItems, item.id]);
+                  }
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}
+              >
+                <View style={{ width: 18, height: 18, borderWidth: 1, borderColor: colors.primary, borderRadius: 4, backgroundColor: isSelected ? colors.primary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                  {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
+                </View>
+                <Text style={{ fontSize: 12, color: colors.neutral[800] }}>{item.item_name} ({item.quantity} {item.unit})</Text>
+              </TouchableOpacity>
+            );
+          })}
+
+          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl, marginBottom: spacing.xl }}>
+            <Button title="Cancel" onPress={() => setShowAddZone(false)} variant="secondary" style={{ flex: 1 }} />
+            <Button title="Save Zone" onPress={handleSaveZone} variant="primary" style={{ flex: 1 }} />
+          </View>
+        </ScrollView>
+      </Modal>
+    </>
   );
 }
 
@@ -1469,6 +3184,9 @@ export default function ProjectWorkspaceScreen() {
             onTabChange={setTab}
           />
         )}
+        {tab === 'BOQ' && (
+          <BOQTab projectId={id} projectName={project.name} />
+        )}
         {tab === 'Tasks' && (
           <TasksTab
             tasks={tasks}
@@ -1493,7 +3211,16 @@ export default function ProjectWorkspaceScreen() {
           <DocumentsTab documents={documents} />
         )}
         {tab === 'Materials' && (
-          <MaterialsTab materialReqs={materialReqs} />
+          <MaterialsTab materialReqs={materialReqs} projectId={id} currentUserId={currentUserId} />
+        )}
+        {tab === 'Variations' && (
+          <VariationsTab projectId={id} currentUserId={currentUserId} />
+        )}
+        {tab === 'Facade Map' && (
+          <FacadeMapTab projectId={id} />
+        )}
+        {tab === 'Procurement' && (
+          <ProcurementTab projectId={id} companyId={profile?.company_id || ''} />
         )}
         {tab === 'Expenses' && (
           <ExpensesTab expenses={expenses} projectId={id} currentUserId={currentUserId} />
@@ -1505,7 +3232,7 @@ export default function ProjectWorkspaceScreen() {
           <CommunicationTab profileId={currentUserId} projectId={id} router={router} />
         )}
         {tab === 'Timeline' && (
-          <TimelineTab project={project} dprs={dprs} tasks={tasks} payments={payments} />
+          <TimelineTab projectId={id} />
         )}
         {tab === 'Reports' && (
           <ReportsTab

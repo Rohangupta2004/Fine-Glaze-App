@@ -62,7 +62,7 @@ serve(async (req: Request) => {
         profile_id,
         role_on_site,
         profiles!inner(id, full_name, status),
-        projects!inner(id, name, address, city, geofence_radius, status)
+        projects!inner(id, name, address, city, geofence_radius_m, status)
       `)
       .eq('profiles.status', 'active')
       .neq('projects.status', 'completed');
