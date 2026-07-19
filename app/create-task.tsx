@@ -29,6 +29,7 @@ import type { TaskPriority } from '../src/types';
 
 function getRouteGroup(role: string): string {
   switch (role) {
+    case 'admin':
     case 'owner':
     case 'project_manager':
     case 'hr':
