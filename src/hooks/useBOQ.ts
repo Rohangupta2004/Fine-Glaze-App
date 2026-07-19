@@ -117,16 +117,20 @@ export function useImportBOQ() {
 
       if (insertErr) throw insertErr;
 
-      // 2. Perform alias learning on database for confirmed matches
-      for (const item of items) {
-        if (item.material_master_id && item.learn_alias) {
-          const { error: aliasErr } = await supabase.rpc('add_material_alias', {
-            p_material_id: item.material_master_id,
-            p_new_alias: item.learn_alias.toLowerCase().trim(),
-          });
-          if (aliasErr) {
-            console.warn('[useImportBOQ] Failed to learn alias:', item.learn_alias, aliasErr.message);
-          }
+      // 2. Perform alias learning on database for confirmed matches (BULK)
+      const aliasesToLearn = items
+        .filter(item => item.material_master_id && item.learn_alias)
+        .map(item => ({
+          id: item.material_master_id,
+          alias: item.learn_alias!.toLowerCase().trim()
+        }));
+
+      if (aliasesToLearn.length > 0) {
+        const { error: aliasErr } = await supabase.rpc('add_material_aliases_bulk', {
+          p_aliases: aliasesToLearn
+        });
+        if (aliasErr) {
+          console.warn('[useImportBOQ] Failed to bulk learn aliases:', aliasErr.message);
         }
       }
     },

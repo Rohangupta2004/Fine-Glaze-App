@@ -58,7 +58,7 @@ export interface InventoryLedgerEntry {
   project_id: string;
   material_master_id: string;
   material_name?: string;
-  transaction_type: 'OPENING' | 'PURCHASE_RECEIVED' | 'SITE_ISSUE' | 'RETURN' | 'TRANSFER' | 'ADJUSTMENT' | 'WASTAGE' | 'SCRAP';
+  transaction_type: 'opening' | 'received' | 'used' | 'adjustment' | 'return' | 'transfer' | 'wastage' | 'scrap';
   quantity: number;
   reference_type: 'dpr' | 'delivery' | 'variation' | 'manual' | null;
   reference_id: string | null;
@@ -278,7 +278,7 @@ export function useApproveVariation() {
             .map((it) => ({
               project_id: variation.project_id,
               material_master_id: it.material_master_id,
-              transaction_type: 'ADJUSTMENT',
+              transaction_type: 'adjustment',
               quantity: it.quantity,
               reference_type: 'variation',
               reference_id: variationId,
@@ -347,7 +347,7 @@ export function useCreateInventoryLedgerEntry() {
     mutationFn: async (params: {
       projectId: string;
       materialMasterId: string;
-      transactionType: 'OPENING' | 'PURCHASE_RECEIVED' | 'SITE_ISSUE' | 'RETURN' | 'TRANSFER' | 'ADJUSTMENT' | 'WASTAGE' | 'SCRAP';
+      transactionType: 'opening' | 'received' | 'used' | 'adjustment' | 'return' | 'transfer' | 'wastage' | 'scrap';
       quantity: number;
       notes?: string;
       createdBy: string;
@@ -371,7 +371,7 @@ export function useCreateInventoryLedgerEntry() {
         .single();
       if (error) throw error;
 
-      if (params.transactionType === 'PURCHASE_RECEIVED') {
+      if (params.transactionType === 'received') {
         const { data: mat } = await supabase
           .from('material_master')
           .select('name')
@@ -502,7 +502,7 @@ export function useIssueMaterialRequest() {
         .insert({
           project_id: projectId,
           material_master_id: materialMasterId,
-          transaction_type: 'SITE_ISSUE',
+          transaction_type: 'used',
           quantity: qty,
           reference_type: 'manual',
           notes: `Issued for Material Request: ${materialName}`,
