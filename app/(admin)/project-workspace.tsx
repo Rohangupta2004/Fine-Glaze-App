@@ -2728,9 +2728,8 @@ function ProcurementTab({ projectId, companyId }: { projectId: string; companyId
         </>
       )}
 
-      {/* New PO Modal */}
       <Modal visible={showPOModal} animationType="slide">
-        <ScrollView style={{ padding: spacing.xl, backgroundColor: '#FAF9F6' }}>
+        <ScrollView style={{ backgroundColor: '#FAF9F6' }} contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100 }}>
           <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: spacing.md }}>Create Purchase Order</Text>
           
           <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Select Supplier *</Text>
@@ -2796,9 +2795,8 @@ function ProcurementTab({ projectId, companyId }: { projectId: string; companyId
         </ScrollView>
       </Modal>
 
-      {/* New GRN Modal */}
       <Modal visible={showGRNModal} animationType="slide">
-        <ScrollView style={{ padding: spacing.xl, backgroundColor: '#FAF9F6' }}>
+        <ScrollView style={{ backgroundColor: '#FAF9F6' }} contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100 }}>
           <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: spacing.md }}>Goods Received Note</Text>
           
           <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Select PO *</Text>
@@ -3022,7 +3020,7 @@ function FacadeMapTab({ projectId }: { projectId: string }) {
       </ScrollView>
 
       <Modal visible={showAddZone} animationType="slide">
-        <ScrollView style={{ padding: spacing.xl, backgroundColor: '#FAF9F6' }}>
+        <ScrollView style={{ backgroundColor: '#FAF9F6' }} contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100 }}>
           <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: spacing.md }}>Draw Elevation Zone</Text>
           <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 4 }}>Tap on the canvas below to set at least 3 points of your zone polygon.</Text>
           
