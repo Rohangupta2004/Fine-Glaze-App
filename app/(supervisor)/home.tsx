@@ -81,11 +81,41 @@ export default function SupervisorHomeScreen() {
           </View>
         </View>
 
+        {/* Quick Action Chips */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
+          <TouchableOpacity 
+            style={styles.actionChip}
+            onPress={() => router.push('/(supervisor)/dpr' as any)}
+          >
+            <LinearGradient colors={['#695030', '#8B6840']} style={styles.chipGradient} start={{x:0, y:0}} end={{x:1, y:1}}>
+              <Ionicons name="document-text" size={16} color="#FFF" />
+              <Text style={styles.actionChipTextPrimary}>+ Submit DPR</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionChipSecondary}
+            onPress={() => router.push('/(supervisor)/team-attendance' as any)}
+          >
+            <Ionicons name="people-outline" size={15} color="#695030" />
+            <Text style={styles.actionChipTextSecondary}>Team Attendance</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionChipSecondary}
+            onPress={() => router.push('/(supervisor)/materials' as any)}
+          >
+            <Ionicons name="cube-outline" size={15} color="#695030" />
+            <Text style={styles.actionChipTextSecondary}>Request Material</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
         {/* Bento Grid — Today's Site & Team Stats */}
         <View style={styles.bentoRow}>
           {/* Site Card */}
           {activeProject ? (
-            <Card style={[styles.bentoCard, styles.siteCard]} padding={spacing.lg}>
+            <Card style={[styles.bentoCard, styles.siteCard, { overflow: 'hidden' }]} padding={spacing.lg}>
+              <LinearGradient colors={['#FFFFFF', '#F6F3EC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
               <Ionicons name="business" size={80} color={colors.primary} style={styles.siteWatermark} />
               <Text style={styles.bentoLabel}>Today's Site</Text>
               <Text style={styles.siteName} numberOfLines={2}>{activeProject.name}</Text>
@@ -95,14 +125,16 @@ export default function SupervisorHomeScreen() {
               </View>
             </Card>
           ) : (
-            <Card style={[styles.bentoCard, styles.siteCard]} padding={spacing.lg}>
+            <Card style={[styles.bentoCard, styles.siteCard, { overflow: 'hidden' }]} padding={spacing.lg}>
+              <LinearGradient colors={['#FFFFFF', '#F6F3EC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
               <Text style={styles.bentoLabel}>Today's Site</Text>
               <Text style={styles.siteName}>No Active Site</Text>
             </Card>
           )}
 
           {/* Team Attendance Overview Card */}
-          <Card style={[styles.bentoCard, styles.statsCard]} padding={spacing.lg}>
+          <Card style={[styles.bentoCard, styles.statsCard, { overflow: 'hidden' }]} padding={spacing.lg}>
+            <LinearGradient colors={['#FFFFFF', '#F6F3EC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
             <Text style={styles.bentoLabel}>Team Today</Text>
             <View style={styles.statsSummary}>
               <View style={styles.statMini}>
@@ -271,6 +303,13 @@ const styles = StyleSheet.create({
     color: colors.neutral[600],
     fontFamily: fontFamily.medium,
   },
+  // Chips
+  chipsScroll: { paddingHorizontal: spacing.lg, gap: spacing.sm, marginBottom: spacing.lg },
+  actionChip: { borderRadius: 20, overflow: 'hidden' },
+  chipGradient: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  actionChipTextPrimary: { fontSize: 12, fontFamily: fontFamily.semiBold, color: '#FFFFFF' },
+  actionChipSecondary: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: 'rgba(105, 80, 48, 0.15)' },
+  actionChipTextSecondary: { fontSize: 12, fontFamily: fontFamily.medium, color: '#695030' },
   bentoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -286,9 +325,8 @@ const styles = StyleSheet.create({
     ...shadows.md,
   },
   siteCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: 'rgba(255, 255, 255, 0.8)',
-    borderWidth: 1.5,
+    borderColor: 'rgba(184, 144, 71, 0.25)',
+    borderWidth: 1.2,
   },
   siteWatermark: {
     position: 'absolute',
@@ -315,9 +353,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   statsCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: 'rgba(255, 255, 255, 0.8)',
-    borderWidth: 1.5,
+    borderColor: 'rgba(184, 144, 71, 0.25)',
+    borderWidth: 1.2,
   },
   statsSummary: {
     flexDirection: 'row',

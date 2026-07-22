@@ -36,6 +36,7 @@ export default function AdminChatScreen() {
 
   const projectChats = (conversations || []).filter(c => c.type === 'project');
   const directChats = (conversations || []).filter(c => c.type === 'direct');
+  const groupChats = (conversations || []).filter(c => c.type === 'group');
 
   return (
     <View style={styles.container}>
@@ -46,12 +47,20 @@ export default function AdminChatScreen() {
             <Text style={styles.headerLabel}>Team</Text>
             <Text style={styles.headerTitle}>Messages</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => router.push('/(admin)/new-message' as any)}
-            style={styles.newBtn}
-          >
-            <Ionicons name="create-outline" size={20} color="#1E1815" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              onPress={() => router.push('/(admin)/new-group' as any)}
+              style={styles.newBtn}
+            >
+              <Ionicons name="people-outline" size={20} color="#1E1815" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push('/(admin)/new-message' as any)}
+              style={styles.newBtn}
+            >
+              <Ionicons name="create-outline" size={20} color="#1E1815" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Stats strip */}
@@ -95,6 +104,31 @@ export default function AdminChatScreen() {
                   <View style={styles.chatInfo}>
                     <Text style={styles.chatName}>{conv.project_id ? projectMap.get(conv.project_id) || 'Project Chat' : 'Project Chat'}</Text>
                     <Text style={styles.chatPreview}>Tap to open conversation</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.neutral[300]} />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
+
+        {/* Group Chats */}
+        {groupChats.length > 0 && (
+          <>
+            <SectionLabel icon="people" text="Group Chats" />
+            {groupChats.map((conv) => (
+              <TouchableOpacity
+                key={conv.id}
+                activeOpacity={0.85}
+                onPress={() => router.push({ pathname: '/(admin)/conversation', params: { conversationId: conv.id, title: conv.title || 'Group Chat' } })}
+              >
+                <View style={styles.chatCard}>
+                  <View style={[styles.chatIconGrad, { backgroundColor: colors.primary + '15' }]}>
+                    <Ionicons name="people" size={20} color={colors.primary} />
+                  </View>
+                  <View style={styles.chatInfo}>
+                    <Text style={styles.chatName}>{conv.title || 'Group Chat'}</Text>
+                    <Text style={styles.chatPreview}>Tap to open group</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.neutral[300]} />
                 </View>

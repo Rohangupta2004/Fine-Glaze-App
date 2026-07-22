@@ -36,11 +36,12 @@ export type DeliveryStatus = 'in_transit' | 'delivered';
 
 export type PaymentStatus = 'paid' | 'pending';
 
-export type ConversationType = 'project' | 'direct';
+export type ConversationType = 'project' | 'direct' | 'group';
 
 export type DprMediaType = 'photo' | 'video';
 
 export type DocumentCategory =
+  | 'cad_drawings'
   | 'drawings'
   | 'boq'
   | 'work_orders'
@@ -328,6 +329,8 @@ export interface Conversation {
   company_id: string;
   type: ConversationType;
   project_id: string | null;
+  title: string | null;
+  created_by?: string | null;
   created_at: string;
 }
 

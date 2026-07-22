@@ -29,12 +29,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Picker } from '@react-native-picker/picker';
 
 import { Card, StatusChip, Avatar, Button, GradientCard, ProgressRing, SearchBar, Input } from '../../src/components';
-import { useProject } from '../../src/hooks/useProjects';
+import { useProject, useUpdateProject } from '../../src/hooks/useProjects';
 import { useEmployees } from '../../src/hooks/useEmployees';
 import { useProjectDprs } from '../../src/hooks/useDpr';
 import { useProjectPayments, useUpdatePayment, useCreatePayment, useDeletePayment } from '../../src/hooks/usePayments';
 import { useMaterialRequests } from '../../src/hooks/useMaterials';
 import { useDocuments } from '../../src/hooks/useDocuments';
+import { useDocumentUpload } from '../../src/hooks/useDocumentUpload';
 import { useProjectAttendance, TeamAttendanceRow } from '../../src/hooks/useAttendance';
 import { useProjectTasks, useUpdateTaskStatus, useCreateTask } from '../../src/hooks/useTasks';
 import { useProjectExpenses, useAddExpense } from '../../src/hooks/useExpenses';
@@ -495,6 +496,14 @@ const boqStyles = StyleSheet.create({
 });
 
 // Overview
+const PROJECT_PHASES = [
+  { label: 'Design & Approval', pct: 20 },
+  { label: 'Procurement & Fabrication', pct: 40 },
+  { label: 'Delivery to Site', pct: 60 },
+  { label: 'Installation', pct: 80 },
+  { label: 'Finishing & Handover', pct: 100 },
+];
+
 function OverviewTab({
   project,
   employees,
@@ -537,6 +546,17 @@ function OverviewTab({
 
   const openTasks = tasks.filter(t => t.status === 'pending');
   const pendingMaterials = materialReqs.filter(m => m.status === 'pending');
+
+  const updateProject = useUpdateProject();
+
+  const handlePhaseToggle = (phasePct: number) => {
+    let newPct = phasePct;
+    if (project.progress_pct === phasePct) {
+      const prevPhase = [...PROJECT_PHASES].reverse().find(p => p.pct < phasePct);
+      newPct = prevPhase ? prevPhase.pct : 0;
+    }
+    updateProject.mutate({ id: project.id, updates: { progress_pct: newPct } });
+  };
 
   return (
     <View style={ovStyles.content}>
@@ -635,6 +655,53 @@ function OverviewTab({
           </View>
         </View>
       </View>
+
+      {/* Project Phases Card */}
+      <Card style={{ padding: spacing.xl, marginBottom: spacing.md }}>
+        <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: spacing.md }}>
+          Project Phases
+        </Text>
+        <View style={{ gap: spacing.sm }}>
+          {PROJECT_PHASES.map((phase) => {
+            const isCompleted = (project.progress_pct || 0) >= phase.pct;
+            return (
+              <TouchableOpacity
+                key={phase.pct}
+                onPress={() => handlePhaseToggle(phase.pct)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: spacing.sm,
+                  paddingHorizontal: spacing.md,
+                  backgroundColor: isCompleted ? '#F0F9FF' : colors.white,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  borderColor: isCompleted ? '#BAE6FD' : colors.neutral[200],
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isCompleted ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={24}
+                  color={isCompleted ? '#0284C7' : colors.neutral[300]}
+                />
+                <Text
+                  style={{
+                    flex: 1,
+                    marginLeft: spacing.md,
+                    fontSize: 14,
+                    fontFamily: isCompleted ? fontFamily.semiBold : fontFamily.medium,
+                    color: isCompleted ? '#0369A1' : colors.neutral[700],
+                  }}
+                >
+                  {phase.label}
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.neutral[400] }}>{phase.pct}%</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </Card>
 
       {/* stat cards: 2x2, horizontal layout */}
       <View style={ovStyles.statsGrid}>
@@ -1079,11 +1146,36 @@ function PhotosTab({ dprs }: { dprs: Dpr[] }) {
   );
 }
 
-// Documents
-function DocumentsTab({ documents }: { documents: DocumentRow[] }) {
+const DOC_CATEGORIES = [
+  { key: 'drawings', label: 'Drawings' },
+  { key: 'boq', label: 'BOQ' },
+  { key: 'quotation', label: 'Quotations' },
+  { key: 'work_orders', label: 'Work Orders' },
+  { key: 'contracts', label: 'Contracts' },
+  { key: 'invoices', label: 'Invoices / Bills' },
+  { key: 'warranty', label: 'Warranty' },
+  { key: 'safety', label: 'Safety' },
+  { key: 'amc', label: 'AMC' },
+  { key: 'other', label: 'Other' },
+];
+
+function DocumentsTab({ documents, projectId }: { documents: DocumentRow[], projectId: string }) {
   const [selectedDoc, setSelectedDoc] = useState<DocumentRow | null>(null);
   const [loadingFile, setLoadingFile] = useState(false);
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const [uploadModal, setUploadModal] = useState(false);
+  const [upCategory, setUpCategory] = useState('drawings');
+  const upload = useDocumentUpload();
+
+  const doUpload = async () => {
+    try {
+      await upload.mutateAsync({ ownerType: 'project', ownerId: projectId, category: upCategory });
+      setUploadModal(false);
+      Alert.alert('Success', 'Document uploaded');
+    } catch (e: any) {
+      if (e.message !== 'Canceled') Alert.alert('Upload Failed', e.message);
+    }
+  };
 
   const grouped = useMemo(() => {
     const g: Record<string, DocumentRow[]> = {};
@@ -1142,7 +1234,15 @@ function DocumentsTab({ documents }: { documents: DocumentRow[] }) {
 
   return (
     <>
-      <SectionHeader title={`Documents (${documents.length})`} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
+        <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink }}>Documents ({documents.length})</Text>
+        <Button
+          title="Upload"
+          onPress={() => setUploadModal(true)}
+          variant="primary"
+          style={{ minWidth: 100 }}
+        />
+      </View>
       {loadingFile && (
         <View style={{ padding: spacing.md, alignItems: 'center' }}>
           <ActivityIndicator color={colors.primary} />
@@ -1206,6 +1306,44 @@ function DocumentsTab({ documents }: { documents: DocumentRow[] }) {
           </View>
         </View>
       </Modal>
+
+      {/* Upload modal */}
+      <Modal visible={uploadModal} transparent animationType="slide" onRequestClose={() => setUploadModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.xl, paddingBottom: 40 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+              <Text style={{ fontSize: 20, fontFamily: fontFamily.bold, color: colors.ink }}>Upload Document</Text>
+              <TouchableOpacity onPress={() => setUploadModal(false)}>
+                <Ionicons name="close" size={24} color={colors.ink} />
+              </TouchableOpacity>
+            </View>
+            <Text style={{ color: colors.neutral[500], marginBottom: spacing.lg }}>Select a category for this file.</Text>
+            
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.xl }}>
+              {DOC_CATEGORIES.map((c) => (
+                <TouchableOpacity
+                  key={c.key}
+                  style={{
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: spacing.sm,
+                    borderRadius: 100,
+                    borderWidth: 1,
+                    borderColor: upCategory === c.key ? colors.primary : colors.neutral[200],
+                    backgroundColor: upCategory === c.key ? colors.primary + '15' : colors.white,
+                  }}
+                  onPress={() => setUpCategory(c.key)}
+                >
+                  <Text style={{ color: upCategory === c.key ? colors.primary : colors.neutral[600], fontFamily: upCategory === c.key ? fontFamily.semiBold : fontFamily.medium, fontSize: 13 }}>
+                    {c.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            <Button title="Choose File & Upload" onPress={doUpload} loading={upload.isPending} />
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -1224,7 +1362,7 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
   // Transaction form states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMaterialId, setSelectedMaterialId] = useState('');
-  const [txType, setTxType] = useState<'OPENING' | 'PURCHASE_RECEIVED' | 'SITE_ISSUE' | 'RETURN' | 'TRANSFER' | 'ADJUSTMENT' | 'WASTAGE' | 'SCRAP'>('PURCHASE_RECEIVED');
+  const [txType, setTxType] = useState<'opening' | 'received' | 'used' | 'return' | 'transfer' | 'adjustment' | 'wastage' | 'scrap'>('received');
   const [qty, setQty] = useState('');
   const [notes, setNotes] = useState('');
   const [batchNumber, setBatchNumber] = useState('');
@@ -1423,7 +1561,7 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
             <>
               <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink, marginTop: spacing.md }}>Ledger Timeline Log</Text>
               {ledger.slice(0, 10).map(entry => {
-                const isDeduction = entry.transaction_type === 'SITE_ISSUE' || entry.transaction_type === 'WASTAGE' || entry.transaction_type === 'SCRAP';
+                const isDeduction = entry.transaction_type === 'used' || entry.transaction_type === 'wastage' || entry.transaction_type === 'scrap' || entry.transaction_type === 'transfer';
                 return (
                   <Card key={entry.id} style={{ padding: spacing.md, borderLeftWidth: 3, borderLeftColor: isDeduction ? colors.error : colors.success }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -1468,17 +1606,17 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
                 onValueChange={(val) => setTxType(val as any)}
                 style={{ backgroundColor: '#FAF9F6', borderRadius: 8 }}
               >
-                <Picker.Item label="OPENING" value="OPENING" />
-                <Picker.Item label="PURCHASE RECEIVED" value="PURCHASE_RECEIVED" />
-                <Picker.Item label="SITE ISSUE" value="SITE_ISSUE" />
-                <Picker.Item label="RETURN" value="RETURN" />
-                <Picker.Item label="TRANSFER" value="TRANSFER" />
-                <Picker.Item label="ADJUSTMENT" value="ADJUSTMENT" />
-                <Picker.Item label="WASTAGE" value="WASTAGE" />
-                <Picker.Item label="SCRAP" value="SCRAP" />
+                <Picker.Item label="Opening Stock" value="opening" />
+                <Picker.Item label="Purchase Received" value="received" />
+                <Picker.Item label="Site Issue (Used)" value="used" />
+                <Picker.Item label="Return to Supplier" value="return" />
+                <Picker.Item label="Transfer to Site" value="transfer" />
+                <Picker.Item label="Inventory Adjustment" value="adjustment" />
+                <Picker.Item label="Wastage" value="wastage" />
+                <Picker.Item label="Scrap" value="scrap" />
               </Picker>
 
-              {txType === 'PURCHASE_RECEIVED' && (
+              {txType === 'received' && (
                 <>
                   <Text style={{ fontSize: 13, fontFamily: fontFamily.semiBold, color: colors.neutral[700] }}>Supplier</Text>
                   <Picker
@@ -2966,7 +3104,7 @@ function ProcurementTab({ projectId, companyId }: { projectId: string; companyId
                         <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 6, padding: 4, backgroundColor: '#fff', fontSize: 11 }} value={item.batch_number} onChangeText={(val) => {
                           const updated = [...grnItems];
                           updated[idx].batch_number = val;
-                          setGrnItems(updated);
+                  setGrnItems(updated);
                         }} />
                       </View>
                       <View style={{ flex: 1 }}>
@@ -2999,42 +3137,62 @@ function FacadeMapTab({ projectId }: { projectId: string }) {
   const { data: boqItems = [] } = useProjectBOQ(projectId);
   
   const [zones, setZones] = useState<any[]>([
-    { id: '1', label: 'L5-North-01', status: 'completed', floor: 'Level 5', elevation: 'North', points: [{x: 0.1, y: 0.1}, {x: 0.3, y: 0.1}, {x: 0.3, y: 0.3}, {x: 0.1, y: 0.3}], boq_names: ['12mm Glass', 'Aluminium Mullions'] },
-    { id: '2', label: 'L5-North-02', status: 'in_progress', floor: 'Level 5', elevation: 'North', points: [{x: 0.4, y: 0.1}, {x: 0.6, y: 0.1}, {x: 0.6, y: 0.3}, {x: 0.4, y: 0.3}], boq_names: ['10mm Glass', 'Silicon Sealant'] },
-    { id: '3', label: 'L6-North-01', status: 'not_started', floor: 'Level 6', elevation: 'North', points: [{x: 0.1, y: 0.4}, {x: 0.3, y: 0.4}, {x: 0.3, y: 0.6}, {x: 0.1, y: 0.6}], boq_names: ['Transoms', 'Brackets'] },
+    { id: '1', label: 'L5-North-01', status: 'completed', floor: 'Level 5', elevation: 'North', points: [{x: 0.1, y: 0.1}, {x: 0.35, y: 0.1}, {x: 0.35, y: 0.35}, {x: 0.1, y: 0.35}], boq_names: ['12mm Glass', 'Aluminium Mullions'] },
+    { id: '2', label: 'L5-North-02', status: 'in_progress', floor: 'Level 5', elevation: 'North', points: [{x: 0.4, y: 0.1}, {x: 0.65, y: 0.1}, {x: 0.65, y: 0.35}, {x: 0.4, y: 0.35}], boq_names: ['10mm Glass', 'Silicon Sealant'] },
+    { id: '3', label: 'L6-North-01', status: 'not_started', floor: 'Level 6', elevation: 'North', points: [{x: 0.1, y: 0.45}, {x: 0.35, y: 0.45}, {x: 0.35, y: 0.7}, {x: 0.1, y: 0.7}], boq_names: ['Transoms', 'Brackets'] },
   ]);
 
   const [showAddZone, setShowAddZone] = useState(false);
   const [newLabel, setNewLabel] = useState('');
-  const [newFloor, setNewFloor] = useState('');
-  const [newElevation, setNewElevation] = useState('');
+  const [newFloor, setNewFloor] = useState('Level 1');
+  const [newElevation, setNewElevation] = useState('North Facade');
   const [selectedBOQItems, setSelectedBOQItems] = useState<string[]>([]);
   const [drawPoints, setDrawPoints] = useState<{ x: number; y: number }[]>([]);
+  const [canvasLayout, setCanvasLayout] = useState<{ width: number; height: number }>({ width: 320, height: 180 });
 
   const handleDrawTap = (x: number, y: number) => {
     setDrawPoints([...drawPoints, { x, y }]);
   };
 
+  const handleQuickPresetZone = (gridCol: number, gridRow: number) => {
+    const startX = 0.05 + gridCol * 0.28;
+    const startY = 0.08 + gridRow * 0.26;
+    const width = 0.24;
+    const height = 0.22;
+
+    const presetPoints = [
+      { x: startX, y: startY },
+      { x: startX + width, y: startY },
+      { x: startX + width, y: startY + height },
+      { x: startX, y: startY + height },
+    ];
+    setDrawPoints(presetPoints);
+  };
+
   const handleSaveZone = () => {
-    if (!newLabel || drawPoints.length < 3) {
-      alert('Please enter a label and tap at least 3 points to define the polygon shape.');
+    if (!newLabel) {
+      alert('Please enter a zone label (e.g. L5-North-03).');
+      return;
+    }
+    if (drawPoints.length < 3) {
+      alert('Please tap at least 3 points on the blueprint canvas or use Quick Box Preset.');
       return;
     }
     const selectedNames = selectedBOQItems.map(id => boqItems.find(b => b.id === id)?.item_name || 'Item');
     const newZone = {
-      id: String(zones.length + 1),
+      id: String(Date.now()),
       label: newLabel,
       floor: newFloor || 'Level 1',
-      elevation: newElevation || 'North',
+      elevation: newElevation || 'North Facade',
       status: 'not_started',
       points: drawPoints,
-      boq_names: selectedNames,
+      boq_names: selectedNames.length ? selectedNames : ['Glass Panel', 'Frame'],
     };
     setZones([...zones, newZone]);
     setShowAddZone(false);
     setNewLabel('');
-    setNewFloor('');
-    setNewElevation('');
+    setNewFloor('Level 1');
+    setNewElevation('North Facade');
     setDrawPoints([]);
     setSelectedBOQItems([]);
   };
@@ -3047,12 +3205,21 @@ function FacadeMapTab({ projectId }: { projectId: string }) {
 
   return (
     <>
+      <Card variant="flat" padding={spacing.md} style={{ marginBottom: spacing.md, backgroundColor: '#FAF6EF', borderColor: 'rgba(139,104,64,0.2)' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 4 }}>
+          <Ionicons name="information-circle" size={20} color="#695030" />
+          <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: '#695030' }}>What is Elevation Mapping?</Text>
+        </View>
+        <Text style={{ fontSize: 11, color: colors.neutral[600], lineHeight: 16 }}>
+          Elevation Zones divide facade building faces (North, South, East, West) into visual grid panels. Use this map to track panel installation status (Red = Pending, Amber = In Progress, Green = Done) and link exact BOQ materials to specific building coordinates.
+        </Text>
+      </Card>
+
       <SectionHeader title="Interactive Elevation Progress Map" />
 
-      {/* Blueprint Canvas */}
-      <View style={{ backgroundColor: '#1E293B', borderRadius: 8, height: 260, position: 'relative', overflow: 'hidden', padding: 8, borderWidth: 1, borderColor: '#334155' }}>
-        <Text style={{ color: '#94A3B8', fontSize: 10, fontFamily: fontFamily.bold, marginBottom: 4 }}>ELEVATION MAP DRAWING OVERVIEW</Text>
-        <View style={{ position: 'absolute', top: 50, left: 20, right: 20, bottom: 20, borderStyle: 'dashed', borderWidth: 1, borderColor: '#475569', opacity: 0.4 }} />
+      <View style={{ backgroundColor: '#0F172A', borderRadius: 12, height: 260, position: 'relative', overflow: 'hidden', padding: 8, borderWidth: 1.5, borderColor: '#334155' }}>
+        <Text style={{ color: '#94A3B8', fontSize: 10, fontFamily: fontFamily.bold, marginBottom: 4 }}>BUILDING ELEVATION INTERACTIVE MAP</Text>
+        <View style={{ position: 'absolute', top: 40, left: 16, right: 16, bottom: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: '#334155', opacity: 0.5 }} />
 
         {zones.map((z) => {
           const xs = z.points.map((p: any) => p.x);
@@ -3068,82 +3235,129 @@ function FacadeMapTab({ projectId }: { projectId: string }) {
               style={{
                 position: 'absolute',
                 left: `${minX}%`,
-                top: `${minY + 20}%`,
-                width: `${width}%`,
-                height: `${height}%`,
+                top: `${minY}%`,
+                width: `${Math.max(12, width)}%`,
+                height: `${Math.max(12, height)}%`,
                 backgroundColor: getStatusColor(z.status),
-                opacity: 0.6,
-                borderWidth: 2,
-                borderColor: '#fff',
+                opacity: 0.75,
+                borderRadius: 6,
+                borderWidth: 1.5,
+                borderColor: '#FFFFFF',
                 justifyContent: 'center',
                 alignItems: 'center',
-              }}
+                boxShadow: '0px 2px 8px rgba(0,0,0,0.3)',
+              } as any}
               onPress={() => {
-                alert(`Zone Details:\nLabel: ${z.label}\nFloor: ${z.floor}\nElevation: ${z.elevation}\nLinked Items: ${z.boq_names.join(', ')}\nStatus: ${z.status}`);
+                alert(`Zone Details:\nLabel: ${z.label}\nFloor: ${z.floor}\nElevation: ${z.elevation}\nLinked BOQ Items: ${z.boq_names.join(', ')}\nStatus: ${z.status.toUpperCase()}`);
               }}
             >
-              <Text style={{ color: '#fff', fontSize: 9, fontFamily: fontFamily.bold, textAlign: 'center' }}>{z.label}</Text>
+              <Text style={{ color: '#fff', fontSize: 10, fontFamily: fontFamily.bold, textAlign: 'center' }}>{z.label}</Text>
             </TouchableOpacity>
           );
         })}
-
-        {showAddZone && drawPoints.map((pt, idx) => (
-          <View key={idx} style={{ position: 'absolute', left: `${pt.x * 100}%`, top: `${pt.y * 100}%`, width: 8, height: 8, borderRadius: 4, backgroundColor: '#3B82F6', transform: [{ translateX: -4 }, { translateY: -4 }] }} />
-        ))}
       </View>
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md }}>
-        <Text style={{ fontSize: 13, fontFamily: fontFamily.bold }}>Elevation Zones Register</Text>
-        <TouchableOpacity onPress={() => setShowAddZone(true)} style={{ backgroundColor: '#7E6144', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}>
-          <Text style={{ color: '#fff', fontSize: 11, fontFamily: fontFamily.bold }}>+ Draw Zone</Text>
+        <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink }}>Elevation Zones Register ({zones.length})</Text>
+        <TouchableOpacity onPress={() => setShowAddZone(true)} style={{ backgroundColor: '#695030', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="add-circle" size={16} color="#fff" />
+          <Text style={{ color: '#fff', fontSize: 12, fontFamily: fontFamily.bold }}>+ Draw Zone</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ marginTop: spacing.sm, maxHeight: 300 }}>
+      <ScrollView style={{ marginTop: spacing.sm, maxHeight: 260 }}>
         {zones.map((z) => (
-          <Card key={z.id} style={{ padding: spacing.sm, marginBottom: spacing.xs, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFFDF9' }}>
+          <Card key={z.id} style={{ padding: spacing.md, marginBottom: spacing.xs, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }} variant="flat">
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 12, fontFamily: fontFamily.bold }}>{z.label} ({z.floor} • {z.elevation})</Text>
-              <Text style={{ fontSize: 11, color: colors.neutral[500], marginTop: 2 }}>BOQs: {z.boq_names.join(', ')}</Text>
+              <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink }}>{z.label} ({z.floor} • {z.elevation})</Text>
+              <Text style={{ fontSize: 11, color: colors.neutral[500], marginTop: 2 }}>Linked Materials: {z.boq_names.join(', ')}</Text>
             </View>
-            <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: getStatusColor(z.status) }}>
-              <Text style={{ color: '#fff', fontSize: 9, fontFamily: fontFamily.bold }}>{z.status.toUpperCase()}</Text>
+            <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, backgroundColor: getStatusColor(z.status) }}>
+              <Text style={{ color: '#fff', fontSize: 10, fontFamily: fontFamily.bold }}>{z.status.toUpperCase()}</Text>
             </View>
           </Card>
         ))}
       </ScrollView>
 
       <Modal visible={showAddZone} animationType="slide">
-        <ScrollView style={{ backgroundColor: '#FAF9F6' }} contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100 }}>
-          <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: spacing.md }}>Draw Elevation Zone</Text>
-          <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 4 }}>Tap on the canvas below to set at least 3 points of your zone polygon.</Text>
+        <ScrollView style={{ backgroundColor: '#FAF8F5' }} contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+            <Text style={{ fontSize: 20, fontFamily: fontFamily.bold, color: colors.ink }}>Draw Elevation Zone</Text>
+            <TouchableOpacity onPress={() => setShowAddZone(false)} style={{ padding: 6 }}>
+              <Ionicons name="close" size={24} color={colors.ink} />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={{ fontSize: 12, color: colors.neutral[600], marginBottom: spacing.sm }}>
+            Tap 3 or more points on the blueprint canvas to draw custom zone coordinates, OR pick a quick preset box:
+          </Text>
+
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: spacing.md }}>
+            <TouchableOpacity onPress={() => handleQuickPresetZone(0, 0)} style={{ backgroundColor: '#695030', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}>
+              <Text style={{ color: '#fff', fontSize: 11, fontFamily: fontFamily.medium }}>Grid Box A1</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleQuickPresetZone(1, 0)} style={{ backgroundColor: '#695030', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}>
+              <Text style={{ color: '#fff', fontSize: 11, fontFamily: fontFamily.medium }}>Grid Box B1</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleQuickPresetZone(0, 1)} style={{ backgroundColor: '#695030', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}>
+              <Text style={{ color: '#fff', fontSize: 11, fontFamily: fontFamily.medium }}>Grid Box A2</Text>
+            </TouchableOpacity>
+            {drawPoints.length > 0 && (
+              <TouchableOpacity onPress={() => setDrawPoints([])} style={{ backgroundColor: '#EF4444', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}>
+                <Text style={{ color: '#fff', fontSize: 11, fontFamily: fontFamily.medium }}>Clear Points</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           
           <TouchableOpacity
             activeOpacity={1}
+            onLayout={(e) => {
+              const { width, height } = e.nativeEvent.layout;
+              if (width > 0 && height > 0) setCanvasLayout({ width, height });
+            }}
             onPress={(e) => {
               const { locationX, locationY } = e.nativeEvent;
-              const x = Math.min(1, Math.max(0, locationX / 300));
-              const y = Math.min(1, Math.max(0, locationY / 180));
+              const x = Math.min(1, Math.max(0, locationX / canvasLayout.width));
+              const y = Math.min(1, Math.max(0, locationY / canvasLayout.height));
               handleDrawTap(x, y);
             }}
-            style={{ width: '100%', height: 180, backgroundColor: '#1E293B', borderRadius: 8, position: 'relative', overflow: 'hidden', borderWidth: 1, borderColor: '#334155' }}
+            style={{ width: '100%', height: 200, backgroundColor: '#0F172A', borderRadius: 12, position: 'relative', overflow: 'hidden', borderWidth: 1.5, borderColor: '#334155' }}
           >
             {drawPoints.map((pt, idx) => (
-              <View key={idx} style={{ position: 'absolute', left: `${pt.x * 100}%`, top: `${pt.y * 100}%`, width: 8, height: 8, borderRadius: 4, backgroundColor: '#3B82F6', transform: [{ translateX: -4 }, { translateY: -4 }] }} />
+              <View 
+                key={idx} 
+                style={{ 
+                  position: 'absolute', 
+                  left: `${pt.x * 100}%`, 
+                  top: `${pt.y * 100}%`, 
+                  width: 12, 
+                  height: 12, 
+                  borderRadius: 6, 
+                  backgroundColor: '#3B82F6', 
+                  borderWidth: 2,
+                  borderColor: '#FFFFFF',
+                  transform: [{ translateX: -6 }, { translateY: -6 }],
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }} 
+              />
             ))}
-            <Text style={{ color: '#94A3B8', fontSize: 10, padding: 8 }}>TAP CANVAS TO PLOT COORDINATES ({drawPoints.length} points set)</Text>
+            
+            <Text style={{ color: '#94A3B8', fontSize: 10, padding: 8, fontFamily: fontFamily.bold }}>
+              BLUEPRINT CANVAS ({drawPoints.length} points plotted) {drawPoints.length >= 3 ? '✓ Polygon Ready' : ''}
+            </Text>
           </TouchableOpacity>
 
-          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginTop: spacing.md, marginBottom: 4 }}>Zone Label *</Text>
-          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 10, backgroundColor: '#fff', marginBottom: spacing.sm }} value={newLabel} onChangeText={setNewLabel} placeholder="L5-North-03" />
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginTop: spacing.lg, marginBottom: 4 }}>Zone Label *</Text>
+          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 10, padding: 12, backgroundColor: '#fff', marginBottom: spacing.sm, fontSize: 14 }} value={newLabel} onChangeText={setNewLabel} placeholder="L5-North-03" />
 
           <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Floor / Level</Text>
-          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 10, backgroundColor: '#fff', marginBottom: spacing.sm }} value={newFloor} onChangeText={setNewFloor} placeholder="Level 5" />
+          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 10, padding: 12, backgroundColor: '#fff', marginBottom: spacing.sm, fontSize: 14 }} value={newFloor} onChangeText={setNewFloor} placeholder="Level 5" />
 
           <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Elevation Orientation</Text>
-          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 8, padding: 10, backgroundColor: '#fff', marginBottom: spacing.sm }} value={newElevation} onChangeText={setNewElevation} placeholder="North Facade" />
+          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 10, padding: 12, backgroundColor: '#fff', marginBottom: spacing.md, fontSize: 14 }} value={newElevation} onChangeText={setNewElevation} placeholder="North Facade" />
 
-          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginTop: spacing.sm, marginBottom: 4 }}>Link BOQ Materials</Text>
+          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 6 }}>Link BOQ Materials</Text>
           {boqItems.map(item => {
             const isSelected = selectedBOQItems.includes(item.id);
             return (
@@ -3158,10 +3372,10 @@ function FacadeMapTab({ projectId }: { projectId: string }) {
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}
               >
-                <View style={{ width: 18, height: 18, borderWidth: 1, borderColor: colors.primary, borderRadius: 4, backgroundColor: isSelected ? colors.primary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                <View style={{ width: 18, height: 18, borderWidth: 1.5, borderColor: '#695030', borderRadius: 4, backgroundColor: isSelected ? '#695030' : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
                   {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
                 </View>
-                <Text style={{ fontSize: 12, color: colors.neutral[800] }}>{item.item_name} ({item.quantity} {item.unit})</Text>
+                <Text style={{ fontSize: 13, color: colors.ink }}>{item.item_name} ({item.unit})</Text>
               </TouchableOpacity>
             );
           })}
@@ -3300,7 +3514,7 @@ export default function ProjectWorkspaceScreen() {
           <PhotosTab dprs={dprs} />
         )}
         {tab === 'Documents' && (
-          <DocumentsTab documents={documents} />
+          <DocumentsTab documents={documents} projectId={id} />
         )}
         {tab === 'Materials' && (
           <MaterialsTab materialReqs={materialReqs} projectId={id} currentUserId={currentUserId} />

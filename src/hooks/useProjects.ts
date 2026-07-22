@@ -39,3 +39,20 @@ export function useUpdateProject() {
     onSuccess: () => client.invalidateQueries({ queryKey: ['projects'] }),
   });
 }
+
+/** Admin deletion of a project via server-side cascade (handles all FK levels atomically). */
+export function useDeleteProject() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (projectId: string) => {
+      const { error } = await supabase.rpc('delete_project_cascade', {
+        p_project_id: projectId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
+}
+

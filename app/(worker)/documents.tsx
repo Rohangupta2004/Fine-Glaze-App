@@ -19,6 +19,7 @@ import { spacing, radius } from '../../src/theme/spacing';
 import type { DocumentCategory } from '../../src/types';
 
 const CATEGORY_ICON: Record<DocumentCategory, React.ComponentProps<typeof Ionicons>['name']> = {
+  cad_drawings: 'cube-outline',
   drawings: 'document-outline',
   boq: 'list-outline',
   work_orders: 'clipboard-outline',
@@ -32,6 +33,7 @@ const CATEGORY_ICON: Record<DocumentCategory, React.ComponentProps<typeof Ionico
 };
 
 const CATEGORY_LABEL: Record<DocumentCategory, string> = {
+  cad_drawings: 'CAD & 3D',
   drawings: 'Drawings',
   boq: 'BOQ',
   work_orders: 'Work Orders',

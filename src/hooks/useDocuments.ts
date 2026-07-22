@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { createSignedMediaUrl } from '../lib/mediaStorage';
 import type { DocumentRow, DocumentVersion } from '../types';
@@ -49,6 +49,20 @@ export function useAllDocuments() {
       const { data, error } = await supabase.from('documents').select('*').in('owner_type', ['company', 'project']).order('created_at', { ascending: false });
       if (error) throw error;
       return data as DocumentRow[];
+    },
+  });
+}
+
+/** Admin deletion of a document record. */
+export function useDeleteDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (documentId: string) => {
+      const { error } = await supabase.from('documents').delete().eq('id', documentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
     },
   });
 }

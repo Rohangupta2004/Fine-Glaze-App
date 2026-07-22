@@ -13,9 +13,8 @@ export interface DprTimelineEntry {
 }
 
 /**
- * Approved DPRs with their media for a given project — client media timeline.
- * Only returns DPRs with status='approved' that have at least one media item.
- * Media items include pre-resolved signed URLs for private storage.
+ * DPR site updates timeline for a given project — client & project media timeline.
+ * Fetches submitted & approved DPRs for the project and pre-resolves signed URLs for private storage.
  */
 export function useDprTimeline(projectId: string | null | undefined) {
   return useQuery({
@@ -23,12 +22,12 @@ export function useDprTimeline(projectId: string | null | undefined) {
     queryFn: async (): Promise<DprTimelineEntry[]> => {
       if (!projectId) return [];
 
-      // Fetch approved DPRs for the project
+      // Fetch DPRs for the project (both submitted & approved)
       const { data: dprs, error: dprErr } = await supabase
         .from('dprs')
         .select('*')
         .eq('project_id', projectId)
-        .eq('status', 'approved')
+        .in('status', ['approved', 'submitted'])
         .order('date', { ascending: false });
 
       if (dprErr) throw dprErr;
@@ -60,10 +59,10 @@ export function useDprTimeline(projectId: string | null | undefined) {
         mediaByDpr.set(m.dpr_id, arr);
       }
 
-      // Only include DPRs that have media
+      // Include all DPR entries that have either media OR work done notes
       return (dprs as Dpr[])
         .map((dpr) => ({ dpr, media: mediaByDpr.get(dpr.id) ?? [] }))
-        .filter((entry) => entry.media.length > 0);
+        .filter((entry) => entry.media.length > 0 || Boolean(entry.dpr.work_done));
     },
     enabled: !!projectId,
   });
@@ -71,7 +70,6 @@ export function useDprTimeline(projectId: string | null | undefined) {
 
 /**
  * Get a signed URL for a DPR media storage path.
- * Use this for one-off resolution outside the timeline hook.
  */
 export async function getDprMediaSignedUrl(storagePath: string): Promise<string> {
   return getSignedUrl('dpr-media', storagePath);
@@ -79,8 +77,6 @@ export async function getDprMediaSignedUrl(storagePath: string): Promise<string>
 
 /**
  * @deprecated Use getDprMediaSignedUrl (async) or SignedImage component instead.
- * Kept temporarily for backwards compatibility — returns broken public URL
- * since the bucket is now private.
  */
 export function getDprMediaUrl(storagePath: string): string {
   console.warn(

@@ -68,7 +68,7 @@ const SECTIONS: { title: string; items: MenuItem[]; gradient: string[] }[] = [
       { icon: 'language', label: 'Language', route: '/(admin)/language-settings', color: '#059669' },
       { icon: 'cloud-download', label: 'Backup & Restore', route: '/(admin)/backup-restore', color: '#7C3AED' },
       { icon: 'help-circle', label: 'Help & Support', route: '/(admin)/help-about', color: '#6B7280' },
-      { icon: 'information-circle', label: 'About Fine Glaze COS', route: '/(admin)/help-about', color: '#695030' },
+      { icon: 'information-circle', label: 'About Fine Glaze', route: '/(admin)/help-about', color: '#695030' },
     ],
   },
 ];
@@ -116,16 +116,20 @@ export default function AdminMoreScreen() {
               <LinearGradient colors={section.gradient as any} style={styles.sectionDot} />
               <Text style={styles.sectionTitle}>{section.title}</Text>
             </View>
-            <View style={styles.menuList}>
+
+            <Card variant="elevated" padding={0} style={styles.sectionGroupCard}>
               {section.items.map((item, idx) => (
                 <TouchableOpacity
                   key={item.label}
-                  style={styles.menuItemCard}
+                  style={[
+                    styles.menuRow,
+                    idx < section.items.length - 1 && styles.menuRowDivider,
+                  ]}
                   onPress={() => router.push(item.route as any)}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.menuIconWrap, { backgroundColor: (item.color || colors.primary) + '18' }]}>
-                    <Ionicons name={item.icon as any} size={18} color={item.color || colors.primary} />
+                  <View style={styles.menuIconWrap}>
+                    <Ionicons name={item.icon as any} size={18} color="#695030" />
                   </View>
                   <Text style={styles.menuLabel}>{item.label}</Text>
                   {item.badge && item.badge > 0 && (
@@ -133,27 +137,35 @@ export default function AdminMoreScreen() {
                       <Text style={styles.badgeText}>{item.badge}</Text>
                     </View>
                   )}
-                  <Ionicons name="chevron-forward" size={15} color={colors.neutral[300]} />
+                  <Ionicons name="chevron-forward" size={16} color={colors.neutral[300]} />
                 </TouchableOpacity>
               ))}
-            </View>
+            </Card>
           </View>
         ))}
 
-        {/* Logout */}
-        <TouchableOpacity
-          style={styles.logoutBtn}
-          activeOpacity={0.8}
+        {/* Executive Logout Card */}
+        <Card 
           onPress={() => {
             signOut();
             router.replace('/(auth)/welcome');
           }}
+          variant="flat"
+          padding={0}
+          style={styles.logoutCard}
+          gradientColors={['#FFFFFF', '#FFF8F8']}
         >
-          <LinearGradient colors={['#FEE2E2', '#FECACA']} style={styles.logoutGrad}>
-            <Ionicons name="log-out-outline" size={18} color={colors.error} />
-            <Text style={styles.logoutText}>Log Out</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+          <View style={styles.logoutRow}>
+            <View style={styles.logoutIconBadge}>
+              <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+            </View>
+            <View style={styles.logoutTextWrap}>
+              <Text style={styles.logoutTitle}>Log Out</Text>
+              <Text style={styles.logoutSub}>Sign out of your account</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="rgba(220, 38, 38, 0.4)" />
+          </View>
+        </Card>
       </View>
     </ScrollView>
   );
@@ -180,27 +192,60 @@ const styles = StyleSheet.create({
   sectionDot: { width: 14, height: 14, borderRadius: 4 },
   sectionTitle: { fontSize: 11, fontFamily: fontFamily.bold, color: colors.neutral[500], textTransform: 'uppercase', letterSpacing: 1 },
 
-  // Menu List
-  menuList: { gap: spacing.sm },
-  menuItemCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(105,80,48,0.08)',
-    boxShadow: '0px 2px 10px rgba(105,80,48,0.05)',
+  // Grouped Section Card
+  sectionGroupCard: { overflow: 'hidden', borderRadius: 20 },
+  menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: spacing.lg,
     gap: spacing.md,
+  },
+  menuRowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(105, 80, 48, 0.08)',
+  },
+  menuIconWrap: { 
+    width: 36, 
+    height: 36, 
+    borderRadius: 10, 
+    backgroundColor: '#FAF4E8', 
+    borderWidth: 1, 
+    borderColor: 'rgba(139, 104, 64, 0.18)', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
   } as any,
-  menuIconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   menuLabel: { flex: 1, fontSize: 14, fontFamily: fontFamily.medium, color: '#1E1815' },
   badge: { backgroundColor: colors.error, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
   badgeText: { fontSize: 10, color: '#fff', fontFamily: fontFamily.bold },
 
-  // Logout
-  logoutBtn: { marginTop: spacing.md, marginBottom: spacing.lg, borderRadius: 16, overflow: 'hidden' },
-  logoutGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.lg, borderRadius: 16 },
-  logoutText: { fontSize: 15, fontFamily: fontFamily.semiBold, color: colors.error },
+  // Executive Logout Card
+  logoutCard: {
+    marginTop: spacing.md,
+    marginBottom: spacing['2xl'],
+    borderRadius: 20,
+    borderWidth: 1.2,
+    borderColor: 'rgba(220, 38, 38, 0.18)',
+    boxShadow: '0px 4px 16px rgba(220, 38, 38, 0.06)',
+  } as any,
+  logoutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+  },
+  logoutIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(220, 38, 38, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(220, 38, 38, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutTextWrap: { flex: 1 },
+  logoutTitle: { fontSize: 15, fontFamily: fontFamily.bold, color: '#DC2626' },
+  logoutSub: { fontSize: 11, fontFamily: fontFamily.regular, color: colors.neutral[400], marginTop: 1 },
 });

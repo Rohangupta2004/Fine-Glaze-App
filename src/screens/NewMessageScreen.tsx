@@ -63,6 +63,9 @@ export function NewMessageScreen({ conversationRoute }: NewMessageScreenProps) {
     const employees = filtered.filter((c) => c.role === 'worker');
     if (employees.length) groups.push({ title: 'Employees', data: employees });
 
+    const clients = filtered.filter((c) => c.role === 'client');
+    if (clients.length) groups.push({ title: 'Clients', data: clients });
+
     return groups;
   }, [filtered]);
 

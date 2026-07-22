@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     padding: spacing.lg,
-    paddingBottom: spacing['6xl'],
+    paddingBottom: 140,
   },
   formCard: {
     backgroundColor: '#FFFFFF',
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
   },
   list: {
     padding: spacing.lg,
-    paddingBottom: spacing['6xl'],
+    paddingBottom: 140,
   },
   dprCard: { 
     marginBottom: spacing.md, 

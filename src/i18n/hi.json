@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "फाइन ग्लेज़ COS",
+    "appName": "फाइन ग्लेज़",
     "loading": "लोड हो रहा है...",
     "save": "सेव करें",
     "cancel": "रद्द करें",
@@ -19,7 +19,7 @@
     "syncPending": "{{count}} आइटम सिंक होने बाकी"
   },
   "auth": {
-    "welcome": "फाइन ग्लेज़ COS में आपका स्वागत है",
+    "welcome": "फाइन ग्लेज़ में आपका स्वागत है",
     "welcomeSubtitle": "कंस्ट्रक्शन ऑपरेटिंग सिस्टम",
     "login": "लॉग इन",
     "phoneNumber": "फ़ोन नंबर",
@@ -36,7 +36,7 @@
     "enterPassword": "पासवर्ड दर्ज करें",
     "resetPin": "PIN रीसेट करें",
     "permissionsTitle": "ऐप अनुमतियां",
-    "permissionsSubtitle": "फाइन ग्लेज़ COS को सही से काम करने के लिए इनकी जरूरत है",
+    "permissionsSubtitle": "फाइन ग्लेज़ को सही से काम करने के लिए इनकी जरूरत है",
     "permLocation": "लोकेशन एक्सेस",
     "permLocationDesc": "साइट अटेंडेंस वेरिफाई करने के लिए",
     "permCamera": "कैमरा एक्सेस",
@@ -83,9 +83,14 @@
     "safetyChecklist": "सुरक्षा चेकलिस्ट",
     "profile": "प्रोफ़ाइल",
     "salary": "वेतन",
+    "messages": "मैसेज",
     "more": "और"
   },
   "supervisor": {
+    "home": "होम",
+    "tasks": "टास्क",
+    "messages": "मैसेज",
+    "more": "और",
     "teamAttendance": "टीम हाज़िरी",
     "presentToday": "आज उपस्थित",
     "assignTask": "टास्क सौंपें",
@@ -96,14 +101,17 @@
     "requestMaterial": "सामग्री अनुरोध"
   },
   "admin": {
+    "home": "होम",
     "dashboard": "डैशबोर्ड",
     "projects": "प्रोजेक्ट",
     "employees": "कर्मचारी",
     "clients": "क्लाइंट",
     "approvals": "अप्रूवल",
     "chat": "चैट",
+    "messages": "मैसेज",
     "notifications": "नोटिफिकेशन",
     "settings": "सेटिंग्स",
+    "more": "और",
     "addEmployee": "कर्मचारी जोड़ें",
     "addProject": "नया प्रोजेक्ट",
     "muster": "मस्टर और वेतन",
@@ -113,10 +121,12 @@
     "quickActions": "त्वरित कार्य"
   },
   "client": {
+    "home": "डैशबोर्ड",
     "dashboard": "डैशबोर्ड",
     "updates": "अपडेट",
     "documents": "दस्तावेज़",
     "payments": "भुगतान",
+    "more": "और",
     "progress": "प्रगति",
     "photoTimeline": "फोटो टाइमलाइन",
     "approvals": "अप्रूवल",

@@ -6,8 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  ImageBackground,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -24,8 +24,8 @@ import { usePendingDprs, usePendingLeave, usePendingMaterialRequests } from '../
 import { useUnreadCount, useNotifications } from '../../src/hooks/useNotifications';
 import { useMyTasks } from '../../src/hooks/useTasks';
 import { colors } from '../../src/theme/colors';
-import { typography, fontFamily } from '../../src/theme/typography';
-import { spacing, radius } from '../../src/theme/spacing';
+import { fontFamily } from '../../src/theme/typography';
+import { spacing } from '../../src/theme/spacing';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../src/lib/supabase';
 
@@ -38,6 +38,7 @@ function getGreeting(): string {
 
 export default function AdminHomeScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const router = useRouter();
   const { t } = useTranslation();
   const profile = useAuthStore((s) => s.profile);
@@ -54,12 +55,6 @@ export default function AdminHomeScreen() {
 
   const activeProjects = (projects || []).filter((p) => p.status !== 'completed');
   const activeEmployees = (employees || []).filter((e) => e.status === 'active');
-  const totalPending = (pendingDprs?.length || 0) + (pendingLeave?.length || 0) + (pendingMaterials?.length || 0);
-  
-  // Count tasks assigned to the admin that are not completed
-  const pendingTasks = (myTasks || []).filter(t => t.status !== 'done').length;
-
-  const importantCount = (notifications || []).filter((n) => n.important && !n.read_at).length;
 
   const todayStr = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const { data: attendanceToday, refetch: rAttendance } = useQuery({
@@ -73,10 +68,6 @@ export default function AdminHomeScreen() {
       return data || [];
     }
   });
-
-  const attendanceAlertsCount = (attendanceToday || []).filter(
-    (a: any) => a.location_verified === false || a.status === 'absent'
-  ).length;
 
   const { data: dprTrend, refetch: rDprTrend } = useQuery({
     queryKey: ['admin-dpr-trend'],
@@ -123,38 +114,108 @@ export default function AdminHomeScreen() {
       >
         <View style={[styles.hero, { paddingTop: insets.top + spacing.xl }]}>
           <View style={styles.heroTop}>
-            <View style={styles.heroLeft}>
-            <Text style={styles.greeting}>{getGreeting()} 👋</Text>
-            <Text style={styles.heroName}>{firstName}</Text>
-            <Text style={styles.heroDate}>
-              {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: spacing.md }}>
+              <View style={styles.brandLogoFrame}>
+                <Image 
+                  source={require('../../assets/images/logo.png')} 
+                  style={styles.brandLogoImage} 
+                  resizeMode="contain" 
+                />
+              </View>
+              <View style={styles.heroLeft}>
+                <Text style={styles.greeting}>{getGreeting()} 👋</Text>
+                <Text style={styles.heroName}>{firstName}</Text>
+                <Text style={styles.heroDate}>
+                  {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.heroActions}>
+              <TouchableOpacity onPress={() => router.push('/(admin)/notifications' as any)} style={styles.heroBtn}>
+                <Ionicons name="notifications-outline" size={20} color="#1E1815" />
+                {(unreadCount || 0) > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{unreadCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/(admin)/global-search' as any)} style={styles.heroBtn}>
+                <Ionicons name="search" size={20} color="#1E1815" />
+              </TouchableOpacity>
+            </View>
           </View>
-          <View style={styles.heroActions}>
-            <TouchableOpacity onPress={() => router.push('/(admin)/global-search' as any)} style={styles.heroBtn}>
-              <Ionicons name="search" size={20} color="#1E1815" />
-            </TouchableOpacity>
-          </View>
-        </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
-          <TopStatCard 
-            title="Notifications" 
-            value={unreadCount || 0} 
-            icon="notifications" 
-            iconColor={(unreadCount || 0) > 0 ? '#D97706' : '#6A4E36'}
-            iconBgColor={(unreadCount || 0) > 0 ? 'rgba(217, 119, 6, 0.12)' : 'rgba(255,255,255,0.8)'}
-            onPress={() => router.push('/(admin)/notifications')} 
-          />
-          <TopStatCard 
-            title="DPR Pending" 
-            value={pendingDprs?.length || 0} 
-            icon="document-text" 
-            iconColor={(pendingDprs?.length || 0) > 0 ? '#2563EB' : '#6A4E36'}
-            iconBgColor={(pendingDprs?.length || 0) > 0 ? 'rgba(37, 99, 235, 0.12)' : 'rgba(255,255,255,0.8)'}
-            onPress={() => router.push('/(admin)/approvals')} 
-          />
-        </ScrollView>
+          {/* Quick Action Chips */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
+            <TouchableOpacity 
+              style={styles.actionChip}
+              onPress={() => router.push('/(admin)/create-project' as any)}
+            >
+              <LinearGradient colors={['#695030', '#8B6840']} style={styles.chipGradient} start={{x:0, y:0}} end={{x:1, y:1}}>
+                <Ionicons name="add-circle" size={16} color="#FFF" />
+                <Text style={styles.actionChipTextPrimary}>+ New Project</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.actionChipSecondary}
+              onPress={() => router.push('/(admin)/add-employee' as any)}
+            >
+              <Ionicons name="person-add-outline" size={15} color="#695030" />
+              <Text style={styles.actionChipTextSecondary}>Add Employee</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.actionChipSecondary}
+              onPress={() => router.push('/(admin)/approvals' as any)}
+            >
+              <Ionicons name="checkmark-done-circle-outline" size={16} color="#695030" />
+              <Text style={styles.actionChipTextSecondary}>DPR Approvals ({pendingDprs?.length || 0})</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.actionChipSecondary}
+              onPress={() => router.push('/(admin)/materials' as any)}
+            >
+              <Ionicons name="cube-outline" size={15} color="#695030" />
+              <Text style={styles.actionChipTextSecondary}>Materials</Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
+            <TopStatCard 
+              title="Active Sites" 
+              value={activeProjects.length} 
+              icon="business" 
+              iconGradient={['#695030', '#8B6840']}
+              cardGradient={['#FFFFFF', '#FAF7F0']}
+              onPress={() => router.push('/(admin)/projects')} 
+            />
+            <TopStatCard 
+              title="Notifications" 
+              value={unreadCount || 0} 
+              icon="notifications" 
+              iconGradient={['#B89047', '#D4AF37']}
+              cardGradient={['#FFFFFF', '#FDFBF7']}
+              onPress={() => router.push('/(admin)/notifications')} 
+            />
+            <TopStatCard 
+              title="DPR Pending" 
+              value={pendingDprs?.length || 0} 
+              icon="document-text" 
+              iconGradient={['#9A7B4F', '#C4A97A']}
+              cardGradient={['#FFFFFF', '#FBF8F2']}
+              onPress={() => router.push('/(admin)/approvals')} 
+            />
+            <TopStatCard 
+              title="Active Team" 
+              value={activeEmployees.length} 
+              icon="people" 
+              iconGradient={['#4A3728', '#695030']}
+              cardGradient={['#FFFFFF', '#FAF6F0']}
+              onPress={() => router.push('/(admin)/employees')} 
+            />
+          </ScrollView>
         </View>
 
       <View style={styles.body}>
@@ -163,14 +224,14 @@ export default function AdminHomeScreen() {
           actionLabel="View detailed" 
           onAction={() => router.push('/(admin)/analytics')} 
         />
-        <Card style={styles.chartCard} padding={spacing.lg} variant="elevated">
+        <Card style={styles.chartCard} padding={spacing.lg} variant="flat" gradientColors={['#FFFFFF', '#FFFFFF']}>
           <Text style={styles.chartTitle}>DPR Submissions (Daily)</Text>
           {dprTrend && (
             <AreaChart 
               data={dprTrend.counts} 
               labels={dprTrend.labels} 
-              width={320} 
-              height={160} 
+              width={Math.max(240, windowWidth - 72)} 
+              height={150} 
               strokeColor="#695030" 
               fillColor="#8B6840" 
             />
@@ -183,6 +244,7 @@ export default function AdminHomeScreen() {
             title="Projects" 
             subtitle="Workspaces & Sites" 
             icon="business" 
+            iconGradient={['#695030', '#8B6840']}
             fullWidth={true}
             onPress={() => router.push('/(admin)/projects')}
           />
@@ -190,30 +252,35 @@ export default function AdminHomeScreen() {
             title="Employees" 
             subtitle="Team & Roles" 
             icon="people" 
+            iconGradient={['#B89047', '#D4AF37']}
             onPress={() => router.push('/(admin)/employees')}
           />
           <ManageCard 
             title="Clients" 
             subtitle="Organisations" 
             icon="folder" 
+            iconGradient={['#9A7B4F', '#C4A97A']}
             onPress={() => router.push('/(admin)/clients')}
           />
           <ManageCard 
             title="Materials" 
             subtitle="Stock & Supplies" 
             icon="cube" 
+            iconGradient={['#4A3728', '#695030']}
             onPress={() => router.push('/(admin)/materials')}
           />
           <ManageCard 
             title="Documents" 
             subtitle="Vault & Uploads" 
             icon="document-text" 
+            iconGradient={['#8B6840', '#B89047']}
             onPress={() => router.push('/(admin)/documents')}
           />
           <ManageCard 
             title="Assign Site" 
             subtitle="Allocate Team & Workers" 
             icon="people-circle" 
+            iconGradient={['#2C2219', '#4A3728']}
             fullWidth={true}
             onPress={() => router.push('/(admin)/assign-site')}
           />
@@ -247,48 +314,80 @@ interface TopStatCardProps {
   value: number | string; 
   title: string; 
   onPress: () => void; 
-  iconColor?: string; 
-  iconBgColor?: string; 
+  iconGradient?: readonly [string, string];
+  cardGradient?: readonly [string, string];
 }
-function TopStatCard({ icon, value, title, onPress, iconColor = '#6A4E36', iconBgColor = 'rgba(255,255,255,0.8)' }: TopStatCardProps) {
+function TopStatCard({ 
+  icon, 
+  value, 
+  title, 
+  onPress, 
+  iconGradient = ['#695030', '#8B6840'],
+  cardGradient = ['#FFFFFF', '#FAF7F0']
+}: TopStatCardProps) {
   return (
     <Card 
       onPress={onPress} 
-      style={[styles.statCard, { width: 130 }]} 
-      padding={spacing.md}
+      style={[styles.statCard, { width: 145 }]} 
       variant="elevated"
+      gradientColors={cardGradient as any}
+      padding={spacing.md}
     >
       <View style={styles.statCardTop}>
-        <View style={[styles.statIconWrap, { backgroundColor: iconBgColor }]}>
-          <Ionicons name={icon as any} size={20} color={iconColor} />
-        </View>
+        <LinearGradient
+          colors={iconGradient as any}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.statIconWrap, { boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.12)' } as any]}
+        >
+          <Ionicons name={icon as any} size={20} color="#FFFFFF" />
+        </LinearGradient>
       </View>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{title}</Text>
+      <Text style={styles.statValue} numberOfLines={1}>{value}</Text>
+      <Text style={styles.statLabel} numberOfLines={1}>{title}</Text>
     </Card>
   );
 }
 
-interface ManageCardProps { icon: string; title: string; subtitle: string; fullWidth?: boolean; onPress: () => void; colors?: [string, string]; }
-function ManageCard({ icon, title, subtitle, fullWidth = false, onPress, colors }: ManageCardProps) {
-  const iconColor = '#6A4E36';
+interface ManageCardProps { 
+  icon: string; 
+  title: string; 
+  subtitle: string; 
+  fullWidth?: boolean; 
+  onPress: () => void; 
+  iconGradient?: readonly [string, string];
+}
+function ManageCard({ 
+  icon, 
+  title, 
+  subtitle, 
+  fullWidth = false, 
+  onPress, 
+  iconGradient = ['#695030', '#8B6840']
+}: ManageCardProps) {
   return (
     <Card 
       onPress={onPress} 
       style={[styles.manageCard, fullWidth ? { width: '100%' } : styles.manageCardWrap]} 
+      variant="interactive"
+      gradientColors={['#FFFFFF', '#FFFFFF']}
       padding={spacing.lg}
-      variant="flat"
     >
       <View style={styles.manageCardInner}>
-        <View style={[styles.manageIconWrap, { backgroundColor: '#F3F0EB' }]}>
-          <Ionicons name={icon as any} size={22} color={iconColor} />
-        </View>
+        <LinearGradient
+          colors={iconGradient as any}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.manageIconWrap, { boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.12)' } as any]}
+        >
+          <Ionicons name={icon as any} size={22} color="#FFFFFF" />
+        </LinearGradient>
         <View style={styles.manageContent}>
-          <Text style={styles.manageLabel}>{title}</Text>
-          <Text style={styles.manageSub}>{subtitle}</Text>
+          <Text style={styles.manageLabel} numberOfLines={1}>{title}</Text>
+          <Text style={styles.manageSub} numberOfLines={1}>{subtitle}</Text>
         </View>
         <View style={styles.manageArrow}>
-          <Ionicons name="arrow-forward" size={16} color="#A39688" />
+          <Ionicons name="arrow-forward" size={16} color="#8B6840" />
         </View>
       </View>
     </Card>
@@ -302,24 +401,48 @@ const styles = StyleSheet.create({
 
   // Hero
   hero: { paddingBottom: spacing.lg },
-  heroOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(250,248,245,0.92)' }, // Creates the faded watermark effect
+  heroOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(250,248,245,0.92)' },
   heroBgImage: { opacity: 0.3, resizeMode: 'cover' },
   
-  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
+  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
+  brandLogoFrame: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: 'rgba(184, 144, 71, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 6,
+    boxShadow: '0px 6px 18px rgba(105, 80, 48, 0.12)',
+  } as any,
+  brandLogoImage: {
+    width: '100%',
+    height: '100%',
+  },
   heroLeft: { flex: 1 },
-  greeting: { fontSize: 15, color: '#666', fontFamily: fontFamily.medium, letterSpacing: 0.2 },
-  heroName: { fontSize: 32, color: '#1E1815', fontFamily: fontFamily.bold, marginTop: 2, letterSpacing: -0.5 },
-  heroDate: { fontSize: 13, color: '#666', marginTop: 4, fontFamily: fontFamily.medium },
+  greeting: { fontSize: 14, color: '#666', fontFamily: fontFamily.medium, letterSpacing: 0.2 },
+  heroName: { fontSize: 30, color: '#1E1815', fontFamily: fontFamily.bold, marginTop: 1, letterSpacing: -0.5 },
+  heroDate: { fontSize: 12, color: '#666', marginTop: 2, fontFamily: fontFamily.medium },
   
-  heroActions: { flexDirection: 'row', gap: spacing.md, marginTop: 4 },
+  heroActions: { flexDirection: 'row', gap: spacing.md },
   heroBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', boxShadow: '0px 4px 12px rgba(0,0,0,0.06)' } as any,
   badge: { position: 'absolute', top: -2, right: -2, backgroundColor: '#EF4444', borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: '#fff' },
   badgeText: { fontSize: 10, color: '#fff', fontFamily: fontFamily.bold },
 
+  // Chips
+  chipsScroll: { paddingHorizontal: spacing.lg, gap: spacing.sm, marginBottom: spacing.lg },
+  actionChip: { borderRadius: 20, overflow: 'hidden' },
+  chipGradient: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  actionChipTextPrimary: { fontSize: 12, fontFamily: fontFamily.semiBold, color: '#FFFFFF' },
+  actionChipSecondary: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: 'rgba(105, 80, 48, 0.15)' },
+  actionChipTextSecondary: { fontSize: 12, fontFamily: fontFamily.medium, color: '#695030' },
+
   // Stats Scroll
   statsScroll: { paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: spacing.sm },
   statCardWrap: { width: 120 },
-  statCard: { backgroundColor: '#fff', borderRadius: 20, padding: spacing.md, boxShadow: '0px 6px 16px rgba(0,0,0,0.04)' } as any,
+  statCard: { borderRadius: 24 } as any,
   statCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.md },
   statIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   statValue: { fontSize: 26, fontFamily: fontFamily.bold, color: '#1E1815' },
@@ -338,7 +461,7 @@ const styles = StyleSheet.create({
   // Manage Grid
   manageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg },
   manageCardWrap: { width: '47.5%' },
-  manageCard: { borderRadius: 24, padding: spacing.lg, minHeight: 160, justifyContent: 'space-between', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.9)', boxShadow: '0px 6px 16px rgba(0,0,0,0.03)' } as any,
+  manageCard: { borderRadius: 24, minHeight: 160, justifyContent: 'space-between' } as any,
   manageCardInner: { flex: 1, justifyContent: 'space-between' },
   manageIconWrap: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   manageContent: { marginTop: spacing.md },

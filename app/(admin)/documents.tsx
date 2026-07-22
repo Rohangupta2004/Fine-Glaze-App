@@ -1,12 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, RefreshControl, Share, ActivityIndicator, Linking, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, RefreshControl, Share, ActivityIndicator, Image, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as WebBrowser from 'expo-web-browser';
 import { WebView } from 'react-native-webview';
 
-import { useAllDocuments, useDocumentVersions } from '../../src/hooks/useDocuments';
+import { useAllDocuments, useDocumentVersions, useDeleteDocument } from '../../src/hooks/useDocuments';
 import { useDocumentUpload } from '../../src/hooks/useDocumentUpload';
 import { useProjects } from '../../src/hooks/useProjects';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -18,7 +17,10 @@ import { spacing } from '../../src/theme/spacing';
 import type { DocumentRow } from '../../src/types';
 import { showAlert } from '../../src/utils/alert';
 
+import { CadViewerModal } from '../../src/components';
+
 const CATEGORIES: { key: string; label: string; icon: string; color: string }[] = [
+  { key: 'cad_drawings', label: 'CAD & 3D Models', icon: 'cube', color: '#B89047' },
   { key: 'drawings', label: 'Drawings', icon: 'color-palette', color: '#2563EB' },
   { key: 'boq', label: 'BOQ', icon: 'calculator', color: '#059669' },
   { key: 'quotation', label: 'Quotations', icon: 'pricetag', color: '#D97706' },
@@ -42,8 +44,9 @@ export default function AdminDocumentsScreen() {
   const { data: documents = [], refetch, isRefetching } = useAllDocuments();
   const { data: projects = [] } = useProjects();
   const upload = useDocumentUpload();
+  const deleteDoc = useDeleteDocument();
 
-  const [scopeFilter, setScopeFilter] = useState<string>('all'); // all | company | <projectId>
+  const [scopeFilter, setScopeFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   // Upload modal
@@ -54,42 +57,14 @@ export default function AdminDocumentsScreen() {
   // Detail modal
   const [selectedDoc, setSelectedDoc] = useState<DocumentRow | null>(null);
   
-  // Direct image preview
+  // Direct preview states
   const [directPreviewUrl, setDirectPreviewUrl] = useState<string | null>(null);
   const [directPdfUrl, setDirectPdfUrl] = useState<string | null>(null);
+  const [cadModalUrl, setCadModalUrl] = useState<string | null>(null);
+  const [cadModalName, setCadModalName] = useState<string>('');
   const [loadingDocId, setLoadingDocId] = useState<string | null>(null);
 
   const handleDocPress = async (doc: DocumentRow) => {
-    const ext = doc.title.split('.').pop()?.toLowerCase();
-    if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext || '')) {
-      setLoadingDocId(doc.id);
-      try {
-        const { data } = await supabase.from('document_versions').select('storage_path').eq('document_id', doc.id).eq('is_current', true).single();
-        if (data?.storage_path) {
-          const url = await createSignedMediaUrl('documents', data.storage_path, 3600);
-          setDirectPreviewUrl(url);
-          setLoadingDocId(null);
-          return;
-        }
-      } catch (e) {
-        // Silently fallback to modal if it fails
-      }
-      setLoadingDocId(null);
-    } else {
-      setLoadingDocId(doc.id);
-      try {
-        const { data } = await supabase.from('document_versions').select('storage_path').eq('document_id', doc.id).eq('is_current', true).single();
-        if (data?.storage_path) {
-          const url = await createSignedMediaUrl('documents', data.storage_path, 3600);
-          setDirectPdfUrl(url);
-          setLoadingDocId(null);
-          return;
-        }
-      } catch (e) {
-        // Silently fallback to modal if it fails
-      }
-      setLoadingDocId(null);
-    }
     setSelectedDoc(doc);
   };
 
@@ -295,6 +270,10 @@ export default function AdminDocumentsScreen() {
         doc={selectedDoc}
         projectName={selectedDoc ? (selectedDoc.owner_type === 'company' ? 'Company Internal' : projectNames.get(selectedDoc.owner_id) || 'Project') : ''}
         onClose={() => setSelectedDoc(null)}
+        onRefetch={refetch}
+        onOpenCad={(url: string, name: string) => { setCadModalUrl(url); setCadModalName(name); }}
+        onOpenImage={(url: string) => setDirectPreviewUrl(url)}
+        onOpenPdf={(url: string) => setDirectPdfUrl(url)}
         onNewVersion={async (doc: DocumentRow) => {
           try {
             await upload.mutateAsync({
@@ -346,25 +325,39 @@ export default function AdminDocumentsScreen() {
           )}
         </View>
       </Modal>
+
+      {/* Interactive CAD & 3D Model Viewer Modal */}
+      <CadViewerModal
+        visible={!!cadModalUrl}
+        onClose={() => setCadModalUrl(null)}
+        fileUrl={cadModalUrl}
+        fileName={cadModalName}
+      />
     </View>
   );
 }
 
-function DocumentDetailModal({ doc, projectName, onClose, onNewVersion }: any) {
+function DocumentDetailModal({ doc, projectName, onClose, onNewVersion, onRefetch, onOpenCad, onOpenImage, onOpenPdf }: any) {
   const insets = useSafeAreaInsets();
   const { data: versions = [], isLoading } = useDocumentVersions(doc?.id);
+  const deleteDoc = useDeleteDocument();
   const [sharing, setSharing] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
 
   const openVersion = async (path: string) => {
     try { 
       const url = await createSignedMediaUrl('documents', path, 3600);
       const ext = path.split('.').pop()?.toLowerCase();
-      if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext || '')) {
-        setPreviewUrl(url);
+      const CAD_EXTS = ['step', 'stp', 'dxf', 'dwg', 'stl', '3mf', 'glb', 'gcode', 'obj'];
+
+      if (CAD_EXTS.includes(ext || '') || doc?.category === 'cad_drawings') {
+        onClose();
+        onOpenCad(url, doc?.title || 'CAD Model');
+      } else if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext || '')) {
+        onClose();
+        onOpenImage(url);
       } else {
-        setPdfPreviewUrl(url);
+        onClose();
+        onOpenPdf(url);
       }
     }
     catch (e: any) { showAlert('Could not open document', e?.message || 'Try again.'); }
@@ -379,8 +372,32 @@ function DocumentDetailModal({ doc, projectName, onClose, onNewVersion }: any) {
     finally { setSharing(false); }
   };
 
+  const handleDelete = async () => {
+    if (!doc) return;
+    showAlert(
+      'Delete Document',
+      `Are you sure you want to permanently delete "${doc.title}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Document',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteDoc.mutateAsync(doc.id);
+              onClose();
+              if (onRefetch) onRefetch();
+              showAlert('Document Deleted', `"${doc.title}" was deleted.`);
+            } catch (err: any) {
+              showAlert('Delete Failed', err?.message || 'Could not delete document.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
-    <>
     <Modal visible={!!doc} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={onClose}>
         <View style={[styles.modalSheet, { paddingBottom: insets.bottom + spacing.lg }]}>
@@ -398,8 +415,8 @@ function DocumentDetailModal({ doc, projectName, onClose, onNewVersion }: any) {
 
           <Text style={styles.fieldLabel}>Version History</Text>
           {isLoading && <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />}
-          <ScrollView style={{ maxHeight: 280, marginTop: 10 }}>
-            {versions.map((v: any, idx: number) => (
+          <ScrollView style={{ maxHeight: 240, marginTop: 10 }}>
+            {versions.map((v: any) => (
               <View key={v.id} style={styles.versionRow}>
                 <View style={styles.versionInfo}>
                   <Text style={styles.versionNum}>v{v.rev_no}</Text>
@@ -424,52 +441,25 @@ function DocumentDetailModal({ doc, projectName, onClose, onNewVersion }: any) {
           </ScrollView>
 
           {doc && (
-            <TouchableOpacity style={[styles.uploadBtn, { marginTop: spacing.lg }]} activeOpacity={0.8} onPress={() => onNewVersion(doc)}>
-              <View style={[styles.uploadBtnBg, { backgroundColor: '#F9F6F0' }]}>
-                <Ionicons name="cloud-upload-outline" size={20} color="#695030" />
-                <Text style={[styles.uploadBtnText, { color: '#695030' }]}>Upload New Version</Text>
-              </View>
-            </TouchableOpacity>
+            <View style={{ gap: spacing.sm, marginTop: spacing.lg }}>
+              <TouchableOpacity style={styles.uploadBtn} activeOpacity={0.8} onPress={() => onNewVersion(doc)}>
+                <View style={[styles.uploadBtnBg, { backgroundColor: '#F9F6F0' }]}>
+                  <Ionicons name="cloud-upload-outline" size={20} color="#695030" />
+                  <Text style={[styles.uploadBtnText, { color: '#695030' }]}>Upload New Version</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.uploadBtn} activeOpacity={0.8} onPress={handleDelete}>
+                <View style={[styles.uploadBtnBg, { backgroundColor: 'rgba(220, 38, 38, 0.1)' }]}>
+                  <Ionicons name="trash-outline" size={20} color="#DC2626" />
+                  <Text style={[styles.uploadBtnText, { color: '#DC2626' }]}>Delete Document</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
       </TouchableOpacity>
     </Modal>
-    
-    <Modal visible={!!previewUrl} transparent animationType="fade" onRequestClose={() => setPreviewUrl(null)}>
-      <View style={styles.previewBackdrop}>
-        <TouchableOpacity style={[styles.previewClose, { top: insets.top + spacing.md }]} onPress={() => setPreviewUrl(null)}>
-          <Ionicons name="close" size={32} color="#fff" />
-        </TouchableOpacity>
-        {previewUrl && (
-          <Image source={{ uri: previewUrl }} style={styles.previewImage} resizeMode="contain" />
-        )}
-      </View>
-    </Modal>
-
-    {/* Detail Document Preview Modal */}
-    <Modal visible={!!pdfPreviewUrl} transparent animationType="slide" onRequestClose={() => setPdfPreviewUrl(null)}>
-      <View style={{ flex: 1, backgroundColor: '#FAF8F5' }}>
-        <View style={{ height: insets.top + 60, backgroundColor: '#FAF8F5', flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: insets.top, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' }}>
-          <TouchableOpacity onPress={() => setPdfPreviewUrl(null)} hitSlop={12} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(105,80,48,0.1)' }}>
-            <Ionicons name="close" size={24} color="#1E1815" />
-          </TouchableOpacity>
-          <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: '#1E1815', marginLeft: spacing.md }}>Document Viewer</Text>
-        </View>
-        {pdfPreviewUrl && (
-            Platform.OS === 'web' ? (
-              <iframe src={pdfPreviewUrl} style={{ width: '100%', height: '100%', border: 'none' }} title="Document Viewer" />
-            ) : (
-              <WebView 
-                source={{ uri: Platform.OS === 'android' ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(pdfPreviewUrl)}` : pdfPreviewUrl }} 
-                style={{ flex: 1 }}
-                startInLoadingState={true}
-                renderLoading={() => <ActivityIndicator size="large" color={colors.primary} style={{ position: 'absolute', top: '50%', left: '50%', transform: [{ translateX: -18 }, { translateY: -18 }] }} />}
-              />
-            )
-        )}
-      </View>
-    </Modal>
-    </>
   );
 }
 
@@ -576,7 +566,7 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 13, fontFamily: fontFamily.medium, color: colors.neutral[600] },
   filterTextActive: { color: '#695030', fontFamily: fontFamily.bold },
 
-  uploadBtn: { marginTop: spacing.xl, borderRadius: 16, overflow: 'hidden' },
+  uploadBtn: { borderRadius: 16, overflow: 'hidden' },
   uploadBtnBg: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.lg, backgroundColor: '#695030' },
   uploadBtnText: { fontSize: 16, fontFamily: fontFamily.bold, color: '#fff' },
 

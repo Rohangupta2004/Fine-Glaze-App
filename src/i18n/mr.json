@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "फाइन ग्लेझ COS",
+    "appName": "फाइन ग्लेझ",
     "loading": "लोड होत आहे...",
     "save": "जतन करा",
     "cancel": "रद्द करा",
@@ -19,7 +19,7 @@
     "syncPending": "{{count}} आयटम सिंक होणे बाकी"
   },
   "auth": {
-    "welcome": "फाइन ग्लेझ COS मध्ये स्वागत",
+    "welcome": "फाइन ग्लेझ मध्ये आपले स्वागत आहे",
     "welcomeSubtitle": "कन्स्ट्रक्शन ऑपरेटिंग सिस्टम",
     "login": "लॉग इन",
     "phoneNumber": "फोन नंबर",
@@ -36,7 +36,7 @@
     "enterPassword": "पासवर्ड टाका",
     "resetPin": "PIN रीसेट करा",
     "permissionsTitle": "ॲप परवानग्या",
-    "permissionsSubtitle": "फाइन ग्लेझ COS ला नीट काम करण्यासाठी या गरजेच्या आहेत",
+    "permissionsSubtitle": "फाइन ग्लेझ ला व्यवस्थित काम करण्यासाठी यांची आवश्यकता आहे",
     "permLocation": "लोकेशन ॲक्सेस",
     "permLocationDesc": "साइट हजेरी तपासण्यासाठी",
     "permCamera": "कॅमेरा ॲक्सेस",
@@ -83,9 +83,14 @@
     "safetyChecklist": "सुरक्षा चेकलिस्ट",
     "profile": "प्रोफाइल",
     "salary": "पगार",
+    "messages": "मेसेज",
     "more": "अधिक"
   },
   "supervisor": {
+    "home": "होम",
+    "tasks": "टास्क",
+    "messages": "मेसेज",
+    "more": "अधिक",
     "teamAttendance": "टीम हजेरी",
     "presentToday": "आज उपस्थित",
     "assignTask": "टास्क सोपवा",
@@ -96,27 +101,32 @@
     "requestMaterial": "साहित्य विनंती"
   },
   "admin": {
+    "home": "होम",
     "dashboard": "डॅशबोर्ड",
     "projects": "प्रोजेक्ट",
     "employees": "कर्मचारी",
     "clients": "क्लायंट",
     "approvals": "मंजुरी",
     "chat": "चॅट",
+    "messages": "मेसेज",
     "notifications": "नोटिफिकेशन",
     "settings": "सेटिंग्ज",
+    "more": "अधिक",
     "addEmployee": "कर्मचारी जोडा",
     "addProject": "नवीन प्रोजेक्ट",
     "muster": "मस्टर आणि पगार",
-    "analytics": "ॲनालिटिक्स",
+    "analytics": "अॅनालिटिक्स",
     "auditLog": "ऑडिट लॉग",
     "backup": "बॅकअप आणि रिस्टोर",
     "quickActions": "जलद कृती"
   },
   "client": {
+    "home": "डॅशबोर्ड",
     "dashboard": "डॅशबोर्ड",
     "updates": "अपडेट",
     "documents": "कागदपत्रे",
     "payments": "पेमेंट",
+    "more": "अधिक",
     "progress": "प्रगती",
     "photoTimeline": "फोटो टाइमलाइन",
     "approvals": "मंजुरी",

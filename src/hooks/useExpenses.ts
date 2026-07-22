@@ -46,3 +46,15 @@ export function useAddExpense() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['expenses'] }),
   });
 }
+
+/** Admin deletion of an expense entry. */
+export function useDeleteExpense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (expenseId: string) => {
+      const { error } = await supabase.from('expenses').delete().eq('id', expenseId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expenses'] }),
+  });
+}

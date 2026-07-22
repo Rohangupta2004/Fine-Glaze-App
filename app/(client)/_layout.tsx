@@ -1,9 +1,11 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { colors } from '../../src/theme/colors';
 import { fontFamily } from '../../src/theme/typography';
 
 export default function ClientLayout() {
+  const { t } = useTranslation();
   return (
     <Tabs
       screenOptions={({ route }) => {
@@ -33,7 +35,7 @@ export default function ClientLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Dashboard',
+          title: t('client.home'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="grid-outline" size={size} color={color} />
           ),
@@ -42,7 +44,7 @@ export default function ClientLayout() {
       <Tabs.Screen
         name="updates"
         options={{
-          title: 'Updates',
+          title: t('client.updates'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="images-outline" size={size} color={color} />
           ),
@@ -51,7 +53,7 @@ export default function ClientLayout() {
       <Tabs.Screen
         name="documents"
         options={{
-          title: 'Documents',
+          title: t('client.documents'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="folder-outline" size={size} color={color} />
           ),
@@ -60,7 +62,7 @@ export default function ClientLayout() {
       <Tabs.Screen
         name="payments"
         options={{
-          title: 'Payments',
+          title: t('client.payments'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="card-outline" size={size} color={color} />
           ),
@@ -69,7 +71,7 @@ export default function ClientLayout() {
       <Tabs.Screen
         name="more"
         options={{
-          title: 'More',
+          title: t('client.more'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="menu-outline" size={size} color={color} />
           ),
@@ -91,9 +93,9 @@ export default function ClientLayout() {
           title: 'Project Chat',
         }}
       />
-      <Tabs.Screen name="materials" options={{ href: null }} />
-      <Tabs.Screen name="new-message" options={{ href: null }} />
-      <Tabs.Screen name="conversation" options={{ href: null }} />
+      <Tabs.Screen name="materials" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="new-message" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="conversation" options={{ href: null, tabBarStyle: { display: 'none' } }} />
     </Tabs>
   );
 }

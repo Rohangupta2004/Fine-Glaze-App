@@ -99,10 +99,24 @@ export default function SupervisorMoreScreen() {
         ))}
       </Card>
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-        <Ionicons name="log-out-outline" size={22} color={colors.error} />
-        <Text style={styles.logoutText}>{t('settings.logout')}</Text>
-      </TouchableOpacity>
+      <Card 
+        onPress={handleLogout}
+        variant="flat"
+        padding={0}
+        style={styles.logoutCard}
+        gradientColors={['#FFFFFF', '#FFF8F8']}
+      >
+        <View style={styles.logoutRow}>
+          <View style={styles.logoutIconBadge}>
+            <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+          </View>
+          <View style={styles.logoutTextWrap}>
+            <Text style={styles.logoutTitle}>{t('settings.logout')}</Text>
+            <Text style={styles.logoutSub}>Sign out of your account</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="rgba(220, 38, 38, 0.4)" />
+        </View>
+      </Card>
     </ScrollView>
   );
 }
@@ -125,12 +139,32 @@ const styles = StyleSheet.create({
   },
   menuItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.neutral[100] },
   menuLabel: { flex: 1, ...typography.bodyMedium, fontFamily: fontFamily.medium, color: colors.ink },
-  logoutBtn: {
+  logoutCard: {
+    marginTop: spacing.md,
+    marginBottom: spacing['2xl'],
+    borderRadius: 20,
+    borderWidth: 1.2,
+    borderColor: 'rgba(220, 38, 38, 0.18)',
+    boxShadow: '0px 4px 16px rgba(220, 38, 38, 0.06)',
+  } as any,
+  logoutRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: TOUCH_TARGET,
-    gap: spacing.sm,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
   },
-  logoutText: { ...typography.button, color: colors.error },
+  logoutIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(220, 38, 38, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(220, 38, 38, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutTextWrap: { flex: 1 },
+  logoutTitle: { fontSize: 15, fontFamily: fontFamily.bold, color: '#DC2626' },
+  logoutSub: { fontSize: 11, fontFamily: fontFamily.regular, color: colors.neutral[400], marginTop: 1 },
 });

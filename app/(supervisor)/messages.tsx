@@ -40,9 +40,14 @@ export default function SupervisorMessagesScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.ink} />
         </TouchableOpacity>
         <Text style={styles.title}>Messages</Text>
-        <TouchableOpacity onPress={() => router.push('/(supervisor)/new-message' as any)} style={styles.newBtn}>
-          <Ionicons name="create-outline" size={26} color={colors.primary} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <TouchableOpacity onPress={() => router.push('/(supervisor)/new-group' as any)} style={styles.newBtn}>
+            <Ionicons name="people-outline" size={26} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(supervisor)/new-message' as any)} style={styles.newBtn}>
+            <Ionicons name="create-outline" size={26} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -59,6 +64,8 @@ export default function SupervisorMessagesScreen() {
         {(conversations || []).map((conv) => {
           const title = conv.type === 'project'
             ? (conv.project_id ? (projectMap.get(conv.project_id) as string) || 'Project Chat' : 'Project Chat')
+            : conv.type === 'group'
+            ? conv.title || 'Group Chat'
             : directTitle(conv.id);
           return (
             <TouchableOpacity key={conv.id} onPress={() => open(conv.id, title)}>
@@ -67,7 +74,7 @@ export default function SupervisorMessagesScreen() {
                   <Avatar name={title} size={44} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.chatName}>{title}</Text>
-                    <Text style={styles.chatMeta}>{conv.type === 'project' ? 'Project chat' : 'Direct message'}</Text>
+                    <Text style={styles.chatMeta}>{conv.type === 'project' ? 'Project chat' : conv.type === 'group' ? 'Group chat' : 'Direct message'}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={colors.neutral[300]} />
                 </View>

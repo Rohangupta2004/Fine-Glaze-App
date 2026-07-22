@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
+import { typography, fontFamily } from '../theme/typography';
 
 interface AvatarProps {
   uri?: string | null;
@@ -20,17 +20,6 @@ function getInitials(name: string): string {
     .join('');
 }
 
-/** Generate a consistent hue from a name string */
-function nameToColor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  // Map to our bronze palette range
-  const hues = [colors.primary, colors.secondary, colors.tertiary, '#7A6040', '#A09070'];
-  return hues[Math.abs(hash) % hues.length];
-}
-
 export function Avatar({ uri, name, size = 44 }: AvatarProps) {
   const borderRadius = size / 2;
 
@@ -45,12 +34,11 @@ export function Avatar({ uri, name, size = 44 }: AvatarProps) {
     );
   }
 
-  const bg = nameToColor(name);
   const initials = getInitials(name);
   const fontSize = size * 0.38;
 
   return (
-    <View style={[styles.initialsContainer, { width: size, height: size, borderRadius, backgroundColor: bg }]}>
+    <View style={[styles.initialsContainer, { width: size, height: size, borderRadius }]}>
       <Text style={[styles.initials, { fontSize, lineHeight: fontSize * 1.2 }]}>
         {initials}
       </Text>
@@ -65,10 +53,12 @@ const styles = StyleSheet.create({
   initialsContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(105, 80, 48, 0.12)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(184, 144, 71, 0.3)',
   },
   initials: {
-    color: colors.white,
-    fontFamily: typography.h5.fontFamily,
-    fontWeight: '600',
+    color: '#695030',
+    fontFamily: fontFamily.semiBold,
   },
 });

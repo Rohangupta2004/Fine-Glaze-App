@@ -7,31 +7,30 @@ import {
   TouchableOpacity,
   RefreshControl,
   Modal,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card, Button } from '../../src/components';
+import { GradientIcon, Button, AnimatedStateView } from '../../src/components';
 import { useProjects } from '../../src/hooks/useProjects';
 import { useDocuments } from '../../src/hooks/useDocuments';
 import { useDocumentUpload } from '../../src/hooks/useDocumentUpload';
-import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
 import { showAlert } from '../../src/utils/alert';
 
-const CATEGORY_ICON: Record<string, { icon: string; color: string }> = {
-  drawings: { icon: 'map', color: colors.info },
-  boq: { icon: 'calculator', color: colors.pending },
-  contracts: { icon: 'document-lock', color: colors.primary },
-  quotation: { icon: 'receipt', color: colors.warning },
-  invoices: { icon: 'cash', color: colors.success },
-  warranty: { icon: 'shield-checkmark', color: colors.success },
-  safety: { icon: 'warning', color: colors.warning },
-  amc: { icon: 'refresh-circle', color: colors.info },
-  work_orders: { icon: 'clipboard', color: colors.primary },
-  other: { icon: 'document', color: colors.neutral[500] },
+const CATEGORY_ICON: Record<string, { icon: string; colors: [string, string] }> = {
+  cad_drawings: { icon: 'cube-outline', colors: ['#B89047', '#D4AF37'] },
+  drawings: { icon: 'map-outline', colors: ['#695030', '#8B6840'] },
+  boq: { icon: 'calculator-outline', colors: ['#9A7B4F', '#C4A97A'] },
+  contracts: { icon: 'document-lock-outline', colors: ['#4A3728', '#695030'] },
+  quotation: { icon: 'receipt-outline', colors: ['#B89047', '#D4AF37'] },
+  invoices: { icon: 'cash-outline', colors: ['#695030', '#918050'] },
+  warranty: { icon: 'shield-checkmark-outline', colors: ['#8B6840', '#B89047'] },
+  safety: { icon: 'shield-outline', colors: ['#9A7B4F', '#C4A97A'] },
+  amc: { icon: 'refresh-circle-outline', colors: ['#695030', '#8B6840'] },
+  work_orders: { icon: 'clipboard-outline', colors: ['#4A3728', '#695030'] },
+  other: { icon: 'document-outline', colors: ['#695030', '#8B6840'] },
 };
 
 export default function ClientDocumentsScreen() {
@@ -72,58 +71,56 @@ export default function ClientDocumentsScreen() {
   }, {} as Record<string, typeof documents>);
 
   return (
-    <View style={{ flex: 1 }}>
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingTop: insets.top + spacing.lg, paddingBottom: spacing['6xl'] }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={styles.title}>Documents</Text>
-        {project ? (
-          <TouchableOpacity onPress={() => setUploadModal(true)} hitSlop={12}>
-            <Ionicons name="cloud-upload-outline" size={26} color={colors.primary} />
-          </TouchableOpacity>
-        ) : null}
-      </View>
-      {project && <Text style={styles.subtitle}>{project.name}</Text>}
-
-      {Object.entries(grouped).map(([category, docs]) => {
-        const meta = CATEGORY_ICON[category] || CATEGORY_ICON.other;
-        return (
-          <View key={category}>
-            <Text style={styles.categoryTitle}>{category.replace(/_/g, ' ')}</Text>
-            {(docs || []).map((doc) => (
-              <TouchableOpacity key={doc.id}>
-                <Card style={styles.docCard} variant="interactive">
-                  <View style={styles.docRow}>
-                    <View style={[styles.docIcon, { backgroundColor: meta.color + '15' }]}>
-                      <Ionicons name={meta.icon as any} size={22} color={meta.color} />
-                    </View>
-                    <View style={styles.docInfo}>
-                      <Text style={styles.docTitle}>{doc.title}</Text>
-                      <Text style={styles.docMeta}>{category.replace(/_/g, ' ')}</Text>
-                    </View>
-                    <Ionicons name="download-outline" size={20} color={colors.neutral[400]} />
-                  </View>
-                </Card>
-              </TouchableOpacity>
-            ))}
-          </View>
-        );
-      })}
-
-      {(!documents || documents.length === 0) && (
-        <View style={styles.empty}>
-          <Ionicons name="folder-open-outline" size={56} color={colors.neutral[300]} />
-          <Text style={styles.emptyTitle}>Documents Vault</Text>
-          <Text style={styles.emptyText}>
-            Drawings, contracts, warranties, and other project documents will appear here
-          </Text>
+    <View style={{ flex: 1, backgroundColor: '#FAF8F5' }}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingTop: insets.top + spacing.lg, paddingBottom: spacing['6xl'] }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#695030" />}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={styles.title}>Documents</Text>
+          {project ? (
+            <TouchableOpacity onPress={() => setUploadModal(true)} hitSlop={12}>
+              <Ionicons name="cloud-upload-outline" size={26} color="#695030" />
+            </TouchableOpacity>
+          ) : null}
         </View>
-      )}
-    </ScrollView>
+        {project && <Text style={styles.subtitle}>{project.name}</Text>}
+
+        {Object.entries(grouped).map(([category, docs]) => {
+          const meta = CATEGORY_ICON[category] || CATEGORY_ICON.other;
+          return (
+            <View key={category}>
+              <Text style={styles.categoryTitle}>{category.replace(/_/g, ' ')}</Text>
+              {(docs || []).map((doc) => (
+                <TouchableOpacity key={doc.id} activeOpacity={0.88} style={styles.outerShellCard}>
+                  <View style={styles.innerCoreCard}>
+                    <View style={styles.docRow}>
+                      <GradientIcon name={meta.icon as any} iconSize={20} colors={meta.colors} />
+                      <View style={styles.docInfo}>
+                        <Text style={styles.docTitle} numberOfLines={1}>{doc.title}</Text>
+                        <Text style={styles.docMeta}>{category.replace(/_/g, ' ')}</Text>
+                      </View>
+                      <Ionicons name="download-outline" size={20} color="#8B6840" />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          );
+        })}
+
+        {(!documents || documents.length === 0) && (
+          <AnimatedStateView
+            type="empty"
+            title="Documents Vault Empty"
+            message="Structural drawings, BOQs, warranties, and project contracts will appear here once shared by the team."
+            actionLabel="Refresh Documents"
+            onAction={refetch}
+          />
+        )}
+      </ScrollView>
 
       {/* Upload modal */}
       <Modal visible={uploadModal} transparent animationType="slide" onRequestClose={() => setUploadModal(false)}>
@@ -132,18 +129,27 @@ export default function ClientDocumentsScreen() {
             <View style={styles.upHead}>
               <Text style={styles.upTitle}>Upload Document</Text>
               <TouchableOpacity onPress={() => setUploadModal(false)}>
-                <Ionicons name="close" size={24} color={colors.ink} />
+                <Ionicons name="close" size={24} color="#1E1815" />
               </TouchableOpacity>
             </View>
             <Text style={styles.upHelp}>Share quotations, drawings, or any file with the Fine Glaze team. All file types accepted (max 25 MB).</Text>
             <View style={styles.upChips}>
               {CLIENT_CATEGORIES.map((c) => (
-                <TouchableOpacity key={c.key} style={[styles.upChip, upCategory === c.key && styles.upChipActive]} onPress={() => setUpCategory(c.key)}>
+                <TouchableOpacity
+                  key={c.key}
+                  style={[styles.upChip, upCategory === c.key && styles.upChipActive]}
+                  onPress={() => setUpCategory(c.key)}
+                >
                   <Text style={[styles.upChipText, upCategory === c.key && styles.upChipTextActive]}>{c.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <Button title="Choose File & Upload" onPress={doUpload} loading={upload.isPending} fullWidth />
+            <Button
+              title="Select File & Upload"
+              onPress={doUpload}
+              loading={upload.isPending}
+              fullWidth
+            />
           </View>
         </View>
       </Modal>
@@ -151,32 +157,43 @@ export default function ClientDocumentsScreen() {
   );
 }
 
-
 const styles = StyleSheet.create({
-  upBackdrop: { flex: 1, backgroundColor: 'rgba(26,22,17,0.4)', justifyContent: 'flex-end' },
-  upSheet: { backgroundColor: colors.white, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg },
-  upHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  upTitle: { ...typography.h4, color: colors.ink },
-  upHelp: { ...typography.bodySmall, color: colors.neutral[400], marginBottom: spacing.md },
-  upChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
-  upChip: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.neutral[200], backgroundColor: colors.white },
-  upChipActive: { borderColor: colors.primary, backgroundColor: colors.primary + '10' },
-  upChipText: { ...typography.bodySmall, color: colors.neutral[600] },
-  upChipTextActive: { color: colors.primary, fontFamily: fontFamily.semiBold },
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg },
-  title: { ...typography.h3, color: colors.ink },
-  subtitle: { ...typography.bodyMedium, color: colors.neutral[500], marginBottom: spacing.xl },
-  categoryTitle: {
-    ...typography.caption, fontFamily: fontFamily.semiBold, color: colors.neutral[400],
-    textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.sm, marginTop: spacing.lg,
+  container: { flex: 1, backgroundColor: 'transparent', paddingHorizontal: spacing.lg },
+  title: { ...typography.h4, color: '#1E1815', fontFamily: fontFamily.semiBold },
+  subtitle: { ...typography.bodySmall, color: '#695030', marginTop: 2, marginBottom: spacing.lg, fontFamily: fontFamily.regular },
+  categoryTitle: { ...typography.label, color: '#695030', marginTop: spacing.md, marginBottom: spacing.xs, textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: fontFamily.medium },
+  
+  // Double-Bezel Outer Shell & Inner Core
+  outerShellCard: {
+    backgroundColor: 'rgba(184, 144, 71, 0.08)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(184, 144, 71, 0.22)',
+    padding: 5,
+    marginBottom: spacing.xs,
+    boxShadow: '0px 4px 14px rgba(105, 80, 48, 0.07)',
+  } as any,
+  innerCoreCard: {
+    backgroundColor: '#F5F2EC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    padding: spacing.md,
   },
-  docCard: { padding: spacing.md, marginBottom: spacing.sm },
+
   docRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  docIcon: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   docInfo: { flex: 1 },
-  docTitle: { ...typography.bodyMedium, fontFamily: fontFamily.medium, color: colors.ink },
-  docMeta: { ...typography.caption, color: colors.neutral[500], marginTop: 2, textTransform: 'capitalize' },
-  empty: { alignItems: 'center', paddingVertical: spacing['5xl'], gap: spacing.sm },
-  emptyTitle: { ...typography.h5, color: colors.neutral[400] },
-  emptyText: { ...typography.bodySmall, color: colors.neutral[400], textAlign: 'center', paddingHorizontal: spacing['2xl'] },
+  docTitle: { ...typography.bodyMedium, fontFamily: fontFamily.semiBold, color: '#1E1815' },
+  docMeta: { ...typography.caption, color: '#695030', marginTop: 2, textTransform: 'capitalize', fontFamily: fontFamily.regular },
+
+  upBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  upSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.xl, gap: spacing.md },
+  upHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  upTitle: { ...typography.h5, color: '#1E1815', fontFamily: fontFamily.semiBold },
+  upHelp: { ...typography.bodySmall, color: '#695030', fontFamily: fontFamily.regular },
+  upChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  upChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, borderWidth: 1, borderColor: 'rgba(105, 80, 48, 0.2)', backgroundColor: '#FAF8F5' },
+  upChipActive: { backgroundColor: '#695030', borderColor: '#695030' },
+  upChipText: { ...typography.caption, color: '#695030', fontFamily: fontFamily.medium },
+  upChipTextActive: { color: '#FFFFFF', fontFamily: fontFamily.semiBold },
 });

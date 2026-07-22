@@ -6,14 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Avatar, Button, Input } from '../../src/components';
-import { useEmployee, useUpdateEmployee } from '../../src/hooks/useEmployees';
+import { useEmployee, useUpdateEmployee, useDeleteEmployee } from '../../src/hooks/useEmployees';
 import { useAttendanceHistory, useTodayAttendance } from '../../src/hooks/useAttendance';
 import { useMyTasks } from '../../src/hooks/useTasks';
 import { useProjects } from '../../src/hooks/useProjects';
@@ -41,9 +40,11 @@ export default function EmployeeProfileScreen() {
   const { data: todayAtt } = useTodayAttendance(id);
   const [tab, setTab] = useState<Tab>('Overview');
   const updateEmployee = useUpdateEmployee();
+  const deleteEmployee = useDeleteEmployee();
 
   // ── Edit state ──
   const [editOpen, setEditOpen] = useState(false);
+  const [eFullName, setEFullName] = useState('');
   const [ePhone, setEPhone] = useState('');
   const [eAddress, setEAddress] = useState('');
   const [eRate, setERate] = useState('');
@@ -51,6 +52,7 @@ export default function EmployeeProfileScreen() {
 
   const openEdit = () => {
     if (!emp) return;
+    setEFullName(emp.full_name || '');
     setEPhone(emp.phone || '');
     setEAddress(emp.address || '');
     setERate(emp.daily_rate != null ? String(emp.daily_rate) : '');
@@ -64,6 +66,7 @@ export default function EmployeeProfileScreen() {
       await updateEmployee.mutateAsync({
         id: emp.id,
         updates: {
+          full_name: eFullName.trim(),
           phone: ePhone.trim(),
           address: eAddress.trim() || null,
           daily_rate: eRate ? Number(eRate) : null,
@@ -97,6 +100,34 @@ export default function EmployeeProfileScreen() {
         },
       ],
     );
+  };
+
+  const handleDeleteEmployee = () => {
+    if (!emp) return;
+    setEditOpen(false);
+    setTimeout(() => {
+      showAlert(
+        'Delete Employee Profile',
+        `Are you sure you want to permanently delete profile "${emp.full_name}"? This action cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete Profile',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await deleteEmployee.mutateAsync(emp.id);
+                showAlert('Profile Deleted', `Profile "${emp.full_name}" was deleted successfully.`, [
+                  { text: 'OK', onPress: () => router.back() },
+                ]);
+              } catch (err: any) {
+                showAlert('Delete Error', err?.message || 'Could not delete profile.');
+              }
+            },
+          },
+        ]
+      );
+    }, 350);
   };
 
   if (!emp) {
@@ -339,6 +370,8 @@ export default function EmployeeProfileScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView keyboardShouldPersistTaps="handled">
+              <Input label="Full Name" value={eFullName} onChangeText={setEFullName} placeholder="e.g. Rahul Sharma" />
+              <View style={styles.editGap} />
               <Input label="Phone" value={ePhone} onChangeText={setEPhone} keyboardType="phone-pad" />
               <View style={styles.editGap} />
               <Input label="Address" value={eAddress} onChangeText={setEAddress} multiline />
@@ -362,6 +395,16 @@ export default function EmployeeProfileScreen() {
                 title={emp.status === 'active' ? 'Deactivate Employee' : 'Reactivate Employee'}
                 variant="secondary"
                 onPress={() => { setEditOpen(false); setTimeout(toggleActive, 350); }}
+                fullWidth
+              />
+              <View style={styles.editGap} />
+              <Button
+                title="Delete Employee Profile"
+                variant="secondary"
+                style={{ backgroundColor: 'rgba(220, 38, 38, 0.1)', borderColor: 'rgba(220, 38, 38, 0.3)' }}
+                textStyle={{ color: '#DC2626' }}
+                onPress={handleDeleteEmployee}
+                loading={deleteEmployee.isPending}
                 fullWidth
               />
             </ScrollView>

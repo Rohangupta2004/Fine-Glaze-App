@@ -79,3 +79,18 @@ export function useSubmitDpr() {
     },
   });
 }
+
+/** Admin deletion of a DPR report. */
+export function useDeleteDpr() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (dprId: string) => {
+      const { error } = await supabase.from('dprs').delete().eq('id', dprId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dprs'] });
+      queryClient.invalidateQueries({ queryKey: ['dpr-timeline'] });
+    },
+  });
+}

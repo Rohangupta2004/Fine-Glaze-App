@@ -1,12 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { GradientButton } from '../../src/components';
-import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing } from '../../src/theme/spacing';
 
@@ -17,39 +15,32 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={[colors.authBg, colors.neutral[100]]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={[styles.content, { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 24 }]}>
-        {/* Logo Container */}
-        <View style={styles.logoContainer}>
-          <View style={styles.logoGlow} />
-          <Image
-            source={require('../../assets/images/logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
+      <ImageBackground
+        source={require('../../assets/images/login_brand_artwork.png')}
+        style={styles.bgImage}
+        imageStyle={{ opacity: 1 }}
+        resizeMode="cover"
+      >
+        <View style={[styles.content, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 28 }]}>
+          <View style={styles.topSpacer} />
 
-        {/* Welcome Text */}
-        <View style={styles.textContainer}>
-          <Text style={styles.title}>{t('auth.welcome')}</Text>
-          <Text style={styles.subtitle}>{t('auth.welcomeSubtitle')}</Text>
-        </View>
+          {/* Welcome Text Box */}
+          <View style={styles.textContainer}>
+            <Text style={styles.title}>{t('auth.welcome')}</Text>
+            <Text style={styles.subtitle}>{t('auth.welcomeSubtitle')}</Text>
+          </View>
 
-        {/* CTA */}
-        <View style={styles.bottomContainer}>
-          <GradientButton
-            title={t('auth.login')}
-            onPress={() => router.push('/(auth)/login')}
-            fullWidth
-            size="lg"
-          />
+          {/* CTA */}
+          <View style={styles.bottomContainer}>
+            <GradientButton
+              title={t('auth.login')}
+              onPress={() => router.push('/(auth)/login')}
+              fullWidth
+              size="lg"
+            />
+          </View>
         </View>
-      </View>
+      </ImageBackground>
     </View>
   );
 }
@@ -57,52 +48,45 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.authBg,
+    backgroundColor: '#FAF8F5',
+  },
+  bgImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
   content: {
     flex: 1,
     paddingHorizontal: spacing['2xl'],
     justifyContent: 'space-between',
   },
-  logoContainer: {
+  topSpacer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  logoGlow: {
-    position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: colors.primary,
-    opacity: 0.15,
-    // Note: React Native style doesn't support blurRadius directly on View, 
-    // but the overlay opacity + design is sufficient.
-  },
-  logo: {
-    width: 180,
-    height: 180,
-    zIndex: 1,
   },
   textContainer: {
     alignItems: 'center',
-    marginBottom: spacing['4xl'],
-  },
+    marginBottom: spacing.xl,
+    backgroundColor: 'rgba(250, 248, 245, 0.92)',
+    padding: spacing.lg,
+    borderRadius: 20,
+    borderWidth: 1.2,
+    borderColor: 'rgba(184, 144, 71, 0.3)',
+    boxShadow: '0px 6px 18px rgba(105, 80, 48, 0.1)',
+  } as any,
   title: {
-    ...typography.h2,
-    color: colors.authText,
+    ...typography.h3,
+    color: '#1E1815',
     textAlign: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
     fontFamily: fontFamily.semiBold,
   },
   subtitle: {
-    ...typography.bodyLarge,
-    color: colors.neutral[400],
+    ...typography.bodyMedium,
+    color: '#695030',
     textAlign: 'center',
     fontFamily: fontFamily.regular,
   },
   bottomContainer: {
-    paddingTop: spacing.lg,
+    paddingTop: spacing.xs,
   },
 });

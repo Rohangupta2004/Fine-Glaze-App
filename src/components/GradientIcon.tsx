@@ -1,82 +1,89 @@
-/**
- * GradientIcon — Circular icon with gradient background and glow shadow.
- *
- * Use for: status indicators, list-row leading icons, empty-state heroes.
- *
- * Props:
- *  - name: Ionicons name
- *  - size: 'sm' | 'md' | 'lg' (28 / 44 / 72 px)
- *  - colors: gradient stops
- *    - Default 'success' preset: green gradient
- *    - Default 'warning' preset: amber gradient
- *    - Default 'brand' preset: bronze→gold
- *    - Default 'info' preset: blue gradient
- *  - iconColor: icon foreground color (default white)
- *  - onPress: tap handler (renders TouchableOpacity if provided)
- */
 import React from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { spacing, radius, shadows } from '../theme/spacing';
+import { radius } from '../theme/spacing';
 
 type IconSize = 'sm' | 'md' | 'lg';
 type IconPreset = 'brand' | 'success' | 'warning' | 'info' | 'error';
 
-interface GradientIconProps {
+export interface GradientIconProps {
   name: string;
-  size?: IconSize;
+  size?: IconSize | number;
   preset?: IconPreset;
   colors?: [string, string, ...string[]];
   iconColor?: string;
   iconSize?: number;
+  variant?: 'glass' | 'solid';
   onPress?: () => void;
 }
 
-const PRESETS: Record<IconPreset, [string, string]> = {
-  brand: ['#695030', '#918050'],
-  success: ['#86EFAC', '#22C55E'],
-  warning: ['#FDE68A', '#F59E0B'],
-  info: ['#93C5FD', '#3B82F6'],
-  error: ['#FCA5A5', '#EF4444'],
+const PRESET_CONFIGS: Record<IconPreset, { bg: string; border: string; icon: string }> = {
+  brand: {
+    bg: 'rgba(105, 80, 48, 0.08)',
+    border: 'rgba(184, 144, 71, 0.22)',
+    icon: '#695030',
+  },
+  success: {
+    bg: 'rgba(22, 163, 74, 0.12)',
+    border: 'rgba(22, 163, 74, 0.25)',
+    icon: '#16A34A',
+  },
+  warning: {
+    bg: 'rgba(217, 119, 6, 0.12)',
+    border: 'rgba(217, 119, 6, 0.25)',
+    icon: '#D97706',
+  },
+  info: {
+    bg: 'rgba(37, 99, 235, 0.12)',
+    border: 'rgba(37, 99, 235, 0.25)',
+    icon: '#2563EB',
+  },
+  error: {
+    bg: 'rgba(220, 38, 38, 0.12)',
+    border: 'rgba(220, 38, 38, 0.25)',
+    icon: '#DC2626',
+  },
 };
 
 const SIZE_MAP: Record<IconSize, { box: number; icon: number; radiusKey: keyof typeof radius }> = {
   sm: { box: 28, icon: 14, radiusKey: 'sm' },
-  md: { box: 44, icon: 20, radiusKey: 'md' },
-  lg: { box: 72, icon: 32, radiusKey: 'full' },
+  md: { box: 40, icon: 20, radiusKey: 'md' },
+  lg: { box: 64, icon: 30, radiusKey: 'full' },
 };
 
 export function GradientIcon({
   name,
   size = 'md',
-  preset,
-  colors,
-  iconColor = '#FFFFFF',
+  preset = 'brand',
+  iconColor,
   iconSize,
   onPress,
 }: GradientIconProps) {
-  const gradientColors = colors || (preset ? PRESETS[preset] : PRESETS.brand);
-  const sizeConfig = SIZE_MAP[size];
-  const actualIconSize = iconSize ?? sizeConfig.icon;
+  const config = PRESET_CONFIGS[preset] || PRESET_CONFIGS.brand;
+
+  const isNumeric = typeof size === 'number';
+  const boxDim = isNumeric ? Math.round(size * 1.8) : SIZE_MAP[size].box;
+  const actualIconSize = iconSize ?? (isNumeric ? size : SIZE_MAP[size].icon);
+  const borderRadius = isNumeric ? Math.round(boxDim / 3.2) : radius[SIZE_MAP[size].radiusKey];
+
+  const actualColor = iconColor || config.icon;
 
   const content = (
-    <LinearGradient
-      colors={gradientColors}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+    <View
       style={[
-        styles.gradient,
+        styles.glassBadge,
         {
-          width: sizeConfig.box,
-          height: sizeConfig.box,
-          borderRadius: radius[sizeConfig.radiusKey],
+          width: boxDim,
+          height: boxDim,
+          borderRadius: borderRadius,
+          backgroundColor: config.bg,
+          borderColor: config.border,
         },
       ]}
     >
-      <Ionicons name={name as any} size={actualIconSize} color={iconColor} />
-    </LinearGradient>
+      <Ionicons name={name as any} size={actualIconSize} color={actualColor} />
+    </View>
   );
 
   if (onPress) {
@@ -91,9 +98,10 @@ export function GradientIcon({
 }
 
 const styles = StyleSheet.create({
-  gradient: {
+  glassBadge: {
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.sm,
-  },
+    borderWidth: 1,
+    boxShadow: '0px 2px 8px rgba(105, 80, 48, 0.05)',
+  } as any,
 });

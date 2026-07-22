@@ -291,7 +291,7 @@ export default function DprScreen() {
         </ScrollView>
 
         {/* Navigation buttons */}
-        <View style={[styles.navButtons, { paddingBottom: insets.bottom + spacing.lg }]}>
+        <View style={[styles.navButtons, { paddingBottom: Math.max(insets.bottom, spacing.md) + 90 }]}>
           {stepIndex > 0 && (
             <Button
               title={t('common.back')}

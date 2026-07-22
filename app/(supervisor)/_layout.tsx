@@ -3,6 +3,7 @@ import { View, StyleSheet, Text } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { colors } from '../../src/theme/colors';
 import { fontFamily } from '../../src/theme/typography';
 
@@ -31,6 +32,7 @@ function ActiveDot() {
 }
 
 export default function SupervisorLayout() {
+  const { t } = useTranslation();
   return (
     <Tabs
       screenOptions={({ route }) => {
@@ -64,13 +66,13 @@ export default function SupervisorLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Home',
+          title: t('supervisor.home'),
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
           ),
           tabBarLabel: ({ color, focused }) => (
             <View style={styles.labelWrap}>
-              <Text style={[styles.labelText, { color }]}>Home</Text>
+              <Text style={[styles.labelText, { color }]}>{t('supervisor.home')}</Text>
               {focused && <ActiveDot />}
             </View>
           ),
@@ -79,13 +81,13 @@ export default function SupervisorLayout() {
       <Tabs.Screen
         name="tasks"
         options={{
-          title: 'Tasks',
+          title: t('supervisor.tasks'),
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? 'list' : 'list-outline'} size={22} color={color} />
           ),
           tabBarLabel: ({ color, focused }) => (
             <View style={styles.labelWrap}>
-              <Text style={[styles.labelText, { color }]}>Tasks</Text>
+              <Text style={[styles.labelText, { color }]}>{t('supervisor.tasks')}</Text>
               {focused && <ActiveDot />}
             </View>
           ),
@@ -94,13 +96,28 @@ export default function SupervisorLayout() {
       <Tabs.Screen
         name="materials"
         options={{
-          title: 'Materials',
+          title: t('supervisor.materials'),
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? 'cube' : 'cube-outline'} size={22} color={color} />
           ),
           tabBarLabel: ({ color, focused }) => (
             <View style={styles.labelWrap}>
-              <Text style={[styles.labelText, { color }]}>Materials</Text>
+              <Text style={[styles.labelText, { color }]}>{t('supervisor.materials')}</Text>
+              {focused && <ActiveDot />}
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: t('supervisor.messages'),
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={22} color={color} />
+          ),
+          tabBarLabel: ({ color, focused }) => (
+            <View style={styles.labelWrap}>
+              <Text style={[styles.labelText, { color }]}>{t('supervisor.messages')}</Text>
               {focused && <ActiveDot />}
             </View>
           ),
@@ -109,13 +126,13 @@ export default function SupervisorLayout() {
       <Tabs.Screen
         name="more"
         options={{
-          title: 'More',
+          title: t('supervisor.more'),
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? 'grid' : 'grid-outline'} size={22} color={color} />
           ),
           tabBarLabel: ({ color, focused }) => (
             <View style={styles.labelWrap}>
-              <Text style={[styles.labelText, { color }]}>More</Text>
+              <Text style={[styles.labelText, { color }]}>{t('supervisor.more')}</Text>
               {focused && <ActiveDot />}
             </View>
           ),
@@ -136,11 +153,11 @@ export default function SupervisorLayout() {
           tabBarStyle: { display: 'none' },
         }}
       />
-      <Tabs.Screen name="messages" options={{ href: null }} />
-      <Tabs.Screen name="new-message" options={{ href: null }} />
-      <Tabs.Screen name="conversation" options={{ href: null }} />
-      <Tabs.Screen name="request-employee" options={{ href: null }} />
-      <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="new-message" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="new-group" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="conversation" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="request-employee" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="notifications" options={{ href: null, tabBarStyle: { display: 'none' } }} />
     </Tabs>
   );
 }

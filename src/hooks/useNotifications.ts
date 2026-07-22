@@ -69,3 +69,15 @@ export function useMarkAllRead() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
   });
 }
+
+/** Dispatch 7:00 PM Daily Notifications for active employees & admin site assignments */
+export function useDispatch7pmNotifications() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('dispatch_daily_7pm_notifications');
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+}

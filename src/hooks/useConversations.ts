@@ -85,13 +85,18 @@ export function useChatContacts() {
       // Clients cannot start direct chats and should not see any contacts
       if (me.role === 'client') return [];
 
-      const { data, error } = await supabase
+      const isAdmin = ['owner', 'project_manager', 'hr', 'accounts'].includes(me.role);
+      let query = supabase
         .from('profiles')
         .select('*')
         .neq('id', me.id)
-        .neq('role', 'client') // Exclude client users from internal directory
-        .eq('status', 'active')
-        .order('full_name');
+        .eq('status', 'active');
+        
+      if (!isAdmin) {
+        query = query.neq('role', 'client'); // Exclude client users for non-admins
+      }
+
+      const { data, error } = await query.order('full_name');
       if (error) throw error;
       return data as Profile[];
     },
@@ -228,6 +233,44 @@ export function useJoinProjectConversation() {
         .from('conversation_members')
         .insert({ conversation_id: convId, profile_id: me.id });
       if (addErr) throw addErr;
+      return convId;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['conversations'] }),
+  });
+}
+export function useStartGroupConversation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ title, participantIds }: { title: string; participantIds: string[] }): Promise<string> => {
+      const me = useAuthStore.getState().profile;
+      if (!me) throw new Error('Not authenticated');
+      if (participantIds.length === 0) throw new Error('No participants selected');
+
+      const convId = Crypto.randomUUID();
+      const { error: convErr } = await supabase
+        .from('conversations')
+        .insert({ id: convId, company_id: me.company_id, type: 'group', title, created_by: me.id });
+      if (convErr) throw convErr;
+
+      // 1. Insert current user first to establish membership (satisfying RLS policies)
+      const { error: addMeErr } = await supabase
+        .from('conversation_members')
+        .insert({ conversation_id: convId, profile_id: me.id });
+      if (addMeErr) throw addMeErr;
+
+      // 2. Insert remaining participants now that current user is verified member
+      const otherIds = participantIds.filter((pid) => pid !== me.id);
+      if (otherIds.length > 0) {
+        const memberInserts = otherIds.map((pid) => ({
+          conversation_id: convId,
+          profile_id: pid,
+        }));
+        const { error: addOthersErr } = await supabase
+          .from('conversation_members')
+          .insert(memberInserts);
+        if (addOthersErr) throw addOthersErr;
+      }
+
       return convId;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['conversations'] }),

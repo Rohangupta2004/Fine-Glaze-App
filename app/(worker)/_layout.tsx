@@ -124,6 +124,21 @@ export default function WorkerLayout() {
         }}
       />
       <Tabs.Screen
+        name="messages"
+        options={{
+          title: t('worker.messages') || 'Messages',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={22} color={color} />
+          ),
+          tabBarLabel: ({ color, focused }) => (
+            <View style={styles.labelWrap}>
+              <Text style={[styles.labelText, { color }]}>{t('worker.messages') || 'Messages'}</Text>
+              {focused && <ActiveDot />}
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="more"
         options={{
           title: t('worker.more'),
@@ -138,10 +153,10 @@ export default function WorkerLayout() {
           ),
         }}
       />
-      {['my-site', 'documents', 'leave-request', 'safety-checklist', 'messages', 'profile', 'offline-sync', 'new-message', 'conversation', 'notifications'].map((name) => (
-        <Tabs.Screen key={name} name={name} options={{ href: null }} />
+      {['my-site', 'documents', 'leave-request', 'safety-checklist', 'profile', 'offline-sync', 'new-message', 'conversation', 'notifications'].map((name) => (
+        <Tabs.Screen key={name} name={name} options={{ href: null, tabBarStyle: { display: 'none' } }} />
       ))}
-      <Tabs.Screen name="punch-in/index" options={{ href: null }} />
+      <Tabs.Screen name="punch-in/index" options={{ href: null, tabBarStyle: { display: 'none' } }} />
     </Tabs>
   );
 }

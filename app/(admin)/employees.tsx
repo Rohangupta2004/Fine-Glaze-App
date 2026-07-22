@@ -3,12 +3,11 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, RefreshControl, Modal,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Avatar, StatusChip } from '../../src/components';
+import { StatusChip } from '../../src/components';
 import { useEmployees, useEmployeeAssignments } from '../../src/hooks/useEmployees';
 import { useProjects } from '../../src/hooks/useProjects';
 import { colors } from '../../src/theme/colors';
@@ -19,6 +18,7 @@ import type { ProfileStatus } from '../../src/types';
 const FILTERS: { label: string; value: ProfileStatus | 'all' }[] = [
   { label: 'All People', value: 'all' },
   { label: 'Active', value: 'active' },
+  { label: 'Deactivated', value: 'inactive' },
   { label: 'On Leave', value: 'on_leave' },
 ];
 
@@ -40,6 +40,7 @@ export default function EmployeesScreen() {
   const { data: employees = [], refetch: refetchEmployees, isRefetching: loadingPeople } = useEmployees();
   const { data: assignments = [], refetch: refetchAssignments, isRefetching: loadingAssignments } = useEmployeeAssignments();
   const { data: projects = [] } = useProjects();
+
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ProfileStatus | 'all'>('all');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -166,9 +167,9 @@ export default function EmployeesScreen() {
         {!!roster.unassigned.length && (
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
-              <Text style={[styles.sectionTitleText, { color: '#9E4723' }]}>Unassigned</Text>
+              <Text style={[styles.sectionTitleText, { color: '#9E4723' }]}>Unassigned / Deactivated</Text>
               <View style={[styles.sectionBadge, { backgroundColor: '#FDF2F0' }]}>
-                <Text style={[styles.sectionCountText, { color: '#9E4723' }]}>{roster.unassigned.length} Pending</Text>
+                <Text style={[styles.sectionCountText, { color: '#9E4723' }]}>{roster.unassigned.length} People</Text>
               </View>
             </View>
             {roster.unassigned.map((person) => (
@@ -298,7 +299,7 @@ const styles = StyleSheet.create({
     height: 38, 
     paddingHorizontal: 20, 
     borderRadius: 19, 
-    backgroundColor: '#F5EFE6', // Muted sand color for inactive state
+    backgroundColor: '#F5EFE6',
     alignItems: 'center', 
     justifyContent: 'center',
     marginRight: spacing.sm,
@@ -309,7 +310,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   chipActive: { 
-    backgroundColor: '#695030', // Solid brown background for highly visible active state!
+    backgroundColor: '#695030',
     shadowColor: '#695030',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -337,7 +338,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.md,
     gap: spacing.md,
-    marginBottom: spacing.md, // Generous spacing between cards!
+    marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: 'rgba(105,80,48,0.08)',
     shadowColor: '#695030',

@@ -26,3 +26,8 @@ export { AddressAutocomplete, StaticMapPreview } from './AddressAutocomplete';
 // SVG Progress Ring (v1.3)
 export { ProgressRing } from './ProgressRing';
 
+// Interactive CAD Viewer Modal (v1.4)
+export { CadViewerModal } from './CadViewerModal';
+
+// Animated State Views with 3D Generated Illustrations (v1.5)
+export { AnimatedStateView } from './AnimatedStateView';

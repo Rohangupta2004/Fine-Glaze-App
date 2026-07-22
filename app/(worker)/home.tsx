@@ -132,7 +132,8 @@ export default function WorkerHomeScreen() {
         {/* Bento Grid — Site Info & Punch Row */}
         <View style={styles.bentoRow}>
           {/* Site Card */}
-          <Card style={[styles.bentoCard, styles.siteCard]} padding={spacing.lg}>
+          <Card style={[styles.bentoCard, styles.siteCard, { overflow: 'hidden' }]} padding={spacing.lg}>
+            <LinearGradient colors={['#FFFFFF', '#F6F3EC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
             <Ionicons name="business" size={80} color={colors.primary} style={styles.siteWatermark} />
             <Text style={styles.bentoLabel}>{t('worker.todaysSite')}</Text>
             <Text style={styles.siteName} numberOfLines={2}>{activeProject?.name || '—'}</Text>
@@ -180,7 +181,8 @@ export default function WorkerHomeScreen() {
         </View>
 
         {/* Bento Task Overview Card */}
-        <Card style={styles.taskBento} padding={spacing.lg}>
+        <Card style={[styles.taskBento, { overflow: 'hidden' }]} padding={spacing.lg}>
+          <LinearGradient colors={['#FFFFFF', '#F6F3EC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
           <View style={styles.taskBentoHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.bentoLabel}>{t('worker.todaysTasks')}</Text>

@@ -1,20 +1,19 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../theme/colors';
-import { spacing, radius, shadows } from '../theme/spacing';
+import { spacing } from '../theme/spacing';
 
-interface CardProps {
+export type CardVariant = 'elevated' | 'interactive' | 'flat' | 'glow' | 'champagne' | 'gold' | 'obsidian';
+
+export interface CardProps {
   children: React.ReactNode;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   /**
-   * elevated   – default lift with subtle shadow
-   * interactive – list rows/tappables with medium shadow + border
-   * flat       – flat muted surface
-   * glow       – strong hero shadow
+   * gold/obsidian/glow – hero gradient cards for dashboards
+   * champagne/flat/elevated – clean porcelain cards for screens & lists
    */
-  variant?: 'elevated' | 'interactive' | 'flat' | 'glow';
+  variant?: CardVariant;
   padding?: number;
   accentColor?: string; // Optional left accent stripe color
   gradientColors?: [string, string, ...string[]]; // Custom gradient colors
@@ -24,97 +23,106 @@ export function Card({
   children,
   onPress,
   style,
-  variant = 'elevated',
+  variant = 'champagne',
   padding = spacing.lg,
   accentColor,
   gradientColors,
 }: CardProps) {
-  // Flatten style object to inspect and filter properties
-  const flattenedStyle = StyleSheet.flatten(style) || {};
+  const isDashboardGradient = Boolean(gradientColors) || variant === 'gold' || variant === 'obsidian' || variant === 'glow';
 
-  // Extract background color override if any, to avoid solid colors breaking glassmorphism
-  const {
-    backgroundColor,
-    width, height, minWidth, minHeight, flex,
-    margin, marginHorizontal, marginVertical, marginTop, marginBottom, marginLeft, marginRight,
-    position, top, bottom, left, right, zIndex,
-    ...innerStyle
-  } = flattenedStyle;
-
-  const outerStyle = {
-    width, height, minWidth, minHeight, flex,
-    margin, marginHorizontal, marginVertical, marginTop, marginBottom, marginLeft, marginRight,
-    position, top, bottom, left, right, zIndex
+  const defaultGradientColors = (): [string, string, ...string[]] => {
+    switch (variant) {
+      case 'gold':
+        return ['#4A3728', '#695030', '#8B6840'];
+      case 'obsidian':
+        return ['#1C1713', '#2A221C', '#3D3126'];
+      case 'glow':
+      default:
+        return ['#FFFFFF', '#FDF5E6', '#F3E4CA'];
+    }
   };
 
-  const cardStyle = [
+  const containerStyle = [
     styles.base,
     variant === 'elevated' && styles.elevated,
     variant === 'interactive' && styles.interactive,
     variant === 'flat' && styles.flat,
     variant === 'glow' && styles.glow,
-    outerStyle,
+    variant === 'champagne' && styles.champagne,
+    variant === 'gold' && styles.gold,
+    variant === 'obsidian' && styles.obsidian,
+    accentColor ? { borderLeftWidth: 4, borderLeftColor: accentColor } : null,
+    style,
   ];
 
-  // Colors for glassmorphic soft gradient background
-  const defaultGradientColors = variant === 'flat'
-    ? ['rgba(255,255,255,1)', 'rgba(255,255,255,0.4)']
-    : ['#FFFFFF', 'rgba(255,255,255,0.7)'];
-
-  const finalGradientColors = gradientColors || defaultGradientColors;
-
-  const renderContent = () => (
+  const content = isDashboardGradient ? (
     <LinearGradient
-      colors={finalGradientColors as [string, string, ...string[]]}
+      colors={gradientColors || defaultGradientColors()}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[
-        styles.gradientContent,
-        { padding },
-        innerStyle,
-        accentColor ? { borderLeftWidth: 4, borderLeftColor: accentColor } : null
-      ]}
+      style={[styles.innerFill, { padding }]}
     >
       {children}
     </LinearGradient>
+  ) : (
+    <View style={[styles.innerFill, { padding }]}>
+      {children}
+    </View>
   );
 
   if (onPress) {
     return (
-      <TouchableOpacity
-        onPress={onPress}
-        activeOpacity={0.75}
-        style={cardStyle}
-      >
-        {renderContent()}
+      <TouchableOpacity onPress={onPress} activeOpacity={0.84} style={containerStyle}>
+        {content}
       </TouchableOpacity>
     );
   }
 
-  return <View style={cardStyle}>{renderContent()}</View>;
+  return <View style={containerStyle}>{content}</View>;
 }
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: radius.xl,
+    borderRadius: 20,
+    backgroundColor: '#F5F2EC',
+    borderWidth: 1.2,
+    borderColor: 'rgba(184, 144, 71, 0.22)',
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  gradientContent: {
+    boxShadow: '0px 4px 14px rgba(105, 80, 48, 0.06)',
+  } as any,
+  innerFill: {
     width: '100%',
     height: '100%',
   },
+  champagne: {
+    backgroundColor: '#F5F2EC',
+    borderColor: 'rgba(184, 144, 71, 0.22)',
+  },
+  gold: {
+    borderColor: 'rgba(212, 175, 55, 0.4)',
+    boxShadow: '0px 10px 24px rgba(74, 55, 40, 0.18)',
+  } as any,
+  obsidian: {
+    borderColor: 'rgba(184, 144, 71, 0.45)',
+    boxShadow: '0px 12px 30px rgba(0, 0, 0, 0.3)',
+  } as any,
   elevated: {
-    ...shadows.sm,
-  },
+    backgroundColor: '#F5F2EC',
+    borderColor: 'rgba(184, 144, 71, 0.22)',
+    boxShadow: '0px 6px 18px rgba(105, 80, 48, 0.08)',
+  } as any,
   interactive: {
-    ...shadows.md,
-  },
+    backgroundColor: '#F5F2EC',
+    borderColor: 'rgba(184, 144, 71, 0.28)',
+    boxShadow: '0px 6px 18px rgba(105, 80, 48, 0.08)',
+  } as any,
   flat: {
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-  },
+    backgroundColor: '#FAF8F5',
+    borderColor: 'rgba(184, 144, 71, 0.18)',
+    boxShadow: '0px 2px 8px rgba(105, 80, 48, 0.04)',
+  } as any,
   glow: {
-    ...shadows.lg,
-  },
+    borderColor: 'rgba(212, 175, 55, 0.55)',
+    boxShadow: '0px 10px 28px rgba(139, 104, 64, 0.2)',
+  } as any,
 });

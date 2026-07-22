@@ -94,7 +94,7 @@ export default function AdminLayout() {
         <Tabs.Screen
           name="home"
           options={{
-            title: 'Home',
+            title: t('admin.home'),
             tabBarIcon: ({ color, size, focused }) => (
               <View style={styles.iconWrap}>
                 <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
@@ -102,7 +102,7 @@ export default function AdminLayout() {
             ),
             tabBarLabel: ({ color, focused }) => (
               <View style={styles.labelWrap}>
-                <Text style={[{ color }, styles.labelText]}>Home</Text>
+                <Text style={[{ color }, styles.labelText]}>{t('admin.home')}</Text>
                 {focused && <ActiveDot />}
               </View>
             ),
@@ -111,7 +111,7 @@ export default function AdminLayout() {
         <Tabs.Screen
           name="projects"
           options={{
-            title: 'Projects',
+            title: t('admin.projects'),
             tabBarIcon: ({ color, size, focused }) => (
               <View style={styles.iconWrap}>
                 <Ionicons name={focused ? 'business' : 'business-outline'} size={22} color={color} />
@@ -119,7 +119,7 @@ export default function AdminLayout() {
             ),
             tabBarLabel: ({ color, focused }) => (
               <View style={styles.labelWrap}>
-                <Text style={[{ color }, styles.labelText]}>Projects</Text>
+                <Text style={[{ color }, styles.labelText]}>{t('admin.projects')}</Text>
                 {focused && <ActiveDot />}
               </View>
             ),
@@ -150,7 +150,7 @@ export default function AdminLayout() {
         <Tabs.Screen
           name="chat"
           options={{
-            title: 'Messages',
+            title: t('admin.messages'),
             tabBarIcon: ({ color, size, focused }) => (
               <View style={styles.iconWrap}>
                 <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={22} color={color} />
@@ -158,7 +158,7 @@ export default function AdminLayout() {
             ),
             tabBarLabel: ({ color, focused }) => (
               <View style={styles.labelWrap}>
-                <Text style={[{ color }, styles.labelText]}>Messages</Text>
+                <Text style={[{ color }, styles.labelText]}>{t('admin.messages')}</Text>
                 {focused && <ActiveDot />}
               </View>
             ),
@@ -167,7 +167,7 @@ export default function AdminLayout() {
         <Tabs.Screen
           name="more"
           options={{
-            title: 'More',
+            title: t('admin.more'),
             tabBarIcon: ({ color, size, focused }) => (
               <View style={styles.iconWrap}>
                 <Ionicons name={focused ? 'grid' : 'grid-outline'} size={22} color={color} />
@@ -175,7 +175,7 @@ export default function AdminLayout() {
             ),
             tabBarLabel: ({ color, focused }) => (
               <View style={styles.labelWrap}>
-                <Text style={[{ color }, styles.labelText]}>More</Text>
+                <Text style={[{ color }, styles.labelText]}>{t('admin.more')}</Text>
                 {focused && <ActiveDot />}
               </View>
             ),
@@ -183,41 +183,42 @@ export default function AdminLayout() {
         />
 
         {/* ── Hidden screens — navigated to via router.push, not shown in tab bar ── */}
-        <Tabs.Screen name="employees" options={{ href: null }} />
-        <Tabs.Screen name="employee-profile" options={{ href: null }} />
-        <Tabs.Screen name="add-employee" options={{ href: null }} />
-        <Tabs.Screen name="approvals" options={{ href: null }} />
-        <Tabs.Screen name="notifications" options={{ href: null }} />
-        <Tabs.Screen name="project-workspace" options={{ href: null }} />
+        <Tabs.Screen name="employees" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="employee-profile" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="add-employee" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="approvals" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="notifications" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="project-workspace" options={{ href: null, tabBarStyle: { display: 'none' } }} />
         <Tabs.Screen name="create-project" options={{ href: null, tabBarStyle: { display: 'none' } }} />
-        <Tabs.Screen name="recurring-tasks" options={{ href: null }} />
-        <Tabs.Screen name="project-qr" options={{ href: null }} />
-        <Tabs.Screen name="assign-site" options={{ href: null }} />
-        <Tabs.Screen name="employee-requests" options={{ href: null }} />
-        <Tabs.Screen name="import-boq" options={{ href: null }} />
-        <Tabs.Screen name="global-search" options={{ href: null }} />
-        <Tabs.Screen name="calendar" options={{ href: null }} />
-        <Tabs.Screen name="dpr-management" options={{ href: null }} />
-        <Tabs.Screen name="analytics" options={{ href: null }} />
-        <Tabs.Screen name="attendance-report" options={{ href: null }} />
-        <Tabs.Screen name="audit-log" options={{ href: null }} />
-        <Tabs.Screen name="all-sites" options={{ href: null }} />
-        <Tabs.Screen name="roles-permissions" options={{ href: null }} />
-        <Tabs.Screen name="language-settings" options={{ href: null }} />
-        <Tabs.Screen name="notification-settings" options={{ href: null }} />
-        <Tabs.Screen name="conversation" options={{ href: null }} />
-        <Tabs.Screen name="backup-restore" options={{ href: null }} />
-        <Tabs.Screen name="legal" options={{ href: null }} />
-        <Tabs.Screen name="help-about" options={{ href: null }} />
-        <Tabs.Screen name="materials" options={{ href: null }} />
-        <Tabs.Screen name="documents" options={{ href: null }} />
-        <Tabs.Screen name="clients" options={{ href: null }} />
-        <Tabs.Screen name="my-profile" options={{ href: null }} />
-        <Tabs.Screen name="company-settings" options={{ href: null }} />
-        <Tabs.Screen name="new-message" options={{ href: null }} />
-        <Tabs.Screen name="quote-calculator" options={{ href: null }} />
-        <Tabs.Screen name="personal-todos" options={{ href: null }} />
-        <Tabs.Screen name="quick-tools" options={{ href: null }} />
+        <Tabs.Screen name="recurring-tasks" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="project-qr" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="assign-site" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="employee-requests" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="import-boq" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="global-search" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="calendar" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="dpr-management" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="analytics" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="attendance-report" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="audit-log" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="all-sites" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="roles-permissions" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="language-settings" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="notification-settings" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="conversation" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="backup-restore" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="legal" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="help-about" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="materials" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="documents" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="clients" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="my-profile" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="company-settings" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="new-message" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="new-group" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="quote-calculator" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="personal-todos" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="quick-tools" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       </Tabs>
 
       {/* Add Menu Popup Overlay */}

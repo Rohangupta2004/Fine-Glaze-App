@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Fine Glaze COS",
+    "name": "Fine Glaze",
     "slug": "fine-glaze-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -50,19 +50,19 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Fine Glaze COS uses your location to verify site attendance punch-in."
+          "locationAlwaysAndWhenInUsePermission": "Fine Glaze uses your location to verify site attendance punch-in."
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Fine Glaze COS uses your camera for attendance selfie and DPR photos."
+          "cameraPermission": "Fine Glaze uses your camera for attendance selfie and DPR photos."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Fine Glaze COS needs access to your photos for DPR uploads and documents."
+          "photosPermission": "Fine Glaze needs access to your photos for DPR uploads and documents."
         }
       ],
       [

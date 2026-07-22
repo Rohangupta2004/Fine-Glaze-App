@@ -14,24 +14,47 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useProjects } from '../../src/hooks/useProjects';
+import { useProjects, useDeleteProject } from '../../src/hooks/useProjects';
 import { colors } from '../../src/theme/colors';
 import { fontFamily } from '../../src/theme/typography';
 import { spacing, shadows, radius } from '../../src/theme/spacing';
-
-
+import { showAlert } from '../../src/utils/alert';
 
 export default function AdminProjectsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { intent } = useLocalSearchParams<{ intent?: string }>();
   const { data: projects, refetch, isRefetching } = useProjects();
+  const deleteProject = useDeleteProject();
   const [search, setSearch] = useState('');
 
   const filtered = (projects || []).filter((p) => {
     if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !(p.city || '').toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+
+  const handleDeleteProject = (e: any, projectId: string, projectName: string) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    showAlert(
+      'Delete Project',
+      `Are you sure you want to permanently delete "${projectName}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteProject.mutateAsync(projectId);
+              showAlert('Project Deleted', `"${projectName}" was deleted successfully.`);
+            } catch (err: any) {
+              showAlert('Delete Error', err.message || 'Failed to delete project.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -118,11 +141,15 @@ export default function AdminProjectsScreen() {
                       {[project.city, project.type, project.stage].filter(Boolean).join(' · ')}
                     </Text>
                   </View>
-                  {project.status === 'completed' && (
-                    <View style={styles.statusPill}>
-                      <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
-                    </View>
-                  )}
+
+                  {/* Admin Delete Action */}
+                  <TouchableOpacity
+                    onPress={(e) => handleDeleteProject(e, project.id, project.name)}
+                    style={styles.deleteBtn}
+                    hitSlop={10}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                  </TouchableOpacity>
                 </View>
 
                 {/* Progress */}
@@ -176,11 +203,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadows.md,
   },
-  headerGlow: {
-    position: 'absolute', top: -60, right: -60,
-    width: 200, height: 200, borderRadius: 100,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-  },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: spacing.lg },
   headerLabel: { fontSize: 13, color: 'rgba(255,255,255,0.8)', fontFamily: fontFamily.medium, letterSpacing: 0.2 },
   headerTitle: { fontSize: 32, color: '#fff', fontFamily: fontFamily.bold, letterSpacing: -0.5, marginTop: 2 },
@@ -227,12 +249,16 @@ const styles = StyleSheet.create({
   projectInfo: { flex: 1 },
   projectName: { fontSize: 17, fontFamily: fontFamily.bold, color: '#1E1815' },
   projectMeta: { fontSize: 13, color: colors.neutral[500], marginTop: 2, textTransform: 'capitalize', fontFamily: fontFamily.medium },
-  statusPill: {
-    width: 32, height: 32,
-    borderRadius: 16,
-    backgroundColor: '#DCFCE7',
-    alignItems: 'center', justifyContent: 'center',
+  
+  deleteBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(220, 38, 38, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
   progressTrack: { flex: 1, height: 8, backgroundColor: '#F3F4F6', borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 4 },

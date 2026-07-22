@@ -115,3 +115,29 @@ export function useUpdateEmployee() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employees'] }),
   });
 }
+
+/** Admin deletion of an employee profile (cleans foreign key dependencies). */
+export function useDeleteEmployee() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (profileId: string) => {
+      // 1. Delete dependent child records linked to this profile ID to prevent 409 Foreign Key conflicts
+      await Promise.allSettled([
+        supabase.from('assignments').delete().eq('profile_id', profileId),
+        supabase.from('profile_financials').delete().eq('id', profileId),
+        supabase.from('notifications').delete().eq('recipient_id', profileId),
+        supabase.from('dprs').delete().eq('submitted_by', profileId),
+        supabase.from('tasks').delete().eq('assigned_to', profileId),
+        supabase.from('material_requests').delete().eq('requested_by', profileId),
+      ]);
+
+      // 2. Delete parent profile record
+      const { error } = await supabase.from('profiles').delete().eq('id', profileId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      queryClient.invalidateQueries({ queryKey: ['assignable-people'] });
+    },
+  });
+}

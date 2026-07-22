@@ -6,23 +6,18 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
-  Image,
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card } from '../../src/components';
+import { GradientIcon, AnimatedStateView } from '../../src/components';
 import { useProjects } from '../../src/hooks/useProjects';
 import {
   useClientApprovals,
   useDecideClientApproval,
 } from '../../src/hooks/useClientApprovals';
-import { useAuthStore } from '../../src/stores/authStore';
-import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
 import type { ClientApproval } from '../../src/types';
@@ -33,10 +28,10 @@ import { showAlert } from '../../src/utils/alert';
 
 function StatusBadge({ status }: { status: string }) {
   const config = {
-    pending: { bg: colors.warningBg, text: colors.warning, label: 'Pending' },
-    approved: { bg: colors.successBg, text: colors.success, label: 'Approved' },
-    rejected: { bg: colors.errorBg, text: colors.error, label: 'Rejected' },
-  }[status] ?? { bg: colors.neutral[100], text: colors.neutral[600], label: status };
+    pending: { bg: 'rgba(217, 119, 6, 0.15)', text: '#D97706', label: 'Pending' },
+    approved: { bg: 'rgba(22, 163, 74, 0.15)', text: '#16A34A', label: 'Approved' },
+    rejected: { bg: 'rgba(220, 38, 38, 0.15)', text: '#DC2626', label: 'Rejected' },
+  }[status] ?? { bg: 'rgba(105, 80, 48, 0.1)', text: '#695030', label: status };
 
   return (
     <View style={[styles.badge, { backgroundColor: config.bg }]}>
@@ -83,6 +78,12 @@ function ApprovalDetail({
     );
   };
 
+  const detailsText = typeof item.details === 'string' 
+    ? item.details 
+    : item.details 
+    ? JSON.stringify(item.details, null, 2) 
+    : null;
+
   return (
     <ScrollView
       style={styles.detailContainer}
@@ -91,7 +92,7 @@ function ApprovalDetail({
     >
       {/* Back */}
       <TouchableOpacity style={styles.backBtn} onPress={onClose}>
-        <Ionicons name="arrow-back" size={22} color={colors.ink} />
+        <Ionicons name="arrow-back" size={22} color="#1E1815" />
         <Text style={styles.backText}>Approval Requests</Text>
       </TouchableOpacity>
 
@@ -102,79 +103,56 @@ function ApprovalDetail({
           <StatusBadge status={item.status} />
         </View>
         {item.request_code && (
-          <Text style={styles.requestCode}>Ref: {item.request_code}</Text>
+          <Text style={styles.detailCode}>Ref: {item.request_code}</Text>
         )}
-        <Text style={styles.detailDate}>
-          Requested {new Date(item.decided_at ?? (item as any).created_at ?? Date.now()).toLocaleDateString('en-IN', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          })}
-        </Text>
       </View>
 
-      {/* Details */}
-      {item.details && Object.keys(item.details).length > 0 && (
-        <Card style={styles.detailsCard}>
-          <Text style={styles.detailsCardTitle}>Details</Text>
-          {Object.entries(item.details).map(([k, v]) => (
-            <View key={k} style={styles.detailsRow}>
-              <Text style={styles.detailsKey}>{k.replace(/_/g, ' ')}</Text>
-              <Text style={styles.detailsVal}>{String(v)}</Text>
+      {/* Description — Double-Bezel Architecture */}
+      {detailsText ? (
+        <View style={styles.outerShell}>
+          <View style={styles.innerCore}>
+            <Text style={styles.sectionHeading}>Details</Text>
+            <Text style={styles.detailDesc}>{detailsText}</Text>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Samples / attachments */}
+      {item.photos && item.photos.length > 0 && (
+        <View style={styles.outerShell}>
+          <View style={styles.innerCore}>
+            <Text style={styles.sectionHeading}>Attached Samples / Photos</Text>
+            <View style={styles.mediaGrid}>
+              {item.photos.map((path: string, idx: number) => (
+                <View key={idx} style={[styles.mediaTileWrap, { width: tileSize - spacing.xl, height: tileSize - spacing.xl }]}>
+                  <SignedImage
+                    bucket="dpr-media"
+                    storagePath={path}
+                    style={styles.mediaTile}
+                    resizeMode="cover"
+                  />
+                </View>
+              ))}
             </View>
-          ))}
-        </Card>
+          </View>
+        </View>
       )}
 
-      {/* Photos */}
-      {(item.photos || []).length > 0 && (
-        <>
-          <Text style={styles.sectionLabel}>Photos</Text>
-          <View style={styles.photoGrid}>
-            {(item.photos || []).map((p: string, i: number) =>
-              p.startsWith('http') ? (
-                <Image
-                  key={i}
-                  source={{ uri: p }}
-                  style={[styles.photoTile, { width: tileSize, height: tileSize }]}
-                  resizeMode="cover"
-                />
-              ) : (
-                <SignedImage
-                  key={i}
-                  bucket="dpr-media"
-                  storagePath={p}
-                  style={[styles.photoTile, { width: tileSize, height: tileSize }]}
-                  resizeMode="cover"
-                />
-              )
+      {/* Decision metadata if resolved */}
+      {isDone && (
+        <View style={styles.outerShell}>
+          <View style={styles.innerCore}>
+            <Text style={styles.sectionHeading}>Decision Record</Text>
+            <Text style={styles.decisionMeta}>
+              Status: <Text style={{ fontFamily: fontFamily.semiBold, color: item.status === 'approved' ? '#16A34A' : '#DC2626' }}>{item.status.toUpperCase()}</Text>
+            </Text>
+            {item.decided_at && (
+              <Text style={styles.decisionMeta}>
+                Date: {new Date(item.decided_at).toLocaleString('en-IN')}
+              </Text>
             )}
           </View>
-        </>
-      )}
-
-      {/* Decided info */}
-      {isDone && item.decided_at && (
-        <Card style={{ ...styles.decidedCard, borderColor: item.status === 'approved' ? colors.success : colors.error }}>
-          <Ionicons
-            name={item.status === 'approved' ? 'checkmark-circle' : 'close-circle'}
-            size={22}
-            color={item.status === 'approved' ? colors.success : colors.error}
-          />
-          <Text
-            style={[
-              styles.decidedText,
-              { color: item.status === 'approved' ? colors.success : colors.error },
-            ]}
-          >
-            {item.status === 'approved' ? 'You approved' : 'You rejected'} this on{' '}
-            {new Date(item.decided_at).toLocaleDateString('en-IN', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })}
-          </Text>
-        </Card>
+        </View>
       )}
 
       {/* Actions — only visible when pending */}
@@ -184,28 +162,26 @@ function ApprovalDetail({
             style={[styles.actionBtn, styles.rejectBtn]}
             onPress={() => handleDecide('rejected')}
             disabled={isPending}
-            accessibilityLabel="Reject approval request"
           >
             {isPending ? (
-              <ActivityIndicator size="small" color={colors.error} />
+              <ActivityIndicator size="small" color="#DC2626" />
             ) : (
-              <Ionicons name="close-circle-outline" size={20} color={colors.error} />
+              <Ionicons name="close-circle-outline" size={20} color="#DC2626" />
             )}
-            <Text style={[styles.actionBtnText, { color: colors.error }]}>Reject</Text>
+            <Text style={[styles.actionBtnText, { color: '#DC2626' }]}>Reject</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.actionBtn, styles.approveBtn]}
             onPress={() => handleDecide('approved')}
             disabled={isPending}
-            accessibilityLabel="Approve approval request"
           >
             {isPending ? (
-              <ActivityIndicator size="small" color={colors.white} />
+              <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Ionicons name="checkmark-circle-outline" size={20} color={colors.white} />
+              <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
             )}
-            <Text style={[styles.actionBtnText, { color: colors.white }]}>Approve</Text>
+            <Text style={[styles.actionBtnText, { color: '#FFFFFF' }]}>Approve</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -225,7 +201,7 @@ export default function ClientApprovalsScreen() {
 
   if (selected) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={{ flex: 1, backgroundColor: '#FAF8F5' }}>
         <ApprovalDetail
           item={selected}
           onClose={() => setSelected(null)}
@@ -238,188 +214,150 @@ export default function ClientApprovalsScreen() {
   const decided = (approvals || []).filter((a) => a.status !== 'pending');
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingTop: insets.top + spacing.lg, paddingBottom: spacing['6xl'] }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />
-      }
-    >
-      <Text style={styles.title}>Approvals</Text>
-      {project && <Text style={styles.subtitle}>{project.name}</Text>}
+    <View style={{ flex: 1, backgroundColor: '#FAF8F5' }}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingTop: insets.top + spacing.lg, paddingBottom: spacing['6xl'] }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#695030" />
+        }
+      >
+        <Text style={styles.title}>Approvals</Text>
+        {project && <Text style={styles.subtitle}>{project.name}</Text>}
 
-      {pending.length > 0 && (
-        <>
-          <Text style={styles.sectionLabel}>Awaiting Your Decision</Text>
-          {pending.map((item) => (
-            <ApprovalCard key={item.id} item={item} onPress={() => setSelected(item)} />
-          ))}
-        </>
-      )}
+        {pending.length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>Awaiting Your Decision</Text>
+            {pending.map((item) => (
+              <ApprovalCard key={item.id} item={item} onPress={() => setSelected(item)} />
+            ))}
+          </>
+        )}
 
-      {decided.length > 0 && (
-        <>
-          <Text style={styles.sectionLabel}>Decided</Text>
-          {decided.map((item) => (
-            <ApprovalCard key={item.id} item={item} onPress={() => setSelected(item)} />
-          ))}
-        </>
-      )}
+        {decided.length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>Decided</Text>
+            {decided.map((item) => (
+              <ApprovalCard key={item.id} item={item} onPress={() => setSelected(item)} />
+            ))}
+          </>
+        )}
 
-      {(!approvals || approvals.length === 0) && (
-        <View style={styles.empty}>
-          <Ionicons name="checkmark-done-circle-outline" size={56} color={colors.neutral[300]} />
-          <Text style={styles.emptyTitle}>No Approval Requests</Text>
-          <Text style={styles.emptyText}>
-            When the team needs your sign-off on materials, finishes, or changes, they will appear here
-          </Text>
-        </View>
-      )}
-    </ScrollView>
+        {(!approvals || approvals.length === 0) && (
+          <AnimatedStateView
+            type="empty"
+            title="No Pending Approval Requests"
+            message="When site managers request your sign-off on facade materials, glass samples, or design variations, they will appear here."
+            actionLabel="Refresh Requests"
+            onAction={refetch}
+          />
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 function ApprovalCard({ item, onPress }: { item: ClientApproval; onPress: () => void }) {
   return (
-    <TouchableOpacity onPress={onPress} accessibilityLabel={`Open ${item.title}`}>
-      <Card style={styles.card} variant="interactive">
+    <TouchableOpacity onPress={onPress} activeOpacity={0.88} style={styles.outerShellCard}>
+      <View style={styles.innerCoreCard}>
         <View style={styles.cardRow}>
-          <View style={[
-            styles.cardIcon,
-            {
-              backgroundColor:
-                item.status === 'approved'
-                  ? colors.successBg
-                  : item.status === 'rejected'
-                  ? colors.errorBg
-                  : colors.warningBg,
-            },
-          ]}>
-            <Ionicons
-              name={
-                item.status === 'approved'
-                  ? 'checkmark-circle'
-                  : item.status === 'rejected'
-                  ? 'close-circle'
-                  : 'hourglass-outline'
-              }
-              size={22}
-              color={
-                item.status === 'approved'
-                  ? colors.success
-                  : item.status === 'rejected'
-                  ? colors.error
-                  : colors.warning
-              }
-            />
-          </View>
+          <GradientIcon
+            name={
+              item.status === 'approved'
+                ? 'checkmark-circle-outline'
+                : item.status === 'rejected'
+                ? 'close-circle-outline'
+                : 'hourglass-outline'
+            }
+            iconSize={20}
+            colors={
+              item.status === 'approved'
+                ? ['#16A34A', '#22C55E']
+                : item.status === 'rejected'
+                ? ['#DC2626', '#EF4444']
+                : ['#B89047', '#D4AF37']
+            }
+          />
           <View style={styles.cardInfo}>
             <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
             {item.request_code && (
               <Text style={styles.cardCode}>Ref: {item.request_code}</Text>
             )}
-            {item.decided_at ? (
-              <Text style={styles.cardDate}>
-                Decided{' '}
-                {new Date(item.decided_at).toLocaleDateString('en-IN', {
-                  day: 'numeric',
-                  month: 'short',
-                })}
-              </Text>
-            ) : null}
           </View>
-          <View style={styles.cardRight}>
-            <StatusBadge status={item.status} />
-            <Ionicons name="chevron-forward" size={16} color={colors.neutral[300]} style={{ marginTop: spacing.xs }} />
-          </View>
+          <StatusBadge status={item.status} />
         </View>
-      </Card>
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg },
-  title: { ...typography.h3, color: colors.ink },
-  subtitle: { ...typography.bodyMedium, color: colors.neutral[500], marginBottom: spacing.xl },
-
-  sectionLabel: {
-    ...typography.caption,
-    fontFamily: fontFamily.semiBold,
-    color: colors.neutral[400],
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: spacing.sm,
-    marginTop: spacing.md,
-  },
-
-  card: { padding: spacing.md, marginBottom: spacing.sm },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  cardIcon: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  cardInfo: { flex: 1 },
-  cardTitle: { ...typography.bodyMedium, fontFamily: fontFamily.medium, color: colors.ink },
-  cardCode: { ...typography.caption, color: colors.neutral[500], marginTop: 2 },
-  cardDate: { ...typography.caption, color: colors.neutral[400], marginTop: 2 },
-  cardRight: { alignItems: 'flex-end', gap: spacing.xs },
-
-  badge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.full },
-  badgeText: { ...typography.caption, fontFamily: fontFamily.semiBold, textTransform: 'capitalize' },
-
-  empty: { alignItems: 'center', paddingVertical: spacing['5xl'], gap: spacing.sm },
-  emptyTitle: { ...typography.h5, color: colors.neutral[400] },
-  emptyText: {
-    ...typography.bodySmall,
-    color: colors.neutral[400],
-    textAlign: 'center',
-    paddingHorizontal: spacing['2xl'],
-  },
-
-  // Detail styles
-  detailContainer: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xl },
-  backText: { ...typography.bodyMedium, fontFamily: fontFamily.medium, color: colors.ink },
-  detailHeader: { marginBottom: spacing.xl },
-  detailTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.xs },
-  detailTitle: { ...typography.h4, color: colors.ink, flex: 1 },
-  requestCode: { ...typography.caption, color: colors.neutral[500], marginBottom: spacing.xs },
-  detailDate: { ...typography.caption, color: colors.neutral[400] },
-  detailsCard: { padding: spacing.lg, marginBottom: spacing.xl },
-  detailsCardTitle: { ...typography.h6, color: colors.ink, marginBottom: spacing.md },
-  detailsRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.sm },
-  detailsKey: {
-    ...typography.bodySmall,
-    color: colors.neutral[500],
-    textTransform: 'capitalize',
-    width: 120,
-  },
-  detailsVal: { ...typography.bodySmall, fontFamily: fontFamily.medium, color: colors.ink, flex: 1 },
-
-  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.xl },
-  photoTile: { borderRadius: radius.md, backgroundColor: colors.neutral[200] },
-
-  decidedCard: {
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+  container: { flex: 1, backgroundColor: 'transparent', paddingHorizontal: spacing.lg },
+  title: { ...typography.h4, color: '#1E1815', fontFamily: fontFamily.semiBold },
+  subtitle: { ...typography.bodySmall, color: '#695030', marginTop: 2, marginBottom: spacing.lg, fontFamily: fontFamily.regular },
+  sectionLabel: { ...typography.label, color: '#695030', marginTop: spacing.md, marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: fontFamily.medium },
+  
+  // Double-Bezel Shells & Core
+  outerShellCard: {
+    backgroundColor: 'rgba(184, 144, 71, 0.08)',
+    borderRadius: 22,
     borderWidth: 1,
-    marginBottom: spacing.xl,
+    borderColor: 'rgba(184, 144, 71, 0.22)',
+    padding: 5,
+    marginBottom: spacing.sm,
+    boxShadow: '0px 4px 14px rgba(105, 80, 48, 0.07)',
+  } as any,
+  innerCoreCard: {
+    backgroundColor: '#F5F2EC',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    padding: spacing.md,
   },
-  decidedText: { ...typography.bodySmall, fontFamily: fontFamily.medium, flex: 1 },
 
-  actionRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.lg,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
+  outerShell: {
+    backgroundColor: 'rgba(184, 144, 71, 0.08)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(184, 144, 71, 0.25)',
+    padding: 6,
+    marginBottom: spacing.md,
+    boxShadow: '0px 6px 16px rgba(105, 80, 48, 0.08)',
+  } as any,
+  innerCore: {
+    backgroundColor: '#F5F2EC',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    padding: spacing.lg,
   },
-  rejectBtn: { borderColor: colors.error, backgroundColor: colors.errorBg },
-  approveBtn: { borderColor: colors.primary, backgroundColor: colors.primary },
-  actionBtnText: { ...typography.button, fontSize: 15 },
+
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  cardInfo: { flex: 1 },
+  cardTitle: { ...typography.bodyMedium, fontFamily: fontFamily.semiBold, color: '#1E1815' },
+  cardCode: { ...typography.caption, color: '#695030', marginTop: 2, fontFamily: fontFamily.regular },
+  badge: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.full },
+  badgeText: { ...typography.caption, fontFamily: fontFamily.medium, fontSize: 11 },
+
+  // Detail panel
+  detailContainer: { flex: 1, backgroundColor: '#FAF8F5', paddingHorizontal: spacing.lg },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.lg },
+  backText: { ...typography.bodyMedium, fontFamily: fontFamily.semiBold, color: '#1E1815' },
+  detailHeader: { marginBottom: spacing.lg },
+  detailTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.md },
+  detailTitle: { flex: 1, ...typography.h5, color: '#1E1815', fontFamily: fontFamily.semiBold },
+  detailCode: { ...typography.caption, color: '#695030', marginTop: 4, fontFamily: fontFamily.regular },
+  sectionHeading: { ...typography.label, color: '#695030', marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: fontFamily.medium },
+  detailDesc: { ...typography.bodyMedium, color: '#1E1815', lineHeight: 22, fontFamily: fontFamily.regular },
+  mediaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs },
+  mediaTileWrap: { borderRadius: radius.md, overflow: 'hidden' },
+  mediaTile: { width: '100%', height: '100%' },
+  decisionMeta: { ...typography.bodySmall, color: '#695030', marginBottom: 4, fontFamily: fontFamily.regular },
+  actionRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
+  actionBtn: { flex: 1, height: 48, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
+  rejectBtn: { backgroundColor: 'rgba(220, 38, 38, 0.1)', borderWidth: 1, borderColor: 'rgba(220, 38, 38, 0.3)' },
+  approveBtn: { backgroundColor: '#695030' },
+  actionBtnText: { ...typography.bodyMedium, fontFamily: fontFamily.semiBold },
 });
