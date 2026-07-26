@@ -22,7 +22,7 @@ export type AttendanceStatus = 'present' | 'absent' | 'leave' | 'half_day';
 
 export type TaskPriority = 'high' | 'medium' | 'low';
 
-export type TaskStatus = 'pending' | 'done' | 'blocked';
+export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'blocked';
 
 export type DprStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
 
@@ -118,6 +118,7 @@ export interface Project {
   start_date: string | null;
   expected_end_date: string | null;
   image_url?: string | null;
+  dpr_direct_to_client?: boolean;
 }
 
 export interface Assignment {
@@ -161,6 +162,13 @@ export interface Task {
   created_by: string;
   recurring_task_id: string | null;
   checklist?: any[];
+  parent_id?: string | null;
+  category?: string | null;
+  unit?: string | null;
+  planned_quantity?: number;
+  completed_quantity?: number;
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 export interface Dpr {
@@ -178,6 +186,7 @@ export interface Dpr {
   reviewed_by: string | null;
   reviewed_at: string | null;
   synced: boolean;
+  client_visible?: boolean;
 }
 
 export interface DprMedia {

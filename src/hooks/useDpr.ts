@@ -72,10 +72,41 @@ export function useSubmitDpr() {
         .select()
         .single();
       if (error) throw error;
+
+      // Dispatch notifications to company Admins and Project Managers
+      try {
+        const { data: admins } = await supabase
+          .from('profiles')
+          .select('id')
+          .in('role', ['owner', 'project_manager', 'admin', 'hr']);
+
+        if (admins && admins.length > 0) {
+          const notifs = admins
+            .filter((adm) => adm.id !== params.submittedBy)
+            .map((adm) => ({
+              recipient_id: adm.id,
+              kind: 'dpr_submission',
+              title: 'New DPR Submitted',
+              body: `New progress report submitted for ${params.workType || 'site work'}: "${params.workDone.slice(0, 60)}${params.workDone.length > 60 ? '...' : ''}"`,
+              ref_table: 'dprs',
+              ref_id: data.id,
+              important: true,
+            }));
+
+          if (notifs.length > 0) {
+            await supabase.from('notifications').insert(notifs);
+          }
+        }
+      } catch (notifErr) {
+        console.warn('[useSubmitDpr] Failed to send admin notifications:', notifErr);
+      }
+
       return data as Dpr;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dprs'] });
+      queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      queryClient.invalidateQueries({ queryKey: ['home'] });
     },
   });
 }

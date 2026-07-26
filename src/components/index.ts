@@ -31,3 +31,8 @@ export { CadViewerModal } from './CadViewerModal';
 
 // Animated State Views with 3D Generated Illustrations (v1.5)
 export { AnimatedStateView } from './AnimatedStateView';
+
+// MIS Task Grid & Analytics (v1.6)
+export { ExcelTaskMISGrid } from './ExcelTaskMISGrid';
+export { MISAnalyticsCharts } from './MISAnalyticsCharts';
+

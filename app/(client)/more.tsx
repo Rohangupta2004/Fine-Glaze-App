@@ -12,6 +12,7 @@ import { useProjects } from '../../src/hooks/useProjects';
 import { useClientApprovals } from '../../src/hooks/useClientApprovals';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
+import { showAlert } from '../../src/utils/alert';
 
 export default function ClientMoreScreen() {
   const insets = useSafeAreaInsets();
@@ -25,9 +26,22 @@ export default function ClientMoreScreen() {
   const { data: approvals } = useClientApprovals(project?.id);
   const pendingCount = (approvals || []).filter((a) => a.status === 'pending').length;
 
-  const handleLogout = async () => {
-    await signOut();
-    router.replace('/(auth)/welcome');
+  const handleLogout = () => {
+    showAlert(
+      'Log Out',
+      'Are you sure you want to log out of your account?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            router.replace('/(auth)/welcome');
+          },
+        },
+      ]
+    );
   };
 
   return (

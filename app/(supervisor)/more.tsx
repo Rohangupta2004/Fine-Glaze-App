@@ -10,6 +10,7 @@ import { useAuthStore } from '../../src/stores/authStore';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, TOUCH_TARGET } from '../../src/theme/spacing';
+import { showAlert } from '../../src/utils/alert';
 
 interface MenuItem {
   icon: keyof typeof Ionicons.glyphMap;
@@ -52,9 +53,22 @@ export default function SupervisorMoreScreen() {
     { icon: 'help-circle-outline', label: t('settings.help') },
   ];
 
-  const handleLogout = async () => {
-    await signOut();
-    router.replace('/(auth)/welcome');
+  const handleLogout = () => {
+    showAlert(
+      'Log Out',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            router.replace('/(auth)/welcome');
+          },
+        },
+      ]
+    );
   };
 
   const handleItemPress = (item: MenuItem) => {
@@ -99,12 +113,10 @@ export default function SupervisorMoreScreen() {
         ))}
       </Card>
 
-      <Card 
+      <TouchableOpacity
         onPress={handleLogout}
-        variant="flat"
-        padding={0}
+        activeOpacity={0.84}
         style={styles.logoutCard}
-        gradientColors={['#FFFFFF', '#FFF8F8']}
       >
         <View style={styles.logoutRow}>
           <View style={styles.logoutIconBadge}>
@@ -116,7 +128,7 @@ export default function SupervisorMoreScreen() {
           </View>
           <Ionicons name="chevron-forward" size={16} color="rgba(220, 38, 38, 0.4)" />
         </View>
-      </Card>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -143,8 +155,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: spacing['2xl'],
     borderRadius: 20,
+    backgroundColor: '#FFF8F8',
     borderWidth: 1.2,
-    borderColor: 'rgba(220, 38, 38, 0.18)',
+    borderColor: 'rgba(220, 38, 38, 0.22)',
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 3,
     boxShadow: '0px 4px 16px rgba(220, 38, 38, 0.06)',
   } as any,
   logoutRow: {

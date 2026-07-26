@@ -39,8 +39,12 @@ const secureStorage = buildSecureStorage();
 
 // ── Supabase client ──────────────────────────────────────────────────────────
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+const DEFAULT_SUPABASE_URL = 'https://vxpkihnovotlwdbnuirt.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4cGtpaG5vdm90bHdkYm51aXJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTM5MjksImV4cCI6MjA5OTMyOTkyOX0.YabanDhoqOYOeEEEheRrIsvMAnhjpzavTQvo3THx9uE';
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

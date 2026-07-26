@@ -460,8 +460,8 @@ const styles = StyleSheet.create({
 
   // Manage Grid
   manageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg },
-  manageCardWrap: { width: '47.5%' },
-  manageCard: { borderRadius: 24, minHeight: 160, justifyContent: 'space-between' } as any,
+  manageCardWrap: { flexBasis: '47%', flexGrow: 1, minWidth: 140 },
+  manageCard: { borderRadius: 24, minHeight: 150, justifyContent: 'space-between' } as any,
   manageCardInner: { flex: 1, justifyContent: 'space-between' },
   manageIconWrap: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   manageContent: { marginTop: spacing.md },

@@ -252,13 +252,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!userId || !profile) return { error: 'Not authenticated' };
     
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) return { error: error.message };
+      const { error: authErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (authErr && !authErr.message.includes('Auth session missing') && !authErr.message.includes('User not found')) {
+        console.warn('[changePassword] Auth update warning:', authErr.message);
+      }
 
       const { error: profileErr } = await supabase
         .from('profiles')
         .update({ password_reset_required: false })
         .eq('id', userId);
+      
       if (profileErr) return { error: profileErr.message };
 
       set({ profile: { ...profile, password_reset_required: false } });

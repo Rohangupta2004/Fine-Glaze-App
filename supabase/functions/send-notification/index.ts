@@ -113,6 +113,7 @@ serve(async (req: Request) => {
           },
           sound: 'default',
           priority: important ? 'high' : 'default',
+          channelId: 'default',
         }),
       });
 

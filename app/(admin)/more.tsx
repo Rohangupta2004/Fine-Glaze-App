@@ -20,6 +20,7 @@ import { usePermissions } from '../../src/hooks/usePermissions';
 import { colors } from '../../src/theme/colors';
 import { fontFamily } from '../../src/theme/typography';
 import { spacing } from '../../src/theme/spacing';
+import { showAlert } from '../../src/utils/alert';
 
 interface MenuItem {
   icon: string;
@@ -79,6 +80,24 @@ export default function AdminMoreScreen() {
   const profile = useAuthStore((s) => s.profile);
   const signOut = useAuthStore((s) => s.signOut);
   const { can } = usePermissions();
+
+  const handleLogout = () => {
+    showAlert(
+      'Log Out',
+      'Are you sure you want to sign out of your account?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            router.replace('/(auth)/welcome');
+          },
+        },
+      ]
+    );
+  };
 
   const visibleSections = SECTIONS.map((sec) => ({
     ...sec,
@@ -145,15 +164,10 @@ export default function AdminMoreScreen() {
         ))}
 
         {/* Executive Logout Card */}
-        <Card 
-          onPress={() => {
-            signOut();
-            router.replace('/(auth)/welcome');
-          }}
-          variant="flat"
-          padding={0}
+        <TouchableOpacity
+          onPress={handleLogout}
+          activeOpacity={0.84}
           style={styles.logoutCard}
-          gradientColors={['#FFFFFF', '#FFF8F8']}
         >
           <View style={styles.logoutRow}>
             <View style={styles.logoutIconBadge}>
@@ -165,7 +179,7 @@ export default function AdminMoreScreen() {
             </View>
             <Ionicons name="chevron-forward" size={16} color="rgba(220, 38, 38, 0.4)" />
           </View>
-        </Card>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -224,8 +238,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: spacing['2xl'],
     borderRadius: 20,
+    backgroundColor: '#FFF8F8',
     borderWidth: 1.2,
-    borderColor: 'rgba(220, 38, 38, 0.18)',
+    borderColor: 'rgba(220, 38, 38, 0.22)',
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 3,
     boxShadow: '0px 4px 16px rgba(220, 38, 38, 0.06)',
   } as any,
   logoutRow: {

@@ -141,14 +141,21 @@ CREATE TABLE recurring_tasks (
 
 CREATE TABLE tasks (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id        UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  project_id        UUID REFERENCES projects(id) ON DELETE CASCADE,
+  parent_id         UUID REFERENCES tasks(id) ON DELETE CASCADE,
   assigned_to       UUID REFERENCES profiles(id),
   title             TEXT NOT NULL,
+  category          TEXT DEFAULT 'Facade',
+  unit              TEXT DEFAULT 'Sqm',
+  planned_quantity  NUMERIC DEFAULT 0 NOT NULL,
+  completed_quantity NUMERIC DEFAULT 0 NOT NULL,
+  start_date        DATE,
+  end_date          DATE,
   level_zone        TEXT,
   priority          TEXT DEFAULT 'medium' CHECK (priority IN ('high','medium','low')),
   window_start      TIMESTAMPTZ,
   window_end        TIMESTAMPTZ,
-  status            TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','done','blocked')),
+  status            TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','in_progress','done','blocked')),
   created_by        UUID NOT NULL REFERENCES profiles(id),
   recurring_task_id UUID REFERENCES recurring_tasks(id),
   created_at        TIMESTAMPTZ DEFAULT now()

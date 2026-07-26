@@ -29,20 +29,29 @@ export async function compressImage(
   maxDimension: number = MAX_DIMENSION,
   quality: number = INITIAL_QUALITY,
 ): Promise<CompressedImage> {
-  const result = await ImageManipulator.manipulateAsync(
-    uri,
-    [{ resize: { width: maxDimension } }],
-    {
-      compress: quality,
-      format: ImageManipulator.SaveFormat.JPEG,
-    },
-  );
+  try {
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: maxDimension } }],
+      {
+        compress: quality,
+        format: ImageManipulator.SaveFormat.JPEG,
+      },
+    );
 
-  return {
-    uri: result.uri,
-    width: result.width,
-    height: result.height,
-  };
+    return {
+      uri: result.uri,
+      width: result.width,
+      height: result.height,
+    };
+  } catch (error) {
+    console.warn('Image manipulation failed, falling back to original URI:', error);
+    return {
+      uri,
+      width: 0,
+      height: 0,
+    };
+  }
 }
 
 /**

@@ -5,13 +5,14 @@
  * to the given conversation route.
  */
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Avatar, SearchBar } from '../components';
 import { useChatContacts, useStartDirectConversation } from '../hooks/useConversations';
+import { showAlert } from '../utils/alert';
 import { colors } from '../theme/colors';
 import { typography, fontFamily } from '../theme/typography';
 import { spacing, radius } from '../theme/spacing';
@@ -76,7 +77,7 @@ export function NewMessageScreen({ conversationRoute }: NewMessageScreenProps) {
       const conversationId = await startChat.mutateAsync({ otherProfileId: person.id });
       router.navigate({ pathname: conversationRoute as any, params: { conversationId, title: person.full_name } });
     } catch (e: any) {
-      Alert.alert('Could not start chat', e?.message || 'Please try again.');
+      showAlert('Could not start chat', e?.message || 'Please try again.');
     } finally {
       setStartingId(null);
     }

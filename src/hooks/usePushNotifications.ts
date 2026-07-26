@@ -5,6 +5,7 @@
  * in the profiles table. Per PRD §10 notifications matrix.
  */
 
+import { Platform } from 'react-native';
 import { useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
@@ -27,6 +28,16 @@ async function registerForPushNotifications(): Promise<string | null> {
   if (!Device.isDevice) {
     console.log('Push notifications require a physical device');
     return null;
+  }
+
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#695030',
+      sound: 'default',
+    });
   }
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();

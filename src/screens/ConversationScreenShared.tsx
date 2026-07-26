@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useMessages, useSendMessage, useConversationMembers, useChatContacts } from '../hooks/useConversations';
 import { supabase } from '../lib/supabase';
 import { compressImage } from '../lib/imageCompression';
+import { showAlert } from '../utils/alert';
 import { colors } from '../theme/colors';
 import { spacing, radius } from '../theme/spacing';
 import { typography, fontFamily } from '../theme/typography';
@@ -92,7 +93,7 @@ export function ConversationScreenShared() {
       if (msgError) throw msgError;
       refetch();
     } catch (e: any) {
-      Alert.alert('Upload failed', e.message);
+      showAlert('Upload failed', e.message);
     } finally {
       setUploading(false);
     }
@@ -105,11 +106,11 @@ export function ConversationScreenShared() {
         .from('conversation_members')
         .insert({ conversation_id: conversationId, profile_id: person.id });
       if (error) throw error;
-      Alert.alert('Success', `${person.full_name} added to conversation`);
+      showAlert('Success', `${person.full_name} added to conversation`);
       refetchMembers();
       setShowAddMember(false);
     } catch (e: any) {
-      Alert.alert('Could not add member', e?.message || 'Please try again.');
+      showAlert('Could not add member', e?.message || 'Please try again.');
     }
   };
 

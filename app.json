@@ -7,11 +7,6 @@
     "icon": "./assets/images/logo.png",
     "scheme": "fineglaze",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/images/splash-background.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#F9F9F8"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fineglaze.cos"
@@ -80,7 +75,10 @@
         }
       ],
       "expo-sqlite",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-image",
+      "expo-sharing",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true

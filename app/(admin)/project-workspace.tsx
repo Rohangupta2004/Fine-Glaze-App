@@ -28,7 +28,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Picker } from '@react-native-picker/picker';
 
-import { Card, StatusChip, Avatar, Button, GradientCard, ProgressRing, SearchBar, Input } from '../../src/components';
+import { Card, StatusChip, Avatar, Button, GradientCard, ProgressRing, SearchBar, Input, ExcelTaskMISGrid, MISAnalyticsCharts } from '../../src/components';
 import { useProject, useUpdateProject } from '../../src/hooks/useProjects';
 import { useEmployees } from '../../src/hooks/useEmployees';
 import { useProjectDprs } from '../../src/hooks/useDpr';
@@ -66,6 +66,7 @@ import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius, shadows } from '../../src/theme/spacing';
 import type { Task, Dpr, DocumentRow, Expense, Payment, MaterialRequest, Attendance } from '../../src/types';
+import { showAlert } from '../../src/utils/alert';
 
 // ── Tab Definition ────────────────────────────────────────────────────────────
 
@@ -282,7 +283,7 @@ function BOQTab({ projectId, projectName }: { projectId: string; projectName: st
                       onSubmitEditing={(e) => {
                         const val = parseFloat(e.nativeEvent.text);
                         if (isNaN(val) || val < 0 || val > item.quantity) {
-                          Alert.alert('Invalid quantity', `Please enter a value between 0 and ${item.quantity}`);
+                          showAlert('Invalid quantity', `Please enter a value between 0 and ${item.quantity}`);
                           return;
                         }
                         updateBOQQtyMutation.mutate({ id: item.id, completed_quantity: val });
@@ -822,7 +823,7 @@ function TasksTab({
       setNewAssignee('');
       setShowAdd(false);
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to create task');
+      showAlert('Error', e.message || 'Failed to create task');
     }
   }
 
@@ -831,7 +832,7 @@ function TasksTab({
     try {
       await updateStatus.mutateAsync({ taskId: task.id, status: next });
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to update task');
+      showAlert('Error', e.message || 'Failed to update task');
     }
   }
 
@@ -842,111 +843,12 @@ function TasksTab({
   };
 
   return (
-    <>
-      <SectionHeader title="Project Tasks" action="Add Task" onAction={() => setShowAdd(true)} />
-
-      {/* Filter pills */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: spacing.md }}>
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          {(['all', 'pending', 'done', 'blocked'] as const).map(s => (
-            <TouchableOpacity
-              key={s}
-              onPress={() => setFilterStatus(s)}
-              style={[styles.filterPill, filterStatus === s && styles.filterPillActive]}
-            >
-              <Text style={[styles.filterPillText, filterStatus === s && styles.filterPillTextActive]}>
-                {s === 'all' ? `All (${tasks.length})` : s}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
-
-      {/* Add Modal */}
-      <Modal visible={showAdd} transparent animationType="slide" onRequestClose={() => setShowAdd(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>New Task</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Task title..."
-              value={newTitle}
-              onChangeText={setNewTitle}
-              autoFocus
-            />
-            <Text style={[typography.caption, { color: colors.neutral[500], marginBottom: spacing.sm }]}>Priority</Text>
-            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg }}>
-              {(['high', 'medium', 'low'] as const).map(p => (
-                <TouchableOpacity
-                  key={p}
-                  onPress={() => setNewPriority(p)}
-                  style={[styles.filterPill, newPriority === p && { backgroundColor: priorityColor[p] }]}
-                >
-                  <Text style={[styles.filterPillText, newPriority === p && { color: colors.white }]}>{p}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={[typography.caption, { color: colors.neutral[500], marginBottom: spacing.sm }]}>Assign To</Text>
-            <View style={[styles.pickerContainer, { marginBottom: spacing.lg }]}>
-              <Picker
-                selectedValue={newAssignee}
-                onValueChange={(val: string) => setNewAssignee(val)}
-                style={styles.picker}
-              >
-                <Picker.Item label="Unassigned" value="" color={colors.neutral[500]} />
-                {employees.map(emp => (
-                  <Picker.Item key={emp.id} label={emp.full_name} value={emp.id} color={colors.ink} />
-                ))}
-              </Picker>
-            </View>
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <Button title="Cancel" variant="tertiary" onPress={() => { setShowAdd(false); setNewAssignee(''); }} style={{ flex: 1 }} />
-              <Button title="Add Task" onPress={handleAdd} loading={createTask.isPending} style={{ flex: 1 }} />
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {filtered.length === 0 && <EmptyState icon="checkmark-circle-outline" text="No tasks yet — tap Add Task to create one" />}
-      {filtered.map(task => (
-        <Card key={task.id} style={styles.listCard}>
-          <View style={styles.listRow}>
-            <TouchableOpacity
-              onPress={() => handleToggle(task)}
-              hitSlop={8}
-              disabled={updateStatus.isPending}
-            >
-              <Ionicons
-                name={task.status === 'done' ? 'checkmark-circle' : task.status === 'blocked' ? 'close-circle' : 'ellipse-outline'}
-                size={24}
-                color={task.status === 'done' ? colors.success : task.status === 'blocked' ? colors.error : colors.neutral[300]}
-              />
-            </TouchableOpacity>
-            <View style={styles.listInfo}>
-              <Text style={[styles.listTitle, task.status === 'done' && { textDecorationLine: 'line-through', color: colors.neutral[400] }]}>
-                {task.title}
-              </Text>
-              <Text style={styles.listSubtitle}>
-                {task.level_zone ? `${task.level_zone} · ` : ''}
-                {task.assigned_to ? (
-                  <Text 
-                    style={{ color: colors.primary, textDecorationLine: 'underline' }}
-                    onPress={() => router.push({ pathname: '/(admin)/employee-profile' as any, params: { id: task.assigned_to } })}
-                  >
-                    {employeeMap.get(task.assigned_to) || 'Assigned'}
-                  </Text>
-                ) : 'Unassigned'}
-                {task.window_start ? ` · Due ${fmtShort(task.window_start)}` : ''}
-              </Text>
-            </View>
-            <View style={[styles.priorityDot, { backgroundColor: priorityColor[task.priority] }]} />
-          </View>
-        </Card>
-      ))}
-    </>
+    <View style={{ gap: spacing.lg }}>
+      <ExcelTaskMISGrid projectId={projectId} tasks={tasks} />
+      <MISAnalyticsCharts tasks={tasks} />
+    </View>
   );
 }
-
 // Employees
 function EmployeesTab({ employees, router }: { employees: any[]; router: any }) {
   const teamMembers = employees.filter(e => e.role !== 'client');
@@ -1067,7 +969,11 @@ function AttendanceTab({ projectId }: { projectId: string }) {
 }
 
 // DPR
-function DprTab({ dprs, employees }: { dprs: Dpr[]; employees: any[] }) {
+function DprTab({ dprs, employees, project }: { dprs: Dpr[]; employees: any[]; project: any }) {
+  const updateProject = useUpdateProject();
+  const [directToClient, setDirectToClient] = useState<boolean>(project?.dpr_direct_to_client || false);
+  const [clientVisibleMap, setClientVisibleMap] = useState<Record<string, boolean>>({});
+
   const employeeMap = useMemo(
     () => new Map(employees.map(e => [e.id, e.full_name])),
     [employees]
@@ -1080,33 +986,134 @@ function DprTab({ dprs, employees }: { dprs: Dpr[]; employees: any[] }) {
     rejected: { color: colors.error, bg: colors.errorBg },
   };
 
+  const handleToggleDirectClient = async (val: boolean) => {
+    setDirectToClient(val);
+    try {
+      if (project?.id) {
+        await supabase.from('projects').update({ dpr_direct_to_client: val }).eq('id', project.id);
+        showAlert(
+          'Client Release Rule Updated',
+          val
+            ? 'DPR submissions will now automatically publish directly to Client views.'
+            : 'Admin manual review & approval required before DPRs are published to Client views.'
+        );
+      }
+    } catch (e: any) {
+      showAlert('Error', e.message || 'Failed to update setting.');
+    }
+  };
+
+  const handleToggleClientPublish = async (dprId: string, currentVisible: boolean) => {
+    const nextState = !currentVisible;
+    setClientVisibleMap((prev) => ({ ...prev, [dprId]: nextState }));
+    try {
+      await supabase.from('dprs').update({ client_visible: nextState }).eq('id', dprId);
+      showAlert(
+        nextState ? 'Published to Client' : 'Revoked from Client',
+        nextState
+          ? 'This DPR is now visible to the client on their dashboard.'
+          : 'This DPR has been hidden from the client view.'
+      );
+    } catch (e: any) {
+      showAlert('Error', e.message || 'Failed to update DPR client visibility.');
+    }
+  };
+
   return (
     <>
       <SectionHeader title={`Daily Progress Reports (${dprs.length})`} />
-      {dprs.length === 0 && <EmptyState icon="document-text-outline" text="No DPRs submitted for this project yet" />}
-      {dprs.map(dpr => (
-        <Card key={dpr.id} style={styles.listCard}>
-          <View style={styles.listRow}>
-            <View style={[styles.iconBox, { backgroundColor: statusColors[dpr.status]?.bg || colors.neutral[100] }]}>
-              <Ionicons name="document-text" size={20} color={statusColors[dpr.status]?.color || colors.neutral[600]} />
-            </View>
-            <View style={styles.listInfo}>
-              <Text style={styles.listTitle}>
-                {fmt(dpr.date, { day: 'numeric', month: 'short', year: 'numeric' })}
-                {dpr.work_type ? ` — ${dpr.work_type}` : ''}
-              </Text>
-              <Text style={styles.listSubtitle} numberOfLines={2}>
-                {dpr.work_done}
-              </Text>
-              <Text style={[styles.listSubtitle, { marginTop: 2 }]}>
-                By: {employeeMap.get(dpr.submitted_by) || dpr.submitted_by}
-                {dpr.level_zone ? ` · ${dpr.level_zone}` : ''}
-              </Text>
-            </View>
-            <StatusBadge status={dpr.status} />
+
+      {/* Admin Client Release Strategy Banner */}
+      <Card style={{ marginBottom: spacing.md, backgroundColor: '#FFFBEB', borderColor: '#FCD34D' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flex: 1, paddingRight: spacing.sm }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#92400E' }}>
+              Direct DPR Release to Client
+            </Text>
+            <Text style={{ fontSize: 11, color: '#B45309', marginTop: 2 }}>
+              {directToClient
+                ? 'Enabled: DPRs publish automatically to client.'
+                : 'Disabled: Admin reviews & edits before releasing to client.'}
+            </Text>
           </View>
-        </Card>
-      ))}
+          <Switch
+            value={directToClient}
+            onValueChange={handleToggleDirectClient}
+            trackColor={{ true: colors.primary, false: colors.neutral[300] }}
+          />
+        </View>
+      </Card>
+
+      {dprs.length === 0 && <EmptyState icon="document-text-outline" text="No DPRs submitted for this project yet" />}
+      {dprs.map(dpr => {
+        const isVisibleToClient = clientVisibleMap[dpr.id] !== undefined
+          ? clientVisibleMap[dpr.id]
+          : directToClient || dpr.client_visible || dpr.status === 'approved';
+
+        return (
+          <Card key={dpr.id} style={styles.listCard}>
+            <View style={styles.listRow}>
+              <View style={[styles.iconBox, { backgroundColor: statusColors[dpr.status]?.bg || colors.neutral[100] }]}>
+                <Ionicons name="document-text" size={20} color={statusColors[dpr.status]?.color || colors.neutral[600]} />
+              </View>
+              <View style={styles.listInfo}>
+                <Text style={styles.listTitle}>
+                  {fmt(dpr.date, { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {dpr.work_type ? ` — ${dpr.work_type}` : ''}
+                </Text>
+                <Text style={styles.listSubtitle} numberOfLines={2}>
+                  {dpr.work_done}
+                </Text>
+                <Text style={[styles.listSubtitle, { marginTop: 2 }]}>
+                  By: {employeeMap.get(dpr.submitted_by) || dpr.submitted_by}
+                  {dpr.level_zone ? ` · ${dpr.level_zone}` : ''}
+                </Text>
+              </View>
+              <StatusBadge status={dpr.status} />
+            </View>
+
+            {/* Admin Client Release Control Button */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderTopWidth: 1,
+                borderTopColor: '#F3F4F6',
+                marginTop: spacing.xs,
+                paddingTop: spacing.xs,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons
+                  name={isVisibleToClient ? 'eye-outline' : 'eye-off-outline'}
+                  size={14}
+                  color={isVisibleToClient ? '#16A34A' : colors.neutral[400]}
+                />
+                <Text style={{ fontSize: 11, color: isVisibleToClient ? '#16A34A' : colors.neutral[500], fontWeight: '600' }}>
+                  {isVisibleToClient ? 'Client Visible' : 'Admin Only (Hidden from Client)'}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: isVisibleToClient ? '#FEF2F2' : '#F0FDF4',
+                  borderColor: isVisibleToClient ? '#FECACA' : '#BBF7D0',
+                  borderWidth: 1,
+                  paddingHorizontal: spacing.sm,
+                  paddingVertical: 4,
+                  borderRadius: radius.sm,
+                }}
+                onPress={() => handleToggleClientPublish(dpr.id, isVisibleToClient)}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '600', color: isVisibleToClient ? '#DC2626' : '#15803D' }}>
+                  {isVisibleToClient ? 'Revoke Client View' : 'Publish to Client'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Card>
+        );
+      })}
     </>
   );
 }
@@ -1171,9 +1178,9 @@ function DocumentsTab({ documents, projectId }: { documents: DocumentRow[], proj
     try {
       await upload.mutateAsync({ ownerType: 'project', ownerId: projectId, category: upCategory });
       setUploadModal(false);
-      Alert.alert('Success', 'Document uploaded');
+      showAlert('Success', 'Document uploaded');
     } catch (e: any) {
-      if (e.message !== 'Canceled') Alert.alert('Upload Failed', e.message);
+      if (e.message !== 'Canceled') showAlert('Upload Failed', e.message);
     }
   };
 
@@ -1200,7 +1207,7 @@ function DocumentsTab({ documents, projectId }: { documents: DocumentRow[], proj
       if (verErr) throw verErr;
 
       if (!versions || versions.length === 0) {
-        Alert.alert('Info', 'No uploaded file versions found for this document record.');
+        showAlert('Info', 'No uploaded file versions found for this document record.');
         setLoadingFile(false);
         return;
       }
@@ -1220,7 +1227,7 @@ function DocumentsTab({ documents, projectId }: { documents: DocumentRow[], proj
         setSelectedDoc(doc);
       }
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to open document file link');
+      showAlert('Error', e.message || 'Failed to open document file link');
     } finally {
       setLoadingFile(false);
     }
@@ -1376,7 +1383,7 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
 
   const handleSaveEntry = async () => {
     if (!selectedMaterialId || !qty) {
-      Alert.alert('Error', 'Please select material and enter quantity.');
+      showAlert('Error', 'Please select material and enter quantity.');
       return;
     }
     try {
@@ -1396,24 +1403,24 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
       setNotes('');
       setBatchNumber('');
       setSupplierId('');
-      Alert.alert('Success', 'Inventory ledger transaction logged.');
+      showAlert('Success', 'Inventory ledger transaction logged.');
       refetchLedger();
       refetchStock();
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to log transaction');
+      showAlert('Error', e.message || 'Failed to log transaction');
     }
   };
 
   const handleIssueRequest = async () => {
     if (!selectedRequest || !issueQty || !issueBatch) {
-      Alert.alert('Error', 'Please enter quantity and batch number.');
+      showAlert('Error', 'Please enter quantity and batch number.');
       return;
     }
 
     // Try to resolve material master id
     const mat = materialsMaster.find(m => m.name.toLowerCase() === selectedRequest.material_name.toLowerCase());
     if (!mat) {
-      Alert.alert('Error', 'Could not resolve material master item in database');
+      showAlert('Error', 'Could not resolve material master item in database');
       return;
     }
 
@@ -1431,11 +1438,11 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
       setSelectedRequest(null);
       setIssueQty('');
       setIssueBatch('');
-      Alert.alert('Success', 'Material issued successfully.');
+      showAlert('Success', 'Material issued successfully.');
       refetchLedger();
       refetchStock();
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to issue material');
+      showAlert('Error', e.message || 'Failed to issue material');
     }
   };
 
@@ -1696,7 +1703,7 @@ function VariationsTab({ projectId, currentUserId }: { projectId: string; curren
     }
 
     if (!name || !qty || !rate) {
-      Alert.alert('Error', 'Please fill item name/material, quantity, and rate.');
+      showAlert('Error', 'Please fill item name/material, quantity, and rate.');
       return;
     }
 
@@ -1719,7 +1726,7 @@ function VariationsTab({ projectId, currentUserId }: { projectId: string; curren
 
   const handleSaveVariation = async () => {
     if (!title.trim() || items.length === 0) {
-      Alert.alert('Error', 'Please enter a title and add at least one item.');
+      showAlert('Error', 'Please enter a title and add at least one item.');
       return;
     }
     try {
@@ -1733,10 +1740,10 @@ function VariationsTab({ projectId, currentUserId }: { projectId: string; curren
       setTitle('');
       setDescription('');
       setItems([]);
-      Alert.alert('Success', 'Variation created successfully.');
+      showAlert('Success', 'Variation created successfully.');
       refetch();
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to create variation');
+      showAlert('Error', e.message || 'Failed to create variation');
     }
   };
 
@@ -1888,10 +1895,10 @@ function OldFacadeMapTab({ projectId }: { projectId: string }) {
   const handleInitMap = async () => {
     try {
       await initSections.mutateAsync(projectId);
-      Alert.alert('Success', 'Elevation matrix initialized successfully (Level 1 to 4, Bays A to D).');
+      showAlert('Success', 'Elevation matrix initialized successfully (Level 1 to 4, Bays A to D).');
       refetch();
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to initialize elevation matrix');
+      showAlert('Error', e.message || 'Failed to initialize elevation matrix');
     }
   };
 
@@ -2029,7 +2036,7 @@ function OldFacadeMapTab({ projectId }: { projectId: string }) {
                         setSelectedSection((prev: FacadeSection | null) => prev ? { ...prev, status: st } : null);
                         refetch();
                       } catch (e: any) {
-                        Alert.alert('Error', e.message || 'Failed to update status');
+                        showAlert('Error', e.message || 'Failed to update status');
                       }
                     }}
                     style={{ flex: 1, paddingVertical: 8, alignItems: 'center', backgroundColor: selectedSection.status === st ? '#fff' : 'transparent', borderRadius: 6 }}
@@ -2073,7 +2080,7 @@ function ExpensesTab({
   async function handleAdd() {
     const amt = parseFloat(amount);
     if (!desc.trim() || isNaN(amt) || amt <= 0) {
-      Alert.alert('Validation', 'Please enter a description and valid amount');
+      showAlert('Validation', 'Please enter a description and valid amount');
       return;
     }
     try {
@@ -2087,7 +2094,7 @@ function ExpensesTab({
       setDesc(''); setAmount(''); setCategory('');
       setShowAdd(false);
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to add expense');
+      showAlert('Error', e.message || 'Failed to add expense');
     }
   }
 
@@ -2184,18 +2191,18 @@ function PaymentsTab({ payments, projectId }: { payments: Payment[]; projectId: 
     try {
       await updatePayment.mutateAsync({ id: p.id, status: next });
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to update payment');
+      showAlert('Error', e.message || 'Failed to update payment');
     }
   }
 
   async function handleAdd() {
     const amt = parseFloat(amount);
     if (!milestoneName.trim()) {
-      Alert.alert('Validation', 'Please enter a milestone name');
+      showAlert('Validation', 'Please enter a milestone name');
       return;
     }
     if (isNaN(amt) || amt <= 0) {
-      Alert.alert('Validation', 'Please enter a valid amount');
+      showAlert('Validation', 'Please enter a valid amount');
       return;
     }
     try {
@@ -2210,12 +2217,12 @@ function PaymentsTab({ payments, projectId }: { payments: Payment[]; projectId: 
       setDueDate('');
       setShowAdd(false);
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to add payment milestone');
+      showAlert('Error', e.message || 'Failed to add payment milestone');
     }
   }
 
   function handleDelete(p: Payment) {
-    Alert.alert(
+    showAlert(
       'Delete milestone',
       `Remove "${p.milestone_name}"? This cannot be undone.`,
       [
@@ -2227,7 +2234,7 @@ function PaymentsTab({ payments, projectId }: { payments: Payment[]; projectId: 
             try {
               await deletePayment.mutateAsync({ id: p.id });
             } catch (e: any) {
-              Alert.alert('Error', e.message || 'Failed to delete payment');
+              showAlert('Error', e.message || 'Failed to delete payment');
             }
           },
         },
@@ -2679,6 +2686,7 @@ function ReportsTab({
   return (
     <>
       <SectionHeader title="Project Reports" />
+      <MISAnalyticsCharts tasks={tasks} overallProgressPct={project.progress_pct} />
       <Card style={styles.reportCard}>
         <Text style={styles.sectionCardTitle}>📊 Project Summary</Text>
         <ReportRow label="Progress" value={`${project.progress_pct}%`} />
@@ -3508,7 +3516,7 @@ export default function ProjectWorkspaceScreen() {
           <AttendanceTab projectId={id} />
         )}
         {tab === 'DPR' && (
-          <DprTab dprs={dprs} employees={employees} />
+          <DprTab dprs={dprs} employees={employees} project={project} />
         )}
         {tab === 'Photos' && (
           <PhotosTab dprs={dprs} />

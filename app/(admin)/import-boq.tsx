@@ -273,13 +273,121 @@ export default function ImportBOQScreen() {
     reader.readAsArrayBuffer(file);
   };
 
-  const triggerWebFileInput = () => {
+  const triggerWebFileInput = async () => {
     if (Platform.OS === 'web') {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.xlsx, .xls';
+      input.accept = '.xlsx, .xls, .csv';
       input.onchange = handleFileChange;
       input.click();
+    } else {
+      try {
+        const DocumentPicker = require('expo-document-picker');
+        const res = await DocumentPicker.getDocumentAsync({
+          type: [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'text/csv',
+            '*/*',
+          ],
+          copyToCacheDirectory: true,
+        });
+
+        if (!res.canceled && res.assets && res.assets[0]) {
+          const fileUri = res.assets[0].uri;
+          setIsLoading(true);
+          setError('');
+
+          const response = await fetch(fileUri);
+          const blob = await response.blob();
+          const reader = new FileReader();
+
+          reader.onload = (evt) => {
+            try {
+              const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+              const workbook = XLSX.read(data, { type: 'array' });
+              const sheetName = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[sheetName];
+              const jsonData = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+
+              if (!jsonData || jsonData.length === 0) {
+                throw new Error('Sheet is empty');
+              }
+
+              let bestHeaderIndex = 0;
+              let bestCols = { itemCol: -1, descCol: -1, qtyCol: -1, unitCol: -1, rateCol: -1, amtCol: -1 };
+              let maxMatchedCount = 0;
+
+              for (let r = 0; r < Math.min(jsonData.length, 15); r++) {
+                const row = jsonData[r];
+                if (!Array.isArray(row)) continue;
+                const cols = detectColumns(row);
+                let matchedCount = 0;
+                if (cols.itemCol !== -1) matchedCount++;
+                if (cols.qtyCol !== -1) matchedCount++;
+                if (cols.unitCol !== -1) matchedCount++;
+
+                if (matchedCount > maxMatchedCount) {
+                  maxMatchedCount = matchedCount;
+                  bestHeaderIndex = r;
+                  bestCols = cols;
+                }
+              }
+
+              if (bestCols.itemCol === -1 || bestCols.qtyCol === -1) {
+                throw new Error('Could not identify Item Name or Quantity columns in file.');
+              }
+
+              const rows: ParsedBOQRow[] = [];
+              for (let i = bestHeaderIndex + 1; i < jsonData.length; i++) {
+                const row = jsonData[i];
+                if (!Array.isArray(row)) continue;
+
+                const itemName = row[bestCols.itemCol] ? String(row[bestCols.itemCol]).trim() : '';
+                const quantity = parseFloat(row[bestCols.qtyCol]);
+                if (!itemName || isNaN(quantity)) continue;
+
+                const description = bestCols.descCol !== -1 && row[bestCols.descCol] ? String(row[bestCols.descCol]).trim() : '';
+                const unit = bestCols.unitCol !== -1 && row[bestCols.unitCol] ? String(row[bestCols.unitCol]).trim() : 'nos';
+                const rate = bestCols.rateCol !== -1 && !isNaN(parseFloat(row[bestCols.rateCol])) ? parseFloat(row[bestCols.rateCol]) : 0;
+                const amount = bestCols.amtCol !== -1 && !isNaN(parseFloat(row[bestCols.amtCol])) ? parseFloat(row[bestCols.amtCol]) : rate * quantity;
+
+                const matchResult = findBestMatch(itemName, masterMaterials);
+
+                rows.push({
+                  index: i,
+                  itemName,
+                  description,
+                  quantity,
+                  unit,
+                  rate,
+                  amount,
+                  matchedId: matchResult.material?.id || null,
+                  matchedName: matchResult.material?.name || null,
+                  confidence: matchResult.score,
+                  matchType: matchResult.type,
+                  learnAlias: matchResult.score > 0 && matchResult.score < 100,
+                });
+              }
+
+              if (rows.length === 0) {
+                throw new Error('No valid rows found (rows require Item Name and Quantity).');
+              }
+
+              setParsedRows(rows);
+            } catch (err: any) {
+              setError(err.message || 'Failed to read document');
+            } finally {
+              setIsLoading(false);
+            }
+          };
+
+          reader.readAsArrayBuffer(blob);
+        }
+      } catch (err: any) {
+        setError('Document selection canceled or failed.');
+        setIsLoading(false);
+      }
     }
   };
 

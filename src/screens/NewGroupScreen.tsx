@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Avatar, SearchBar, Button } from '../components';
 import { useChatContacts, useStartGroupConversation } from '../hooks/useConversations';
+import { showAlert } from '../utils/alert';
 import { colors } from '../theme/colors';
 import { typography, fontFamily } from '../theme/typography';
 import { spacing, radius } from '../theme/spacing';
@@ -54,11 +55,11 @@ export function NewGroupScreen({ conversationRoute }: NewGroupScreenProps) {
 
   const onCreateGroup = async () => {
     if (!title.trim()) {
-      Alert.alert('Missing Name', 'Please enter a group name.');
+      showAlert('Missing Name', 'Please enter a group name.');
       return;
     }
     if (selectedIds.size === 0) {
-      Alert.alert('Missing Members', 'Please select at least one member.');
+      showAlert('Missing Members', 'Please select at least one member.');
       return;
     }
     
@@ -70,7 +71,7 @@ export function NewGroupScreen({ conversationRoute }: NewGroupScreenProps) {
       router.push({ pathname: conversationRoute as any, params: { conversationId, title: title.trim() } });
     } catch (e: any) {
       console.error('Create group failed:', e);
-      Alert.alert('Could not start group chat', e?.message || 'Please try again.');
+      showAlert('Could not start group chat', e?.message || 'Please try again.');
     }
   };
 

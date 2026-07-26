@@ -89,6 +89,26 @@ export default function MyProfileScreen() {
     }
   };
 
+  const signOut = useAuthStore((s) => s.signOut);
+
+  const handleLogout = () => {
+    showAlert(
+      'Log Out',
+      'Are you sure you want to sign out of your account?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            router.replace('/(auth)/welcome');
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Light Header with Profile Overview */}
@@ -164,6 +184,22 @@ export default function MyProfileScreen() {
             <InfoRow icon="location" label="Address" value={profile.address || '—'} />
             <InfoRow icon="calendar" label="Joined" value={profile.joining_date ? new Date(profile.joining_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'} />
             <InfoRow icon="id-card" label="Employee ID" value={profile.worker_id || '—'} />
+
+            {/* Logout Card */}
+            <TouchableOpacity onPress={handleLogout} activeOpacity={0.8} style={{ marginTop: spacing.md }}>
+              <View style={[styles.card, { borderColor: 'rgba(220, 38, 38, 0.2)', backgroundColor: '#FEF2F2' }]}>
+                <View style={styles.infoRow}>
+                  <View style={[styles.iconWrap, { backgroundColor: 'rgba(220, 38, 38, 0.1)' }]}>
+                    <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: spacing.md }}>
+                    <Text style={[styles.infoLabel, { color: '#DC2626' }]}>Log Out</Text>
+                    <Text style={[styles.infoValue, { color: '#991B1B', textTransform: 'none' }]}>Sign out of your account</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#DC2626" />
+                </View>
+              </View>
+            </TouchableOpacity>
           </>
         )}
       </ScrollView>
