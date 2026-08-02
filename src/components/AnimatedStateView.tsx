@@ -108,9 +108,14 @@ export function AnimatedStateView({
     // Loading state badge
     return (
       <Animated.View style={[styles.badgeWrap, { transform: [{ scale: pulseScale }] }]}>
-        <View style={styles.loadingCircle}>
-          <ActivityIndicator size="large" color="#695030" />
-        </View>
+        <LinearGradient
+          colors={['#5B4122', '#8B6840']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.loadingCircle}
+        >
+          <ActivityIndicator size="large" color="#FFFFFF" />
+        </LinearGradient>
       </Animated.View>
     );
   };

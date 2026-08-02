@@ -1,15 +1,16 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, RefreshControl, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, RefreshControl, Image, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
 
-import { StatusChip } from '../../src/components';
+import { StatusChip, DatePickerField } from '../../src/components';
 import {
   useAllMaterials, useMaterialRequests, useDeliveries,
   useUpsertMaterial, useDecideMaterialRequest, useCreateDelivery, useMarkDelivered,
-  useDeliveryPhotoUrls,
+  useDeliveryPhotoUrls, useSubmitMaterialRequest,
 } from '../../src/hooks/useMaterials';
 import { useProjects } from '../../src/hooks/useProjects';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -36,6 +37,7 @@ export default function AdminMaterialsScreen() {
   const upsert = useUpsertMaterial();
   const createDelivery = useCreateDelivery();
   const markDelivered = useMarkDelivered();
+  const submitReq = useSubmitMaterialRequest();
 
   const projectName = useMemo(() => new Map((projects || []).map((p: any) => [p.id, p.name])), [projects]);
 
@@ -47,6 +49,29 @@ export default function AdminMaterialsScreen() {
   const [mUnit, setMUnit] = useState('');
   const [mQty, setMQty] = useState('');
   const [mProject, setMProject] = useState<string | null>(null);
+
+  // Request modal state
+  const [reqModal, setReqModal] = useState(false);
+  const [reqName, setReqName] = useState('');
+  const [reqSpec, setReqSpec] = useState('');
+  const [reqQty, setReqQty] = useState('');
+  const [reqNeededBy, setReqNeededBy] = useState('');
+  const [reqNotes, setReqNotes] = useState('');
+  const [reqProject, setReqProject] = useState<string | null>(null);
+
+  const handleAddPress = () => {
+    if (tab === 'requests') {
+      setReqName('');
+      setReqSpec('');
+      setReqQty('');
+      setReqNeededBy('');
+      setReqNotes('');
+      setReqProject(projects[0]?.id || null);
+      setReqModal(true);
+    } else {
+      openStockModal();
+    }
+  };
 
   const openStockModal = (item?: Material) => {
     setEditing(item || null);
@@ -60,7 +85,7 @@ export default function AdminMaterialsScreen() {
 
   const saveStock = async () => {
     if (!mName.trim() || !mProject) {
-      showAlert('Missing info', 'Material name and site are required.');
+      showAlert('Missing Info', 'Material name and site are required.');
       return;
     }
     try {
@@ -73,8 +98,38 @@ export default function AdminMaterialsScreen() {
         stock_qty: mQty ? Number(mQty) : 0,
       });
       setStockModal(false);
+      rStock();
+      showAlert('Success', editing ? 'Stock updated' : 'Stock item added');
     } catch (e: any) {
-      showAlert('Could not save', e?.message || 'Please try again.');
+      showAlert('Could Not Save', e?.message || 'Please try again.');
+    }
+  };
+
+  const saveRequest = async () => {
+    if (!reqName.trim() || !reqQty || !reqProject || !profile) {
+      showAlert('Missing Info', 'Material name, quantity, and site are required.');
+      return;
+    }
+    const q = parseFloat(reqQty);
+    if (isNaN(q) || q <= 0) {
+      showAlert('Invalid Quantity', 'Please enter a valid quantity.');
+      return;
+    }
+    try {
+      await submitReq.mutateAsync({
+        projectId: reqProject,
+        requestedBy: profile.id,
+        materialName: reqName.trim(),
+        qty: q,
+        spec: reqSpec.trim() || undefined,
+        neededBy: reqNeededBy.trim() || undefined,
+        notes: reqNotes.trim() || undefined,
+      });
+      setReqModal(false);
+      rReq();
+      showAlert('Success', 'Material request created successfully.');
+    } catch (e: any) {
+      showAlert('Error', e?.message || 'Could not submit request.');
     }
   };
 
@@ -106,26 +161,28 @@ export default function AdminMaterialsScreen() {
       {/* Light Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
         <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={20} color="#1E1815" />
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+            <Ionicons name="arrow-back-sharp" size={20} color="#1E1815" />
           </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerLabel}>Inventory</Text>
+          <View style={{ flex: 1, marginLeft: spacing.md }}>
+            <Text style={styles.headerLabel}>Inventory & Logistics</Text>
             <Text style={styles.headerTitle}>Materials</Text>
           </View>
-          <TouchableOpacity style={styles.addBtn} onPress={() => openStockModal()}>
-            <Ionicons name="add" size={24} color="#1E1815" />
+          <TouchableOpacity style={styles.addBtn} onPress={handleAddPress} activeOpacity={0.8}>
+            <LinearGradient colors={['#5B4122', '#8B6840']} style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', borderRadius: 22 }]}>
+              <Ionicons name="add-sharp" size={22} color="#FFFFFF" />
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
         {/* Pipeline Strip */}
         <View style={styles.pipelineStrip}>
           <FlowStat label="Pending" value={pending.length} color="#F59E0B" />
-          <Ionicons name="chevron-forward" size={14} color={colors.neutral[300]} />
+          <Ionicons name="chevron-forward-sharp" size={14} color={colors.neutral[400]} />
           <FlowStat label="Approved" value={approved.length} color="#3B82F6" />
-          <Ionicons name="chevron-forward" size={14} color={colors.neutral[300]} />
+          <Ionicons name="chevron-forward-sharp" size={14} color={colors.neutral[400]} />
           <FlowStat label="Ordered" value={ordered.length} color="#8B5CF6" />
-          <Ionicons name="chevron-forward" size={14} color={colors.neutral[300]} />
+          <Ionicons name="chevron-forward-sharp" size={14} color={colors.neutral[400]} />
           <FlowStat label="Delivered" value={delivered.length} color="#10B981" />
         </View>
       </View>
@@ -142,17 +199,17 @@ export default function AdminMaterialsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={f1 || f2 || f3} onRefresh={() => { rReq(); rStock(); rDel(); }} tintColor="#14B8A6" />}
+        refreshControl={<RefreshControl refreshing={f1 || f2 || f3} onRefresh={() => { rReq(); rStock(); rDel(); }} tintColor="#695030" />}
       >
         {tab === 'requests' && (
           <>
-            {requests.length === 0 && <EmptyState icon="cube-outline" title="No requests" text="Material requests from sites will appear here." />}
+            {requests.length === 0 && <EmptyState icon="cube-sharp" title="No requests" text="Tap + to create a site material request." />}
             {requests.map((req) => (
               <View key={req.id} style={styles.card}>
                 <View style={styles.cardHead}>
-                  <View style={styles.cardIconWrap}>
-                    <Ionicons name="cube" size={20} color="#695030" />
-                  </View>
+                  <LinearGradient colors={['#5B4122', '#8B6840']} style={styles.cardIconWrap}>
+                    <Ionicons name="cube-sharp" size={20} color="#FFFFFF" />
+                  </LinearGradient>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle}>{req.material_name}</Text>
                     <Text style={styles.cardMeta}>
@@ -241,24 +298,178 @@ export default function AdminMaterialsScreen() {
       </ScrollView>
 
       {/* Stock Modal */}
-      <Modal visible={stockModal} transparent animationType="fade" onRequestClose={() => setStockModal(false)}>
-        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setStockModal(false)}>
-          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + spacing.xl }]} onStartShouldSetResponder={() => true}>
+      <Modal visible={stockModal} transparent animationType="slide" onRequestClose={() => setStockModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setStockModal(false)} />
+          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + spacing.xl }]}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>{editing ? 'Edit Stock' : 'Add Stock'}</Text>
-            
-            <Text style={styles.inputLabel}>Material Name *</Text>
-            <View style={styles.inputWrap}>
-              <Text style={{ flex: 1, color: '#1E1815' }}>{mName || 'e.g. Aluminium Section AA6063'}</Text>
-            </View>
-            
-             <TouchableOpacity style={styles.saveBtn} activeOpacity={0.8} onPress={saveStock} disabled={upsert.isPending}>
-                <View style={styles.saveBtnBg}>
-                  <Text style={styles.saveBtnText}>{editing ? 'Save Changes' : 'Add Stock'}</Text>
+            <Text style={styles.sheetTitle}>{editing ? 'Edit Stock Item' : 'Add Stock Item'}</Text>
+
+            <ScrollView contentContainerStyle={{ gap: spacing.xs }} style={{ maxHeight: 400 }}>
+              <Text style={styles.inputLabel}>Site / Project *</Text>
+              <View style={styles.pickerWrap}>
+                <Picker
+                  selectedValue={mProject}
+                  onValueChange={(val) => setMProject(val)}
+                  mode="dropdown"
+                  dropdownIconColor="#4A3820"
+                  style={{ height: 50, color: '#1E1815', backgroundColor: '#FFFFFF' }}
+                >
+                  {projects.map((p: any) => (
+                    <Picker.Item key={p.id} label={p.name} value={p.id} color="#1E1815" style={{ backgroundColor: '#FFFFFF' }} />
+                  ))}
+                </Picker>
+              </View>
+
+              <Text style={styles.inputLabel}>Material Name *</Text>
+              <View style={styles.inputWrap}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. Aluminium Section AA6063"
+                  placeholderTextColor="#94A3B8"
+                  value={mName}
+                  onChangeText={setMName}
+                />
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Quantity *</Text>
+                  <View style={styles.inputWrap}>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="e.g. 100"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="numeric"
+                      value={mQty}
+                      onChangeText={setMQty}
+                    />
+                  </View>
                 </View>
-              </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Unit</Text>
+                  <View style={styles.inputWrap}>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="e.g. sqm / pcs"
+                      placeholderTextColor="#94A3B8"
+                      value={mUnit}
+                      onChangeText={setMUnit}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <Text style={styles.inputLabel}>Specification / Grade</Text>
+              <View style={styles.inputWrap}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. Grade A6 / Bronze Anodized"
+                  placeholderTextColor="#94A3B8"
+                  value={mSpec}
+                  onChangeText={setMSpec}
+                />
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity style={styles.saveBtn} activeOpacity={0.8} onPress={saveStock} disabled={upsert.isPending}>
+              <View style={styles.saveBtnBg}>
+                <Text style={styles.saveBtnText}>{editing ? 'Save Changes' : 'Add Stock Item'}</Text>
+              </View>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* Create Material Request Modal */}
+      <Modal visible={reqModal} transparent animationType="slide" onRequestClose={() => setReqModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setReqModal(false)} />
+          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + spacing.xl }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>New Material Request</Text>
+
+            <ScrollView contentContainerStyle={{ gap: spacing.xs }} style={{ maxHeight: 420 }}>
+              <Text style={styles.inputLabel}>Site / Project *</Text>
+              <View style={styles.pickerWrap}>
+                <Picker
+                  selectedValue={reqProject}
+                  onValueChange={(val) => setReqProject(val)}
+                  mode="dropdown"
+                  dropdownIconColor="#4A3820"
+                  style={{ height: 50, color: '#1E1815', backgroundColor: '#FFFFFF' }}
+                >
+                  {projects.map((p: any) => (
+                    <Picker.Item key={p.id} label={p.name} value={p.id} color="#1E1815" style={{ backgroundColor: '#FFFFFF' }} />
+                  ))}
+                </Picker>
+              </View>
+
+              <Text style={styles.inputLabel}>Material Name *</Text>
+              <View style={styles.inputWrap}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. Structural Silicon Sealant / Brackets"
+                  placeholderTextColor="#94A3B8"
+                  value={reqName}
+                  onChangeText={setReqName}
+                />
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Quantity *</Text>
+                  <View style={styles.inputWrap}>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="e.g. 50"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="numeric"
+                      value={reqQty}
+                      onChangeText={setReqQty}
+                    />
+                  </View>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Specification</Text>
+                  <View style={styles.inputWrap}>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="e.g. Grade 1"
+                      placeholderTextColor="#94A3B8"
+                      value={reqSpec}
+                      onChangeText={setReqSpec}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <DatePickerField
+                label="Needed By Date"
+                value={reqNeededBy}
+                onChange={setReqNeededBy}
+                placeholder="Select date (e.g. YYYY-MM-DD)"
+              />
+
+              <Text style={styles.inputLabel}>Notes / Delivery Location</Text>
+              <View style={styles.inputWrap}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. Deliver to Tower A 5th Floor"
+                  placeholderTextColor="#94A3B8"
+                  value={reqNotes}
+                  onChangeText={setReqNotes}
+                />
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity style={styles.saveBtn} activeOpacity={0.8} onPress={saveRequest} disabled={submitReq.isPending}>
+              <View style={styles.saveBtnBg}>
+                <Text style={styles.saveBtnText}>Submit Material Request</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -399,11 +610,13 @@ const styles = StyleSheet.create({
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(20,16,12,0.5)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: spacing.xl },
-  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', alignSelf: 'center', marginBottom: spacing.lg },
-  sheetTitle: { fontSize: 20, fontFamily: fontFamily.bold, color: '#1E1815', marginBottom: spacing.lg },
-  inputLabel: { fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[500], marginTop: spacing.md, marginBottom: 8 },
-  inputWrap: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: colors.neutral[200], borderRadius: 14, padding: spacing.md },
-  saveBtn: { marginTop: spacing.xl, borderRadius: 16, overflow: 'hidden' },
-  saveBtnBg: { backgroundColor: '#695030', paddingVertical: spacing.lg, alignItems: 'center' },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', alignSelf: 'center', marginBottom: spacing.md },
+  sheetTitle: { fontSize: 20, fontFamily: fontFamily.bold, color: '#1E1815', marginBottom: spacing.md },
+  inputLabel: { fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[500], marginTop: spacing.xs, marginBottom: 4 },
+  inputWrap: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: colors.neutral[200], borderRadius: 14, paddingHorizontal: spacing.md, paddingVertical: 8 },
+  pickerWrap: { backgroundColor: '#F8FAF9', borderRadius: 14, overflow: 'hidden', borderWidth: 0 },
+  textInput: { fontSize: 14, fontFamily: fontFamily.medium, color: '#1E1815', padding: 0 },
+  saveBtn: { marginTop: spacing.lg, borderRadius: 16, overflow: 'hidden' },
+  saveBtnBg: { backgroundColor: '#695030', paddingVertical: spacing.md, alignItems: 'center' },
   saveBtnText: { fontSize: 16, fontFamily: fontFamily.bold, color: '#fff' },
 });

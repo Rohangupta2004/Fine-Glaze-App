@@ -15,19 +15,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card } from '../../src/components';
-import { AreaChart } from '../../src/components/SVGCharts';
-import { useAuthStore } from '../../src/stores/authStore';
-import { useProjects } from '../../src/hooks/useProjects';
-import { useEmployees } from '../../src/hooks/useEmployees';
-import { usePendingDprs, usePendingLeave, usePendingMaterialRequests } from '../../src/hooks/useApprovals';
-import { useUnreadCount, useNotifications } from '../../src/hooks/useNotifications';
-import { useMyTasks } from '../../src/hooks/useTasks';
-import { colors } from '../../src/theme/colors';
-import { fontFamily } from '../../src/theme/typography';
-import { spacing } from '../../src/theme/spacing';
+import { Card } from '../../../src/components';
+import { AreaChart } from '../../../src/components/SVGCharts';
+import { useAuthStore } from '../../../src/stores/authStore';
+import { useProjects } from '../../../src/hooks/useProjects';
+import { useEmployees } from '../../../src/hooks/useEmployees';
+import { usePendingDprs, usePendingLeave, usePendingMaterialRequests } from '../../../src/hooks/useApprovals';
+import { useUnreadCount, useNotifications } from '../../../src/hooks/useNotifications';
+import { useMyTasks } from '../../../src/hooks/useTasks';
+import { colors } from '../../../src/theme/colors';
+import { fontFamily } from '../../../src/theme/typography';
+import { spacing } from '../../../src/theme/spacing';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../src/lib/supabase';
+import { supabase } from '../../../src/lib/supabase';
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -117,7 +117,7 @@ export default function AdminHomeScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: spacing.md }}>
               <View style={styles.brandLogoFrame}>
                 <Image 
-                  source={require('../../assets/images/logo.png')} 
+                  source={require('../../../assets/images/logo.png')} 
                   style={styles.brandLogoImage} 
                   resizeMode="contain" 
                 />
@@ -150,9 +150,10 @@ export default function AdminHomeScreen() {
             <TouchableOpacity 
               style={styles.actionChip}
               onPress={() => router.push('/(admin)/create-project' as any)}
+              activeOpacity={0.8}
             >
-              <LinearGradient colors={['#695030', '#8B6840']} style={styles.chipGradient} start={{x:0, y:0}} end={{x:1, y:1}}>
-                <Ionicons name="add-circle" size={16} color="#FFF" />
+              <LinearGradient colors={['#5B4122', '#8B6840', '#A88454']} style={styles.chipGradient} start={{x:0, y:0}} end={{x:1, y:1}}>
+                <Ionicons name="add-circle-sharp" size={16} color="#FFF" />
                 <Text style={styles.actionChipTextPrimary}>+ New Project</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -160,24 +161,27 @@ export default function AdminHomeScreen() {
             <TouchableOpacity 
               style={styles.actionChipSecondary}
               onPress={() => router.push('/(admin)/add-employee' as any)}
+              activeOpacity={0.8}
             >
-              <Ionicons name="person-add-outline" size={15} color="#695030" />
+              <Ionicons name="person-add-sharp" size={15} color="#695030" />
               <Text style={styles.actionChipTextSecondary}>Add Employee</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={styles.actionChipSecondary}
               onPress={() => router.push('/(admin)/approvals' as any)}
+              activeOpacity={0.8}
             >
-              <Ionicons name="checkmark-done-circle-outline" size={16} color="#695030" />
+              <Ionicons name="checkmark-done-circle-sharp" size={16} color="#695030" />
               <Text style={styles.actionChipTextSecondary}>DPR Approvals ({pendingDprs?.length || 0})</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={styles.actionChipSecondary}
               onPress={() => router.push('/(admin)/materials' as any)}
+              activeOpacity={0.8}
             >
-              <Ionicons name="cube-outline" size={15} color="#695030" />
+              <Ionicons name="cube-sharp" size={15} color="#695030" />
               <Text style={styles.actionChipTextSecondary}>Materials</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -186,33 +190,33 @@ export default function AdminHomeScreen() {
             <TopStatCard 
               title="Active Sites" 
               value={activeProjects.length} 
-              icon="business" 
-              iconGradient={['#695030', '#8B6840']}
-              cardGradient={['#FFFFFF', '#FAF7F0']}
-              onPress={() => router.push('/(admin)/projects')} 
+              icon="business-sharp" 
+              iconGradient={['#059669', '#10B981']}
+              cardGradient={['#FFFFFF', '#F0FDF4']}
+              onPress={() => router.push('/(admin)/projects' as any)} 
             />
             <TopStatCard 
               title="Notifications" 
               value={unreadCount || 0} 
-              icon="notifications" 
-              iconGradient={['#B89047', '#D4AF37']}
-              cardGradient={['#FFFFFF', '#FDFBF7']}
+              icon="notifications-sharp" 
+              iconGradient={['#D97706', '#F59E0B']}
+              cardGradient={['#FFFFFF', '#FFFBEB']}
               onPress={() => router.push('/(admin)/notifications')} 
             />
             <TopStatCard 
               title="DPR Pending" 
               value={pendingDprs?.length || 0} 
-              icon="document-text" 
-              iconGradient={['#9A7B4F', '#C4A97A']}
-              cardGradient={['#FFFFFF', '#FBF8F2']}
+              icon="document-text-sharp" 
+              iconGradient={['#4F46E5', '#6366F1']}
+              cardGradient={['#FFFFFF', '#EEF2FF']}
               onPress={() => router.push('/(admin)/approvals')} 
             />
             <TopStatCard 
               title="Active Team" 
               value={activeEmployees.length} 
-              icon="people" 
-              iconGradient={['#4A3728', '#695030']}
-              cardGradient={['#FFFFFF', '#FAF6F0']}
+              icon="people-sharp" 
+              iconGradient={['#1E40AF', '#3B82F6']}
+              cardGradient={['#FFFFFF', '#EFF6FF']}
               onPress={() => router.push('/(admin)/employees')} 
             />
           </ScrollView>
@@ -224,7 +228,7 @@ export default function AdminHomeScreen() {
           actionLabel="View detailed" 
           onAction={() => router.push('/(admin)/analytics')} 
         />
-        <Card style={styles.chartCard} padding={spacing.lg} variant="flat" gradientColors={['#FFFFFF', '#FFFFFF']}>
+        <Card style={styles.chartCard} padding={spacing.lg} variant="flat" gradientColors={['#FFFFFF', '#FDFBF7']}>
           <Text style={styles.chartTitle}>DPR Submissions (Daily)</Text>
           {dprTrend && (
             <AreaChart 
@@ -243,44 +247,44 @@ export default function AdminHomeScreen() {
           <ManageCard 
             title="Projects" 
             subtitle="Workspaces & Sites" 
-            icon="business" 
-            iconGradient={['#695030', '#8B6840']}
+            icon="business-sharp" 
+            iconGradient={['#8B6840', '#B89047']}
             fullWidth={true}
-            onPress={() => router.push('/(admin)/projects')}
+            onPress={() => router.push('/(admin)/projects' as any)}
           />
           <ManageCard 
             title="Employees" 
             subtitle="Team & Roles" 
-            icon="people" 
-            iconGradient={['#B89047', '#D4AF37']}
+            icon="people-sharp" 
+            iconGradient={['#4338CA', '#6366F1']}
             onPress={() => router.push('/(admin)/employees')}
           />
           <ManageCard 
             title="Clients" 
             subtitle="Organisations" 
-            icon="folder" 
-            iconGradient={['#9A7B4F', '#C4A97A']}
+            icon="briefcase-sharp" 
+            iconGradient={['#0D9488', '#14B8A6']}
             onPress={() => router.push('/(admin)/clients')}
           />
           <ManageCard 
             title="Materials" 
             subtitle="Stock & Supplies" 
-            icon="cube" 
-            iconGradient={['#4A3728', '#695030']}
+            icon="cube-sharp" 
+            iconGradient={['#E11D48', '#F43F5E']}
             onPress={() => router.push('/(admin)/materials')}
           />
           <ManageCard 
             title="Documents" 
             subtitle="Vault & Uploads" 
-            icon="document-text" 
-            iconGradient={['#8B6840', '#B89047']}
+            icon="folder-open-sharp" 
+            iconGradient={['#1E293B', '#334155']}
             onPress={() => router.push('/(admin)/documents')}
           />
           <ManageCard 
             title="Assign Site" 
             subtitle="Allocate Team & Workers" 
-            icon="people-circle" 
-            iconGradient={['#2C2219', '#4A3728']}
+            icon="map-sharp" 
+            iconGradient={['#6D28D9', '#8B5CF6']}
             fullWidth={true}
             onPress={() => router.push('/(admin)/assign-site')}
           />
@@ -293,10 +297,16 @@ export default function AdminHomeScreen() {
 
 interface SectionHeaderProps { title: string; actionLabel?: string; onAction?: () => void; }
 function SectionHeader({ title, actionLabel, onAction }: SectionHeaderProps) {
+  const getHeaderIcon = (t: string) => {
+    if (t === "Performance Trends") return "trending-up-sharp";
+    if (t === "Workspace") return "grid-sharp";
+    return "briefcase-sharp";
+  };
+
   return (
     <View style={styles.sectionHeader}>
       <View style={styles.titleWrap}>
-        <Ionicons name={title === "Manage" ? "options" : "business"} size={18} color="#695030" style={{ marginRight: 6 }} />
+        <Ionicons name={getHeaderIcon(title)} size={18} color="#695030" style={{ marginRight: 6 }} />
         <Text style={styles.sectionTitle}>{title}</Text>
       </View>
       {actionLabel && onAction && (
@@ -338,7 +348,7 @@ function TopStatCard({
           colors={iconGradient as any}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.statIconWrap, { boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.12)' } as any]}
+          style={[styles.statIconWrap, { boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.16)' } as any]}
         >
           <Ionicons name={icon as any} size={20} color="#FFFFFF" />
         </LinearGradient>
@@ -370,7 +380,7 @@ function ManageCard({
       onPress={onPress} 
       style={[styles.manageCard, fullWidth ? { width: '100%' } : styles.manageCardWrap]} 
       variant="interactive"
-      gradientColors={['#FFFFFF', '#FFFFFF']}
+      gradientColors={['#FFFFFF', '#FDFBF7']}
       padding={spacing.lg}
     >
       <View style={styles.manageCardInner}>
@@ -378,7 +388,7 @@ function ManageCard({
           colors={iconGradient as any}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.manageIconWrap, { boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.12)' } as any]}
+          style={[styles.manageIconWrap, { boxShadow: '0px 4px 14px rgba(0, 0, 0, 0.16)' } as any]}
         >
           <Ionicons name={icon as any} size={22} color="#FFFFFF" />
         </LinearGradient>
@@ -387,7 +397,7 @@ function ManageCard({
           <Text style={styles.manageSub} numberOfLines={1}>{subtitle}</Text>
         </View>
         <View style={styles.manageArrow}>
-          <Ionicons name="arrow-forward" size={16} color="#8B6840" />
+          <Ionicons name="arrow-forward-sharp" size={16} color="#8B6840" />
         </View>
       </View>
     </Card>

@@ -5,9 +5,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
-import { StatusChip } from '../../src/components';
+import { StatusChip, AssignProjectModal } from '../../src/components';
 import { useEmployees, useEmployeeAssignments } from '../../src/hooks/useEmployees';
 import { useProjects } from '../../src/hooks/useProjects';
 import { colors } from '../../src/theme/colors';
@@ -44,6 +45,8 @@ export default function EmployeesScreen() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ProfileStatus | 'all'>('all');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [assignTargetEmployee, setAssignTargetEmployee] = useState<any>(null);
+  const [actionSheetEmployee, setActionSheetEmployee] = useState<any>(null);
 
   const roster = useMemo(() => {
     const people = employees.filter(
@@ -74,27 +77,29 @@ export default function EmployeesScreen() {
       <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
         <View style={styles.headerTop}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={20} color="#1E1815" />
+            <Ionicons name="arrow-back-sharp" size={20} color="#1E1815" />
           </TouchableOpacity>
           <View style={{ flex: 1, marginLeft: spacing.md }}>
             <Text style={styles.headerLabel}>{getGreeting()} 👋</Text>
-            <Text style={styles.headerTitle}>Team</Text>
+            <Text style={styles.headerTitle}>Team Hub</Text>
           </View>
           <TouchableOpacity style={styles.addBtn} onPress={() => setMenuOpen(true)} activeOpacity={0.8}>
-            <Ionicons name="add" size={22} color="#fff" />
+            <LinearGradient colors={['#5B4122', '#8B6840']} style={[StyleSheet.absoluteFill, { borderRadius: 22, alignItems: 'center', justifyContent: 'center' }]}>
+              <Ionicons name="add-sharp" size={22} color="#fff" />
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
         {/* Stats */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsRow}>
-          <StatChip icon="briefcase" value={roster.count} label="Total" iconBg="#6A4E36" lineBg="#6A4E36" />
-          <StatChip icon="people" value={roster.groups.length} label="Active Sites" iconBg="#A47D4C" lineBg="#A47D4C" />
-          <StatChip icon="time" value={roster.unassigned.length} label="Unassigned" iconBg="#9E4723" lineBg="#9E4723" />
+          <StatChip icon="people-sharp" value={roster.count} label="Total" gradient={['#5B4122', '#8B6840']} />
+          <StatChip icon="business-sharp" value={roster.groups.length} label="Active Sites" gradient={['#059669', '#10B981']} />
+          <StatChip icon="time-sharp" value={roster.unassigned.length} label="Unassigned" gradient={['#D97706', '#F59E0B']} />
         </ScrollView>
 
         {/* Search */}
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color="#8B7E74" />
+          <Ionicons name="search-sharp" size={18} color="#695030" />
           <TextInput
             style={styles.searchInput}
             placeholder="Search teams or people..."
@@ -104,10 +109,10 @@ export default function EmployeesScreen() {
           />
           {search ? (
             <TouchableOpacity onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={18} color="#ccc" />
+              <Ionicons name="close-circle-sharp" size={18} color="#ccc" />
             </TouchableOpacity>
           ) : (
-            <Ionicons name="filter" size={18} color="#8B7E74" />
+            <Ionicons name="options-sharp" size={18} color="#8B7E74" />
           )}
         </View>
       </View>
@@ -122,11 +127,18 @@ export default function EmployeesScreen() {
           {FILTERS.map((f) => (
             <TouchableOpacity
               key={f.value}
-              style={[styles.chip, filter === f.value && styles.chipActive]}
               onPress={() => setFilter(f.value)}
               activeOpacity={0.8}
             >
-              <Text style={[styles.chipText, filter === f.value && styles.chipTextActive]}>{f.label}</Text>
+              {filter === f.value ? (
+                <LinearGradient colors={['#5B4122', '#8B6840']} style={styles.chip}>
+                  <Text style={styles.chipTextActive}>{f.label}</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.chip}>
+                  <Text style={styles.chipText}>{f.label}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -158,7 +170,8 @@ export default function EmployeesScreen() {
                 person={person}
                 siteRole={role}
                 roleLabel={roleLabel}
-                onPress={() => router.push({ pathname: '/(admin)/employee-profile' as any, params: { id: person.id } })}
+                onPress={() => setActionSheetEmployee(person)}
+                onAssign={() => setAssignTargetEmployee(person)}
               />
             ))}
           </View>
@@ -177,7 +190,8 @@ export default function EmployeesScreen() {
                 key={person.id}
                 person={person}
                 roleLabel={roleLabel}
-                onPress={() => router.push({ pathname: '/(admin)/employee-profile' as any, params: { id: person.id } })}
+                onPress={() => setActionSheetEmployee(person)}
+                onAssign={() => setAssignTargetEmployee(person)}
               />
             ))}
           </View>
@@ -185,70 +199,123 @@ export default function EmployeesScreen() {
 
         {!roster.count && (
           <View style={styles.empty}>
-            <Ionicons name="people-outline" size={52} color={colors.neutral[300]} />
+            <Ionicons name="people-sharp" size={52} color={colors.neutral[300]} />
             <Text style={styles.emptyText}>No people match this view</Text>
           </View>
         )}
       </ScrollView>
 
-      {/* Action Modal */}
-      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setMenuOpen(false)}>
+      {/* Employee Click Action Modal */}
+      <Modal visible={!!actionSheetEmployee} transparent animationType="fade" onRequestClose={() => setActionSheetEmployee(null)}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setActionSheetEmployee(null)}>
           <View style={styles.bottomSheet}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Team Actions</Text>
+            <Text style={styles.sheetTitle}>{actionSheetEmployee?.full_name}</Text>
+
             <SheetItem
-              icon="person-add-outline"
-              title="Add Employee"
-              detail="Create a worker, supervisor or manager account"
-              onPress={() => { setMenuOpen(false); router.push('/(admin)/add-employee' as any); }}
+              icon="person-circle-sharp"
+              title="View Full Profile"
+              detail="Personal details, documents & assignments"
+              onPress={() => {
+                const emp = actionSheetEmployee;
+                setActionSheetEmployee(null);
+                router.push({ pathname: '/(admin)/employee-profile' as any, params: { id: emp?.id } });
+              }}
             />
             <SheetItem
-              icon="people-outline"
-              title="Assign to Project"
-              detail="Manage the roster from a project workspace"
-              onPress={() => { setMenuOpen(false); router.push('/(admin)/projects' as any); }}
+              icon="person-add-sharp"
+              title="Assign to Site"
+              detail="Allocate workspace site and role"
+              onPress={() => {
+                const emp = actionSheetEmployee;
+                setActionSheetEmployee(null);
+                setAssignTargetEmployee(emp);
+              }}
             />
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Quick Add Employee Floating Modal */}
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setMenuOpen(false)}>
+          <View style={styles.bottomSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Team Operations</Text>
+
+            <SheetItem
+              icon="person-add-sharp"
+              title="Add New Employee"
+              detail="Create new profile and generate credentials"
+              onPress={() => { setMenuOpen(false); router.push('/(admin)/add-employee' as any); }}
+            />
+            <SheetItem
+              icon="swap-horizontal-sharp"
+              title="Assign Site Workers"
+              detail="Batch allocate workforce across project sites"
+              onPress={() => { setMenuOpen(false); router.push('/(admin)/assign-site' as any); }}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Assign Modal */}
+      {assignTargetEmployee && (
+        <AssignProjectModal
+          visible={!!assignTargetEmployee}
+          employee={assignTargetEmployee}
+          onClose={() => setAssignTargetEmployee(null)}
+          onSuccess={() => {
+            refetchEmployees();
+            refetchAssignments();
+          }}
+        />
+      )}
     </View>
   );
 }
 
-function StatChip({ icon, value, label, iconBg, lineBg }: { icon: string; value: number; label: string; iconBg: string; lineBg: string; }) {
+function StatChip({ icon, value, label, gradient }: any) {
   return (
     <View style={styles.statCardWrap}>
-      <View style={styles.statCard}>
+      <LinearGradient colors={['#FFFFFF', '#FDFBF7']} start={{x:0, y:0}} end={{x:1, y:1}} style={styles.statCard}>
         <View style={styles.statCardTop}>
-          <View style={[styles.statIconWrap, { backgroundColor: iconBg }]}>
+          <LinearGradient colors={gradient} style={styles.statIconWrap}>
             <Ionicons name={icon as any} size={18} color="#fff" />
-          </View>
+          </LinearGradient>
         </View>
         <Text style={styles.statValue}>{value}</Text>
         <Text style={styles.statLabel}>{label}</Text>
-        <View style={[styles.statLine, { backgroundColor: lineBg }]} />
-      </View>
+      </LinearGradient>
     </View>
   );
 }
 
-function PersonCard({ person, siteRole, roleLabel, onPress }: any) {
+function PersonCard({ person, siteRole, roleLabel, onPress, onAssign }: any) {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
-      <View style={styles.personCard}>
-        <View style={styles.avatarPlaceholder}>
+      <LinearGradient colors={['#FFFFFF', '#FDFBF7']} start={{x:0, y:0}} end={{x:1, y:1}} style={styles.personCard}>
+        <LinearGradient colors={['#5B4122', '#8B6840']} style={styles.avatarPlaceholder}>
           <Text style={styles.avatarText}>
             {person.full_name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
           </Text>
-        </View>
+        </LinearGradient>
         <View style={{ flex: 1 }}>
           <Text style={styles.personName}>{person.full_name}</Text>
           <Text style={styles.personRole}>{siteRole || roleLabel[person.role] || person.role}</Text>
         </View>
         <StatusChip status={person.status} size="sm" />
-        <Ionicons name="chevron-forward" size={15} color={colors.neutral[300]} style={{ marginLeft: spacing.xs }} />
-      </View>
+        <TouchableOpacity
+          style={styles.quickAssignBtn}
+          onPress={(e) => {
+            e.stopPropagation();
+            if (onAssign) onAssign();
+          }}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="person-add-sharp" size={20} color="#695030" />
+        </TouchableOpacity>
+      </LinearGradient>
     </TouchableOpacity>
   );
 }
@@ -256,14 +323,14 @@ function PersonCard({ person, siteRole, roleLabel, onPress }: any) {
 function SheetItem({ icon, title, detail, onPress }: any) {
   return (
     <TouchableOpacity style={styles.sheetItem} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.sheetIcon}>
-        <Ionicons name={icon} size={20} color="#695030" />
-      </View>
+      <LinearGradient colors={['#5B4122', '#8B6840']} style={styles.sheetIcon}>
+        <Ionicons name={icon} size={20} color="#FFFFFF" />
+      </LinearGradient>
       <View style={{ flex: 1 }}>
         <Text style={styles.sheetItemTitle}>{title}</Text>
         <Text style={styles.sheetItemDetail}>{detail}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={16} color={colors.neutral[300]} />
+      <Ionicons name="chevron-forward-sharp" size={16} color={colors.neutral[300]} />
     </TouchableOpacity>
   );
 }
@@ -351,6 +418,7 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 16, fontFamily: fontFamily.bold, color: '#695030' },
   personName: { fontSize: 15, fontFamily: fontFamily.bold, color: '#1E1815' },
   personRole: { fontSize: 12, color: '#8B7E74', marginTop: 2, textTransform: 'capitalize', fontFamily: fontFamily.medium },
+  quickAssignBtn: { padding: spacing.xs, marginLeft: spacing.xs },
 
   // Empty
   empty: { alignItems: 'center', paddingVertical: 80, gap: spacing.md },

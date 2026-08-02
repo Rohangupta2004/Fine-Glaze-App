@@ -33,11 +33,11 @@ export default function GlobalSearchScreen() {
     <View style={[styles.container, { paddingTop: insets.top + spacing.md }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
+        <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F5F2EC' }}>
+          <Ionicons name="arrow-back-sharp" size={20} color="#1E1815" />
         </TouchableOpacity>
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color={colors.neutral[400]} />
+          <Ionicons name="search-sharp" size={20} color="#8B7E74" />
           <TextInput
             style={styles.searchInput}
             placeholder="Search employees, projects, materials..."
@@ -49,7 +49,7 @@ export default function GlobalSearchScreen() {
           />
           {query.length > 0 && (
             <TouchableOpacity onPress={() => setQuery('')}>
-              <Ionicons name="close-circle" size={20} color={colors.neutral[400]} />
+              <Ionicons name="close-circle-sharp" size={20} color="#8B7E74" />
             </TouchableOpacity>
           )}
         </View>
@@ -63,14 +63,14 @@ export default function GlobalSearchScreen() {
 
       {query.length < 2 && (
         <View style={styles.hintContainer}>
-          <Ionicons name="search-outline" size={48} color={colors.neutral[300]} />
+          <Ionicons name="search-sharp" size={48} color="#C4B9A8" />
           <Text style={styles.hintText}>Type at least 2 characters to search</Text>
         </View>
       )}
 
       {results && results.totalCount === 0 && query.length >= 2 && (
         <View style={styles.hintContainer}>
-          <Ionicons name="alert-circle-outline" size={48} color={colors.neutral[300]} />
+          <Ionicons name="alert-circle-sharp" size={48} color="#C4B9A8" />
           <Text style={styles.hintText}>No results found for "{query}"</Text>
         </View>
       )}
@@ -84,7 +84,7 @@ export default function GlobalSearchScreen() {
         {results && results.employees.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="people" size={18} color={colors.primary} />
+              <Ionicons name="people-sharp" size={18} color="#695030" />
               <Text style={styles.sectionTitle}>Employees ({results.employees.length})</Text>
             </View>
             {results.employees.map((emp) => (
@@ -111,7 +111,7 @@ export default function GlobalSearchScreen() {
         {results && results.projects.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="business" size={18} color={colors.info} />
+              <Ionicons name="business-sharp" size={18} color="#0369A1" />
               <Text style={styles.sectionTitle}>Projects ({results.projects.length})</Text>
             </View>
             {results.projects.map((proj) => (
@@ -122,7 +122,7 @@ export default function GlobalSearchScreen() {
                 <Card style={styles.resultCard} variant="interactive">
                   <View style={styles.resultRow}>
                     <View style={[styles.typeIcon, { backgroundColor: colors.infoBg }]}>
-                      <Ionicons name="business" size={18} color={colors.info} />
+                      <Ionicons name="business-sharp" size={18} color={colors.info} />
                     </View>
                     <View style={styles.resultInfo}>
                       <Text style={styles.resultTitle}>{proj.name}</Text>
@@ -140,7 +140,7 @@ export default function GlobalSearchScreen() {
         {results && results.tasks.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="checkmark-circle" size={18} color={colors.warning} />
+              <Ionicons name="checkmark-circle-sharp" size={18} color={colors.warning} />
               <Text style={styles.sectionTitle}>Tasks ({results.tasks.length})</Text>
             </View>
             {results.tasks.map((task) => (
@@ -152,7 +152,7 @@ export default function GlobalSearchScreen() {
                 <Card style={styles.resultCard} variant="interactive">
                   <View style={styles.resultRow}>
                     <View style={[styles.typeIcon, { backgroundColor: colors.warningBg }]}>
-                      <Ionicons name="checkmark-circle" size={18} color={colors.warning} />
+                      <Ionicons name="checkmark-circle-sharp" size={18} color={colors.warning} />
                     </View>
                     <View style={styles.resultInfo}>
                       <Text style={styles.resultTitle}>{task.title}</Text>
@@ -169,14 +169,14 @@ export default function GlobalSearchScreen() {
         {results && results.materials.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="cube" size={18} color={colors.pending} />
+              <Ionicons name="cube-sharp" size={18} color={colors.pending} />
               <Text style={styles.sectionTitle}>Materials ({results.materials.length})</Text>
             </View>
             {results.materials.map((mat) => (
               <Card key={mat.id} style={styles.resultCard} variant="interactive">
                 <View style={styles.resultRow}>
                   <View style={[styles.typeIcon, { backgroundColor: colors.pendingBg }]}>
-                    <Ionicons name="cube" size={18} color={colors.pending} />
+                    <Ionicons name="cube-sharp" size={18} color={colors.pending} />
                   </View>
                   <View style={styles.resultInfo}>
                     <Text style={styles.resultTitle}>{mat.material_name}</Text>
@@ -192,14 +192,14 @@ export default function GlobalSearchScreen() {
         {results && results.documents.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="document-text" size={18} color={colors.success} />
+              <Ionicons name="document-text-sharp" size={18} color={colors.success} />
               <Text style={styles.sectionTitle}>Documents ({results.documents.length})</Text>
             </View>
             {results.documents.map((doc) => (
               <Card key={doc.id} style={styles.resultCard} variant="interactive">
                 <View style={styles.resultRow}>
                   <View style={[styles.typeIcon, { backgroundColor: colors.successBg }]}>
-                    <Ionicons name="document-text" size={18} color={colors.success} />
+                    <Ionicons name="document-text-sharp" size={18} color={colors.success} />
                   </View>
                   <View style={styles.resultInfo}>
                     <Text style={styles.resultTitle}>{doc.title}</Text>

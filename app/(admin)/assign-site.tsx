@@ -16,10 +16,19 @@ export default function AssignSiteScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
 
-  const [projectId, setProjectId] = useState('');
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [zone, setZone] = useState('');
+  const [shift, setShift] = useState<'General Shift (09:00 - 18:00)' | 'Day Shift (08:00 - 17:00)' | 'Night Shift (20:00 - 05:00)' | 'Custom Shift'>('General Shift (09:00 - 18:00)');
+  const [customStartTime, setCustomStartTime] = useState('09:00');
+  const [customEndTime, setCustomEndTime] = useState('18:00');
   const [saving, setSaving] = useState(false);
+
+  const toggleProject = (id: string) => {
+    setSelectedProjectIds((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
+    );
+  };
 
   const { data: projects = [] } = useQuery({
     queryKey: ['projects'],
@@ -51,20 +60,33 @@ export default function AssignSiteScreen() {
   const toggle = (id: string) =>
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
+  function resolveShiftTimes(shiftName: string) {
+    if (shiftName.includes('Day Shift')) return { start: '08:00:00', end: '17:00:00' };
+    if (shiftName.includes('Night Shift')) return { start: '20:00:00', end: '05:00:00' };
+    if (shiftName.includes('Custom')) return { start: `${customStartTime}:00`, end: `${customEndTime}:00` };
+    return { start: '09:00:00', end: '18:00:00' };
+  }
+
   const save = async () => {
-    if (!projectId || !selected.length) {
-      showAlert('Select project and team', 'Choose at least one worker or supervisor.');
+    if (!selectedProjectIds.length || !selected.length) {
+      showAlert('Select project(s) and team', 'Choose at least one project and one worker/supervisor.');
       return;
     }
     setSaving(true);
     try {
-      const rows = selected.map((id) => ({
-        project_id: projectId,
-        profile_id: id,
-        role_on_site: people.find((p: any) => p.id === id)?.role || 'worker',
-        level_zone: zone.trim() || null,
-        active: true,
-      }));
+      const { start: shift_start, end: shift_end } = resolveShiftTimes(shift);
+
+      const rows = selectedProjectIds.flatMap((pId) =>
+        selected.map((id) => ({
+          project_id: pId,
+          profile_id: id,
+          role_on_site: people.find((p: any) => p.id === id)?.role || 'worker',
+          level_zone: [zone.trim(), shift].filter(Boolean).join(' • ') || null,
+          shift_start,
+          shift_end,
+          active: true,
+        }))
+      );
 
       const { error } = await supabase
         .from('assignments')
@@ -72,7 +94,7 @@ export default function AssignSiteScreen() {
       if (error) throw error;
 
       await qc.invalidateQueries({ queryKey: ['assignments'] });
-      showAlert('Team assigned', `${selected.length} team member${selected.length === 1 ? '' : 's'} assigned successfully.`, [
+      showAlert('Teams & Shifts assigned', `${selected.length} team member(s) assigned across ${selectedProjectIds.length} site(s) with shift hours (${shift_start.slice(0, 5)} - ${shift_end.slice(0, 5)}).`, [
         { text: 'Done', onPress: () => router.back() },
       ]);
     } catch (e: any) {
@@ -89,20 +111,26 @@ export default function AssignSiteScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color="#1E1815" />
         </TouchableOpacity>
-        <Text style={styles.title}>Assign Site & Workers</Text>
+        <Text style={styles.title}>Assign Sites & Shifts</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Step 1: Select Project */}
-        <Text style={styles.heading}>1. Select project</Text>
+        {/* Step 1: Select Project(s) */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+          <Text style={styles.heading}>1. Select site(s) / project(s)</Text>
+          <TouchableOpacity onPress={() => setSelectedProjectIds(selectedProjectIds.length === projects.length ? [] : projects.map((p: any) => p.id))}>
+            <Text style={styles.selectAll}>{selectedProjectIds.length === projects.length ? 'Clear' : 'Select all'}</Text>
+          </TouchableOpacity>
+        </View>
+        
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
           {projects.map((p: any) => {
-            const isSel = projectId === p.id;
+            const isSel = selectedProjectIds.includes(p.id);
             return (
               <TouchableOpacity
                 key={p.id}
-                onPress={() => setProjectId(p.id)}
+                onPress={() => toggleProject(p.id)}
                 style={[styles.projectCard, isSel && styles.projectCardActive]}
                 activeOpacity={0.85}
               >
@@ -119,6 +147,50 @@ export default function AssignSiteScreen() {
         </ScrollView>
 
         <View style={styles.gap} />
+
+        {/* Shift Options for Multi-shift */}
+        <Text style={styles.heading}>Assign Shift Hours</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs, marginBottom: spacing.sm }}>
+          {(['General Shift (09:00 - 18:00)', 'Day Shift (08:00 - 17:00)', 'Night Shift (20:00 - 05:00)', 'Custom Shift'] as const).map((s) => (
+            <TouchableOpacity
+              key={s}
+              onPress={() => setShift(s)}
+              style={{
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.xs,
+                borderRadius: 20,
+                backgroundColor: shift === s ? '#695030' : '#F5F2EC',
+                borderWidth: 1,
+                borderColor: shift === s ? '#695030' : 'rgba(184, 144, 71, 0.2)',
+              }}
+            >
+              <Text style={{ fontSize: 12, fontFamily: fontFamily.semiBold, color: shift === s ? '#fff' : '#1E1815' }}>{s}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {shift === 'Custom Shift' && (
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: spacing.sm }}>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Shift Start Time (HH:MM)"
+                value={customStartTime}
+                onChangeText={setCustomStartTime}
+                placeholder="09:00"
+                keyboardType="numbers-and-punctuation"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Shift End Time (HH:MM)"
+                value={customEndTime}
+                onChangeText={setCustomEndTime}
+                placeholder="18:00"
+                keyboardType="numbers-and-punctuation"
+              />
+            </View>
+          </View>
+        )}
 
         <Input
           label="Level / Zone (optional)"
@@ -183,7 +255,7 @@ export default function AssignSiteScreen() {
           title="Assign to Site"
           onPress={save}
           loading={saving}
-          disabled={!projectId || !selected.length}
+          disabled={!selectedProjectIds.length || !selected.length}
           style={{ flex: 1 }}
         />
       </View>

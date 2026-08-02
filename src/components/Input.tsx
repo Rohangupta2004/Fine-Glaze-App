@@ -123,7 +123,9 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.regular,
     color: colors.ink,
     paddingVertical: spacing.md,
-  },
+    outlineStyle: 'none',
+    outlineWidth: 0,
+  } as any,
   inputDark: {
     color: colors.authText,
   },

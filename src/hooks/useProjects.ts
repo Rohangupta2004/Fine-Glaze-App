@@ -40,18 +40,62 @@ export function useUpdateProject() {
   });
 }
 
-/** Admin deletion of a project via server-side cascade (handles all FK levels atomically). */
+/** Admin deletion of a project with multi-level cascade cleanup (prevents foreign key violation errors). */
 export function useDeleteProject() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (projectId: string) => {
-      const { error } = await supabase.rpc('delete_project_cascade', {
+      // 1. Try server RPC function first
+      const { error: rpcErr } = await supabase.rpc('delete_project_cascade', {
         p_project_id: projectId,
       });
-      if (error) throw error;
+
+      if (!rpcErr) return;
+
+      console.warn('[useDeleteProject] RPC missing or failed, executing client-side cascade cleanup:', rpcErr.message);
+
+      // 2. Client-side sequential cascade cleanup in order of dependency
+      try {
+        // Fetch DPR IDs for this project
+        const { data: dprList } = await supabase.from('dprs').select('id').eq('project_id', projectId);
+        const dprIds = (dprList || []).map((d) => d.id);
+
+        if (dprIds.length > 0) {
+          await supabase.from('dpr_boq_items').delete().in('dpr_id', dprIds);
+        }
+
+        // Delete DPRs
+        await supabase.from('dprs').delete().eq('project_id', projectId);
+
+        // Delete BOQ items, tasks, assignments, documents
+        await supabase.from('project_boq_items').delete().eq('project_id', projectId);
+        await supabase.from('tasks').delete().eq('project_id', projectId);
+        await supabase.from('assignments').delete().eq('project_id', projectId);
+        await supabase.from('documents').delete().eq('project_id', projectId);
+
+        // Fetch & delete Conversations + Chat Messages
+        const { data: convList } = await supabase.from('conversations').select('id').eq('project_id', projectId);
+        const convIds = (convList || []).map((c) => c.id);
+        if (convIds.length > 0) {
+          await supabase.from('messages').delete().in('conversation_id', convIds);
+        }
+        await supabase.from('conversations').delete().eq('project_id', projectId);
+
+        // Delete client access, safety checks & update attendance references
+        await supabase.from('client_project_access').delete().eq('project_id', projectId);
+        await supabase.from('safety_checks').delete().eq('project_id', projectId);
+        await supabase.from('attendance').update({ project_id: null }).eq('project_id', projectId);
+
+        // Finally delete the project record
+        const { error: finalErr } = await supabase.from('projects').delete().eq('id', projectId);
+        if (finalErr) throw finalErr;
+      } catch (err: any) {
+        throw new Error(`Failed to delete project: ${err?.message || 'Foreign key constraint issue'}`);
+      }
     },
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ['projects'] });
+      client.invalidateQueries({ queryKey: ['assigned_projects'] });
     },
   });
 }

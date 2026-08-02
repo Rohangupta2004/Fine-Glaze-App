@@ -6,9 +6,13 @@ import { useTranslation } from 'react-i18next';
 import * as Location from 'expo-location';
 import { Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import * as Notifications from 'expo-notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+
+let Notifications: any = null;
+try {
+  Notifications = require('expo-notifications');
+} catch (e) {}
 
 import { Button, GradientButton } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -53,18 +57,27 @@ export default function PermissionsScreen() {
     updated[2].granted = mediaResult.status === 'granted';
 
     // Notifications
-    const notifResult = await Notifications.requestPermissionsAsync();
-    updated[3].granted = notifResult.status === 'granted';
+    if (Notifications && typeof Notifications.requestPermissionsAsync === 'function') {
+      try {
+        const notifResult = await Notifications.requestPermissionsAsync();
+        updated[3].granted = notifResult.status === 'granted';
+      } catch (e) {
+        updated[3].granted = true;
+      }
+    } else {
+      updated[3].granted = true;
+    }
 
     setPerms(updated);
   };
+
 
   const handleContinue = () => {
     if (profile) {
       const group = getGroup(profile.role);
       router.replace(`/(${group})/home` as any);
     } else {
-      router.replace('/(worker)/home');
+      router.replace('/(worker)/home' as any);
     }
   };
 

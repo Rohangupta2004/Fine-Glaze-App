@@ -169,6 +169,8 @@ export interface Task {
   completed_quantity?: number;
   start_date?: string | null;
   end_date?: string | null;
+  completed_at?: string | null;
+  client_visible?: boolean;
 }
 
 export interface Dpr {
@@ -187,6 +189,8 @@ export interface Dpr {
   reviewed_at: string | null;
   synced: boolean;
   client_visible?: boolean;
+  task_id?: string | null;
+  quantity_completed?: number | null;
 }
 
 export interface DprMedia {

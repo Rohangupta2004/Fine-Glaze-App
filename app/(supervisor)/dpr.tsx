@@ -13,10 +13,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { Picker } from '@react-native-picker/picker';
+
 import { Card, Button, GradientButton, Input } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useProjects } from '../../src/hooks/useProjects';
 import { useMyDprs, useSubmitDpr } from '../../src/hooks/useDpr';
+import { useProjectTasks } from '../../src/hooks/useTasks';
 import { useProjectBOQ } from '../../src/hooks/useBOQ';
 import { supabase } from '../../src/lib/supabase';
 import { colors } from '../../src/theme/colors';
@@ -24,6 +27,8 @@ import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius, shadows, TOUCH_TARGET } from '../../src/theme/spacing';
 import type { DprStatus } from '../../src/types';
 import { showAlert } from '../../src/utils/alert';
+
+import { useMyAssignedProjects } from '../../src/hooks/useAssignedProjects';
 
 const STATUS_META: Record<DprStatus, { color: string; bg: string; label: string }> = {
   draft: { color: colors.neutral[600], bg: colors.neutral[100], label: 'Draft' },
@@ -38,13 +43,21 @@ export default function SupervisorDprScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const profile = useAuthStore((s) => s.profile);
-  const { data: projects } = useProjects();
-  const activeProject = (projects || [])[0];
+  const { data: assignedProjects = [] } = useMyAssignedProjects(profile?.id);
+  const { data: allProjects = [] } = useProjects();
+  const availableProjects = (assignedProjects.length > 0) ? assignedProjects : allProjects;
+  
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const activeProject = availableProjects.find(p => p.id === selectedProjectId) || availableProjects[0];
+
   const { data: dprs, refetch, isRefetching } = useMyDprs(profile?.id);
   const { data: boqItems = [] } = useProjectBOQ(activeProject?.id);
+  const { data: projectTasks = [] } = useProjectTasks(activeProject?.id);
   const submitDpr = useSubmitDpr();
 
   const [mode, setMode] = useState<ViewMode>('list');
+  const [selectedTaskId, setSelectedTaskId] = useState<string>('');
+  const [quantityCompleted, setQuantityCompleted] = useState<string>('');
   const [workType, setWorkType] = useState('');
   const [levelZone, setLevelZone] = useState('');
   const [workDone, setWorkDone] = useState('');
@@ -59,6 +72,8 @@ export default function SupervisorDprScreen() {
         workType: workType.trim(),
         levelZone: levelZone.trim(),
         workDone: workDone.trim(),
+        taskId: selectedTaskId || null,
+        quantityCompleted: parseFloat(quantityCompleted) || 0,
       });
 
       // Filter and insert BOQ items reported today
@@ -78,6 +93,7 @@ export default function SupervisorDprScreen() {
       }
 
       showAlert('Submitted', 'Daily Progress Report submitted successfully.');
+      setSelectedTaskId(''); setQuantityCompleted('');
       setWorkType(''); setLevelZone(''); setWorkDone('');
       setReportedQuantities({});
       setMode('list');
@@ -126,6 +142,78 @@ export default function SupervisorDprScreen() {
               <Text style={styles.formDate}>
                 {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
               </Text>
+
+              {availableProjects.length > 0 && (
+                <View style={[styles.field, { marginBottom: spacing.lg }]}>
+                  <Text style={styles.sectionLabel}>Select Assigned Site *</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs, paddingTop: 4 }}>
+                    {availableProjects.map((p) => {
+                      const isSel = (activeProject?.id === p.id);
+                      return (
+                        <TouchableOpacity
+                          key={p.id}
+                          onPress={() => setSelectedProjectId(p.id)}
+                          style={{
+                            paddingHorizontal: spacing.md,
+                            paddingVertical: 8,
+                            borderRadius: radius.md,
+                            backgroundColor: isSel ? '#695030' : '#FAF9F6',
+                            borderWidth: 1,
+                            borderColor: isSel ? '#695030' : colors.neutral[200],
+                          }}
+                        >
+                          <Text style={{ color: isSel ? '#fff' : colors.ink, fontFamily: fontFamily.semiBold, fontSize: 12 }}>
+                            {p.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Task / Subtask Link Picker */}
+              {projectTasks.length > 0 && (
+                <View style={[styles.field, { marginBottom: spacing.sm }]}>
+                  <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 6 }}>
+                    Link to Task / Subtask (Recommended)
+                  </Text>
+                  <View style={{ backgroundColor: '#F8FAF9', borderRadius: radius.md, overflow: 'hidden', paddingHorizontal: 4 }}>
+                    <Picker
+                      selectedValue={selectedTaskId}
+                      onValueChange={(val: string) => {
+                        setSelectedTaskId(val);
+                        const sel = projectTasks.find(t => t.id === val);
+                        if (sel?.level_zone && !levelZone) setLevelZone(sel.level_zone);
+                        if (sel?.title && !workType) setWorkType(sel.title);
+                      }}
+                      style={{ height: 48 }}
+                    >
+                      <Picker.Item label="-- Select Task / Subtask --" value="" color={colors.neutral[500]} />
+                      {projectTasks.map((t) => (
+                        <Picker.Item 
+                          key={t.id} 
+                          label={`${t.title} (Target: ${t.planned_quantity || 0} ${t.unit || 'units'} | Done: ${t.completed_quantity || 0})`} 
+                          value={t.id} 
+                          color={colors.ink} 
+                        />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+              )}
+
+              {selectedTaskId !== '' && (
+                <View style={[styles.field, { marginBottom: spacing.sm }]}>
+                  <Input
+                    label="Work Quantity Completed Today (for selected task)"
+                    placeholder="e.g. 50"
+                    keyboardType="numeric"
+                    value={quantityCompleted}
+                    onChangeText={setQuantityCompleted}
+                  />
+                </View>
+              )}
 
               <View style={styles.field}>
                 <Input

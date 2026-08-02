@@ -16,6 +16,7 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { uploadLocalMedia } from '../lib/mediaStorage';
 import { compressImage, compressSelfie } from '../lib/imageCompression';
+import { queryClient } from '../lib/queryClient';
 import {
   enqueueOutboxItem,
   getPendingItems,
@@ -65,7 +66,7 @@ async function syncPunchIn(payload: PunchInPayload, outboxId: string): Promise<v
     `${payload.profileId}/${payload.capturedAt.slice(0, 10)}/${outboxId}`,
     { uri: compressed.uri, type: 'photo', mimeType: 'image/jpeg' },
   );
-  const { error } = await supabase.from('attendance').upsert({
+  const { error } = await supabase.from('attendance').insert({
     profile_id: payload.profileId,
     project_id: payload.projectId,
     date: payload.capturedAt.slice(0, 10),
@@ -76,8 +77,9 @@ async function syncPunchIn(payload: PunchInPayload, outboxId: string): Promise<v
     location_verified: payload.locationVerified,
     status: 'present',
     synced: true,
-  }, { onConflict: 'profile_id,date' });
+  });
   if (error) throw new Error(error.message);
+
 }
 
 async function syncDpr(payload: DprPayload, outboxId: string): Promise<void> {
@@ -157,12 +159,16 @@ export const useOutboxStore = create<OutboxState>((set, get) => ({
   enqueuePunchIn: async (payload: PunchInPayload) => {
     const id = await enqueueOutboxItem('punch_in', payload);
     await get().loadPending();
+    queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    get().flushOutbox().catch(() => {});
     return id;
   },
 
   enqueueDpr: async (payload: DprPayload) => {
     const id = await enqueueOutboxItem('dpr', payload);
     await get().loadPending();
+    queryClient.invalidateQueries({ queryKey: ['dprs'] });
+    get().flushOutbox().catch(() => {});
     return id;
   },
 
@@ -190,6 +196,9 @@ export const useOutboxStore = create<OutboxState>((set, get) => ({
       set({ isSyncing: false });
       // Reload UI state after flush
       await get().loadPending();
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['dprs'] });
     }
   },
 }));
+

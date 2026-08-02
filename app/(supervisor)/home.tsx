@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { Card, Avatar, StatusChip } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
-import { useProjects } from '../../src/hooks/useProjects';
+import { useMyAssignedProjects } from '../../src/hooks/useAssignedProjects';
 import { useEmployees } from '../../src/hooks/useEmployees';
 import { usePendingMaterialRequests } from '../../src/hooks/useApprovals';
 import { colors } from '../../src/theme/colors';
@@ -35,7 +35,7 @@ export default function SupervisorHomeScreen() {
   const profile = useAuthStore((s) => s.profile);
   const firstName = profile?.full_name?.split(' ')[0] || 'Supervisor';
 
-  const { data: projects, refetch: rP, isRefetching: r1 } = useProjects();
+  const { data: projects, refetch: rP, isRefetching: r1 } = useMyAssignedProjects(profile?.id);
   const { data: employees, refetch: rE, isRefetching: r2 } = useEmployees();
   const { data: pendingMaterials } = usePendingMaterialRequests();
 

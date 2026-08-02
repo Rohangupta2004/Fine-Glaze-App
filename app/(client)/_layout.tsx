@@ -8,6 +8,7 @@ export default function ClientLayout() {
   const { t } = useTranslation();
   return (
     <Tabs
+      backBehavior="history"
       screenOptions={({ route }) => {
         return {
           headerShown: false,
@@ -17,27 +18,26 @@ export default function ClientLayout() {
             display: 'flex',
             backgroundColor: colors.white,
             borderTopColor: colors.neutral[200],
-            elevation: 15,
-            height: 72,
-            paddingBottom: 12,
+            elevation: 18,
+            height: 82,
+            paddingBottom: 14,
             paddingTop: 10,
-            borderRadius: 24,
-            boxShadow: '0px 10px 30px rgba(139, 104, 64, 0.15)',
+            borderRadius: 28,
+            boxShadow: '0px 12px 36px rgba(139, 104, 64, 0.18)',
           },
           tabBarLabelStyle: {
-            fontFamily: fontFamily.medium,
-            fontSize: 11,
+            fontFamily: fontFamily.semiBold,
+            fontSize: 11.5,
           },
         };
       }}
     >
-      {/* ── Visible 5-tab structure ── */}
       <Tabs.Screen
         name="home"
         options={{
           title: t('client.home'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="grid-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="grid-outline" size={25} color={color} />
           ),
         }}
       />
@@ -45,8 +45,8 @@ export default function ClientLayout() {
         name="updates"
         options={{
           title: t('client.updates'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="images-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="images-outline" size={25} color={color} />
           ),
         }}
       />
@@ -54,8 +54,8 @@ export default function ClientLayout() {
         name="documents"
         options={{
           title: t('client.documents'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="folder-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="folder-outline" size={25} color={color} />
           ),
         }}
       />
@@ -63,8 +63,8 @@ export default function ClientLayout() {
         name="payments"
         options={{
           title: t('client.payments'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="card-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="card-outline" size={25} color={color} />
           ),
         }}
       />
@@ -72,27 +72,14 @@ export default function ClientLayout() {
         name="more"
         options={{
           title: t('client.more'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="menu-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="menu-outline" size={25} color={color} />
           ),
         }}
       />
 
-      {/* ── Stack-hidden routes (no tab bar entry) ── */}
-      <Tabs.Screen
-        name="approvals"
-        options={{
-          href: null, // hide from tab bar
-          title: 'Approvals',
-        }}
-      />
-      <Tabs.Screen
-        name="chat"
-        options={{
-          href: null, // hide from tab bar
-          title: 'Project Chat',
-        }}
-      />
+      <Tabs.Screen name="approvals" options={{ href: null, title: 'Approvals' }} />
+      <Tabs.Screen name="chat" options={{ href: null, title: 'Project Chat' }} />
       <Tabs.Screen name="materials" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       <Tabs.Screen name="new-message" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       <Tabs.Screen name="conversation" options={{ href: null, tabBarStyle: { display: 'none' } }} />

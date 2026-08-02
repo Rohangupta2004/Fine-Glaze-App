@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,16 +11,16 @@ import {
   Platform,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 
 import { Card, Button } from '../src/components';
 import { useAuthStore } from '../src/stores/authStore';
-import { useEmployees } from '../src/hooks/useEmployees';
+import { useEmployees, useEmployeeAssignments } from '../src/hooks/useEmployees';
 import { useProjects } from '../src/hooks/useProjects';
-import { useCreateTask } from '../src/hooks/useTasks';
+import { useCreateTask, useProjectTasks } from '../src/hooks/useTasks';
 import { colors } from '../src/theme/colors';
 import { typography, fontFamily } from '../src/theme/typography';
 import { spacing, radius } from '../src/theme/spacing';
@@ -47,20 +47,29 @@ function getRouteGroup(role: string): string {
 export default function CreateTaskScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const routeParams = useLocalSearchParams<{ projectId?: string; assigneeId?: string }>();
   const profile = useAuthStore((s) => s.profile);
   
   const { data: employees = [] } = useEmployees();
+  const { data: assignments = [] } = useEmployeeAssignments();
   const { data: projects = [] } = useProjects();
   const createTask = useCreateTask();
 
   const [title, setTitle] = useState('');
   const [assigneeType, setAssigneeType] = useState<'myself' | 'supervisor' | 'worker'>('myself');
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(routeParams.assigneeId || '');
   const [priority, setPriority] = useState<TaskPriority>('medium');
-  const [projectId, setProjectId] = useState('');
+  const [projectId, setProjectId] = useState(routeParams.projectId || '');
+  const [plannedQuantity, setPlannedQuantity] = useState('');
+  const [unit, setUnit] = useState('Sqm');
+  const [levelZone, setLevelZone] = useState('');
+  const [parentId, setParentId] = useState('');
+  const [category, setCategory] = useState('Facade');
   const [isVisible, setIsVisible] = useState(true);
   const [checklist, setChecklist] = useState<string[]>([]);
   const [newChecklistItem, setNewChecklistItem] = useState('');
+
+  const { data: projectTasks = [] } = useProjectTasks(projectId || null);
 
   // Client role guard
   useEffect(() => {
@@ -68,6 +77,16 @@ export default function CreateTaskScreen() {
       router.replace('/');
     }
   }, [profile]);
+
+  // Sync route params if they change
+  useEffect(() => {
+    if (routeParams.projectId && !projectId) {
+      setProjectId(routeParams.projectId);
+    }
+    if (routeParams.assigneeId && !selectedEmployeeId) {
+      setSelectedEmployeeId(routeParams.assigneeId);
+    }
+  }, [routeParams.projectId, routeParams.assigneeId]);
 
   // Determine selectable assignee types based on role
   const getAssigneeOptions = (role: string | undefined): ('myself' | 'supervisor' | 'worker')[] => {
@@ -79,8 +98,23 @@ export default function CreateTaskScreen() {
 
   const assigneeOptions = getAssigneeOptions(profile?.role);
 
-  // Filter employees based on selected role
-  const filteredEmployees = employees.filter(e => e.role === assigneeType);
+  // Active site assignments map for filtering
+  const siteEmployeeIds = useMemo(() => {
+    if (!projectId) return null;
+    return new Set(assignments.filter(a => a.project_id === projectId).map(a => a.profile_id));
+  }, [projectId, assignments]);
+
+  // Filter & sort employees: employees assigned to the selected site appear first
+  const filteredEmployees = useMemo(() => {
+    const byRole = employees.filter(e => e.role === assigneeType);
+    if (!siteEmployeeIds || siteEmployeeIds.size === 0) return byRole;
+
+    return [...byRole].sort((a, b) => {
+      const aOnSite = siteEmployeeIds.has(a.id) ? 1 : 0;
+      const bOnSite = siteEmployeeIds.has(b.id) ? 1 : 0;
+      return bOnSite - aOnSite;
+    });
+  }, [employees, assigneeType, siteEmployeeIds]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -111,7 +145,8 @@ export default function CreateTaskScreen() {
       return;
     }
 
-    const assignedTo = assigneeType === 'myself' ? profile?.id : selectedEmployeeId;
+    const currentUserId = profile?.id || useAuthStore.getState().userId;
+    const assignedTo = assigneeType === 'myself' ? currentUserId : selectedEmployeeId;
 
     try {
       await createTask.mutateAsync({
@@ -119,8 +154,13 @@ export default function CreateTaskScreen() {
         assignedTo,
         priority,
         projectId: projectId || null,
-        createdBy: profile?.id!,
+        createdBy: currentUserId!,
         checklist: checklist.map(text => ({ text, done: false })),
+        plannedQuantity: parseFloat(plannedQuantity) || 0,
+        unit: unit.trim() || 'Units',
+        levelZone: levelZone.trim() || null,
+        parentId: parentId || null,
+        category,
       });
       showAlert(
         'Success', 
@@ -151,6 +191,26 @@ export default function CreateTaskScreen() {
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
               
+              {/* Site / Project Selection */}
+              <View style={styles.inputWrap}>
+                <Text style={styles.label}>Target Site / Project</Text>
+                <Text style={styles.helpText}>Select the site where this task will be executed.</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={projectId}
+                    onValueChange={(val: string) => setProjectId(val)}
+                    mode="dropdown"
+                    dropdownIconColor="#4A3820"
+                    style={{ height: 50, color: '#1E1815', backgroundColor: '#FFFFFF' }}
+                  >
+                    <Picker.Item label="All Sites / Personal Task" value="" color="#71717A" style={{ backgroundColor: '#FFFFFF' }} />
+                    {projects.filter(p => p.status !== 'completed').map(p => (
+                      <Picker.Item key={p.id} label={`${p.name}${p.city ? ` (${p.city})` : ''}`} value={p.id} color="#1E1815" style={{ backgroundColor: '#FFFFFF' }} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+
               {/* Assign To Selection (only show if role has choices) */}
               {assigneeOptions.length > 1 && (
                 <View style={styles.inputWrap}>
@@ -182,12 +242,23 @@ export default function CreateTaskScreen() {
                     <Picker
                       selectedValue={selectedEmployeeId}
                       onValueChange={(val: string) => setSelectedEmployeeId(val)}
-                      style={styles.picker}
+                      mode="dropdown"
+                      dropdownIconColor="#4A3820"
+                      style={{ height: 50, color: '#1E1815', backgroundColor: '#FFFFFF' }}
                     >
-                      <Picker.Item label="Select Employee..." value="" color={colors.neutral[400]} />
-                      {filteredEmployees.map(emp => (
-                        <Picker.Item key={emp.id} label={emp.full_name} value={emp.id} color={colors.ink} />
-                      ))}
+                      <Picker.Item label="Select Employee..." value="" color="#71717A" style={{ backgroundColor: '#FFFFFF' }} />
+                      {filteredEmployees.map(emp => {
+                        const isAssigned = siteEmployeeIds?.has(emp.id);
+                        return (
+                          <Picker.Item 
+                            key={emp.id} 
+                            label={`${emp.full_name}${isAssigned ? ' (Site Assigned ⭐)' : ''}`} 
+                            value={emp.id} 
+                            color="#1E1815" 
+                            style={{ backgroundColor: '#FFFFFF' }}
+                          />
+                        );
+                      })}
                     </Picker>
                   </View>
                 </View>
@@ -195,13 +266,68 @@ export default function CreateTaskScreen() {
 
               {/* Task Title */}
               <View style={styles.inputWrap}>
-                <Text style={styles.label}>Task Title</Text>
+                <Text style={styles.label}>Task Title *</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="What needs to be done?"
+                  placeholder="e.g. Glass Installation - Level 3"
                   value={title}
                   onChangeText={setTitle}
                   multiline
+                />
+              </View>
+
+              {/* Subtask Parent Selection */}
+              {projectTasks.length > 0 && (
+                <View style={styles.inputWrap}>
+                  <Text style={styles.label}>Is this a Subtask under a Main Task? (Optional)</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={parentId}
+                      onValueChange={(val: string) => setParentId(val)}
+                      mode="dropdown"
+                      dropdownIconColor="#4A3820"
+                      style={{ height: 50, color: '#1E1815', backgroundColor: '#FFFFFF' }}
+                    >
+                      <Picker.Item label="None (Main Task)" value="" color="#71717A" style={{ backgroundColor: '#FFFFFF' }} />
+                      {projectTasks.filter((t: any) => !t.parent_id).map((t: any) => (
+                        <Picker.Item key={t.id} label={`Parent Task: ${t.title}`} value={t.id} color="#1E1815" style={{ backgroundColor: '#FFFFFF' }} />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+              )}
+
+              {/* Target Planned Scope & Unit */}
+              <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Target Quantity</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. 100"
+                    keyboardType="numeric"
+                    value={plannedQuantity}
+                    onChangeText={setPlannedQuantity}
+                  />
+                </View>
+                <View style={{ width: 110 }}>
+                  <Text style={styles.label}>Unit</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Sqm"
+                    value={unit}
+                    onChangeText={setUnit}
+                  />
+                </View>
+              </View>
+
+              {/* Level / Zone */}
+              <View style={styles.inputWrap}>
+                <Text style={styles.label}>Level / Zone (Optional)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. Level 3 – Zone B"
+                  value={levelZone}
+                  onChangeText={setLevelZone}
                 />
               </View>
 
@@ -232,24 +358,6 @@ export default function CreateTaskScreen() {
                       </Text>
                     </TouchableOpacity>
                   ))}
-                </View>
-              </View>
-
-              {/* Optional Site / Project */}
-              <View style={styles.inputWrap}>
-                <Text style={styles.label}>Linked Site (Optional)</Text>
-                <Text style={styles.helpText}>Leave empty if this is a personal task without a specific site.</Text>
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={projectId}
-                    onValueChange={(val: string) => setProjectId(val)}
-                    style={styles.picker}
-                  >
-                    <Picker.Item label="No Site Linked" value="" color={colors.neutral[500]} />
-                    {projects.filter(p => p.status !== 'completed').map(p => (
-                      <Picker.Item key={p.id} label={p.name} value={p.id} color={colors.ink} />
-                    ))}
-                  </Picker>
                 </View>
               </View>
 
@@ -374,10 +482,9 @@ const styles = StyleSheet.create({
   segmentText: { ...typography.bodySmall, fontFamily: fontFamily.medium, color: colors.neutral[500] },
   segmentTextActive: { color: colors.primary, fontFamily: fontFamily.semiBold },
   pickerContainer: {
-    backgroundColor: colors.white,
+    backgroundColor: '#F8FAF9',
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
+    borderWidth: 0,
     overflow: 'hidden',
   },
   picker: { height: 50 },

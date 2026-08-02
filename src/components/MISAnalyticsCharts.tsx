@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../theme/colors';
 import { radius, spacing, shadows } from '../theme/spacing';
 import type { Task } from '../types';
@@ -36,27 +37,32 @@ export function MISAnalyticsCharts({ tasks, overallProgressPct }: MISAnalyticsCh
     const catTotal = catTasks.length;
     if (catTotal === 0) return { category: cat, progress: 0 };
 
-    const catDone = catTasks.filter(
-      (t) => t.status === 'done' || (t.completed_quantity || 0) >= (t.planned_quantity || 1)
-    ).length;
+    let totalPlanned = 0;
+    let totalCompleted = 0;
+    catTasks.forEach((t) => {
+      totalPlanned += t.planned_quantity || 1;
+      totalCompleted += Math.min(t.planned_quantity || 1, t.completed_quantity || (t.status === 'done' ? (t.planned_quantity || 1) : 0));
+    });
+
+    const progress = totalPlanned > 0 ? Math.round((totalCompleted / totalPlanned) * 100) : 0;
 
     return {
       category: cat,
-      progress: Math.round((catDone / catTotal) * 100),
+      progress,
     };
   });
 
   return (
     <View style={styles.container}>
-      {/* 1. Overall Progress Ring / Donut */}
+      {/* 1. Overall Progress Ring */}
       <View style={styles.chartCard}>
         <Text style={styles.cardTitle}>Overall Progress</Text>
         
         <View style={styles.donutRow}>
-          <View style={styles.donutContainer}>
+          <View style={[styles.donutContainer, { borderColor: displayProgress > 0 ? '#16A34A' : '#CBD5E1' }]}>
             <View style={styles.donutRing}>
               <Text style={styles.donutValue}>{displayProgress}%</Text>
-              <Text style={styles.donutLabel}>Project Completion</Text>
+              <Text style={styles.donutLabel}>Completion</Text>
             </View>
           </View>
 
@@ -87,53 +93,59 @@ export function MISAnalyticsCharts({ tasks, overallProgressPct }: MISAnalyticsCh
         <Text style={styles.cardTitle}>Task Status</Text>
         
         <View style={styles.barChartContainer}>
+          {/* Completed Bar */}
           <View style={styles.barGroup}>
+            <Text style={[styles.barBadgeText, { color: '#16A34A' }]}>{completed}</Text>
             <View style={styles.barTrack}>
-              <View
+              <LinearGradient
+                colors={['#4ADE80', '#16A34A']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
                 style={[
                   styles.barFill,
                   {
-                    backgroundColor: '#16A34A',
-                    height: `${total > 0 ? Math.min(100, Math.max(10, (completed / total) * 100)) : 10}%`,
+                    height: completed > 0 ? `${Math.min(100, Math.max(10, completedPct))}%` : '0%',
                   },
                 ]}
-              >
-                <Text style={styles.barValText}>{completed}</Text>
-              </View>
+              />
             </View>
             <Text style={styles.barLabel}>Completed</Text>
           </View>
 
+          {/* In Progress Bar */}
           <View style={styles.barGroup}>
+            <Text style={[styles.barBadgeText, { color: '#D97706' }]}>{inProgress}</Text>
             <View style={styles.barTrack}>
-              <View
+              <LinearGradient
+                colors={['#FBBF24', '#D97706']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
                 style={[
                   styles.barFill,
                   {
-                    backgroundColor: '#D97706',
-                    height: `${total > 0 ? Math.min(100, Math.max(10, (inProgress / total) * 100)) : 10}%`,
+                    height: inProgress > 0 ? `${Math.min(100, Math.max(10, inProgressPct))}%` : '0%',
                   },
                 ]}
-              >
-                <Text style={styles.barValText}>{inProgress}</Text>
-              </View>
+              />
             </View>
             <Text style={styles.barLabel}>In Progress</Text>
           </View>
 
+          {/* Pending Bar */}
           <View style={styles.barGroup}>
+            <Text style={[styles.barBadgeText, { color: '#DC2626' }]}>{pending}</Text>
             <View style={styles.barTrack}>
-              <View
+              <LinearGradient
+                colors={['#FCA5A5', '#DC2626']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
                 style={[
                   styles.barFill,
                   {
-                    backgroundColor: '#DC2626',
-                    height: `${total > 0 ? Math.min(100, Math.max(10, (pending / total) * 100)) : 10}%`,
+                    height: pending > 0 ? `${Math.min(100, Math.max(10, pendingPct))}%` : '0%',
                   },
                 ]}
-              >
-                <Text style={styles.barValText}>{pending}</Text>
-              </View>
+              />
             </View>
             <Text style={styles.barLabel}>Pending</Text>
           </View>
@@ -145,35 +157,44 @@ export function MISAnalyticsCharts({ tasks, overallProgressPct }: MISAnalyticsCh
         <Text style={styles.cardTitle}>Category Progress</Text>
         
         <View style={styles.catList}>
-          {categoryStats.map((item) => (
-            <View key={item.category} style={styles.catItem}>
-              <View style={styles.catMeta}>
-                <Text style={styles.catName}>{item.category}</Text>
-                <Text style={styles.catPct}>{item.progress}%</Text>
-              </View>
+          {categoryStats.map((item) => {
+            const gradColors: [string, string] =
+              item.category === 'Facade'
+                ? ['#60A5FA', '#2563EB']
+                : item.category === 'Structure'
+                ? ['#34D399', '#059669']
+                : item.category === 'Civil'
+                ? ['#FBBF24', '#D97706']
+                : ['#C084FC', '#9333EA'];
 
-              <View style={styles.catTrack}>
-                <View
-                  style={[
-                    styles.catFill,
-                    {
-                      width: `${Math.max(2, item.progress)}%`,
-                      backgroundColor:
-                        item.category === 'Facade'
-                          ? '#2563EB'
-                          : item.category === 'Structure'
-                          ? '#059669'
-                          : item.category === 'Civil'
-                          ? '#D97706'
-                          : '#8B5CF6',
-                    },
-                  ]}
-                />
+            return (
+              <View key={item.category} style={styles.catItem}>
+                <View style={styles.catMeta}>
+                  <Text style={styles.catName}>{item.category}</Text>
+                  <Text style={styles.catPct}>{item.progress}%</Text>
+                </View>
+
+                <View style={styles.catTrack}>
+                  {item.progress > 0 ? (
+                    <LinearGradient
+                      colors={gradColors}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={[
+                        styles.catFill,
+                        {
+                          width: `${Math.min(100, item.progress)}%`,
+                        },
+                      ]}
+                    />
+                  ) : null}
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </View>
+
     </View>
   );
 }
@@ -188,11 +209,11 @@ const styles = StyleSheet.create({
   chartCard: {
     flex: 1,
     minWidth: 260,
-    backgroundColor: '#FFF',
-    borderRadius: radius.md,
-    padding: spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.lg,
+    padding: spacing.lg,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E2E8F0',
     ...shadows.sm,
   },
   cardTitle: {
@@ -207,53 +228,56 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
+    paddingVertical: spacing.xs,
   },
+
   donutContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 105,
+    height: 105,
+    borderRadius: 53,
     borderWidth: 8,
     borderColor: '#16A34A',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F8FAFC',
   },
-  donutRing: { alignItems: 'center' },
-  donutValue: { fontSize: 20, fontWeight: '800', color: colors.neutral[900] },
-  donutLabel: { fontSize: 9, color: colors.neutral[500], textAlign: 'center' },
+  donutRing: { alignItems: 'center', justifyContent: 'center' },
+  donutValue: { fontSize: 22, fontWeight: '800', color: colors.neutral[900] },
+  donutLabel: { fontSize: 9, fontWeight: '600', color: colors.neutral[500], textAlign: 'center', marginTop: 1 },
 
-  legendColumn: { gap: 8 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 12, color: colors.neutral[600], width: 70 },
-  legendVal: { fontSize: 12, fontWeight: '700', color: colors.neutral[900] },
+  legendColumn: { gap: 10 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  legendText: { fontSize: 12, color: colors.neutral[600], width: 75, fontWeight: '500' },
+  legendVal: { fontSize: 13, fontWeight: '700', color: colors.neutral[900] },
 
   // Bar Chart
   barChartContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'flex-end',
-    height: 110,
+    height: 120,
     paddingTop: spacing.xs,
   },
   barGroup: { alignItems: 'center', flex: 1 },
+  barBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
   barTrack: {
-    width: 28,
-    height: 85,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 6,
+    width: 32,
+    height: 75,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
   barFill: {
     width: '100%',
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: 2,
+    borderRadius: 8,
   },
-  barValText: { color: '#FFF', fontSize: 10, fontWeight: '700' },
-  barLabel: { fontSize: 10, color: colors.neutral[600], marginTop: 4 },
+  barLabel: { fontSize: 11, fontWeight: '600', color: colors.neutral[600], marginTop: 6 },
 
   // Category Bars
   catList: { gap: 12 },
@@ -261,13 +285,8 @@ const styles = StyleSheet.create({
   catMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   catName: { fontSize: 12, fontWeight: '600', color: colors.neutral[700] },
   catPct: { fontSize: 12, fontWeight: '700', color: colors.neutral[900] },
-  catTrack: { height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden' },
+  catTrack: { height: 8, backgroundColor: '#F1F5F9', borderRadius: 4, overflow: 'hidden' },
   catFill: { height: '100%', borderRadius: 4 },
-
-  // Pivot Table
-  pivotTable: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: radius.sm, overflow: 'hidden' },
-  pivotThRow: { flexDirection: 'row', backgroundColor: '#F9FAFB', borderBottomWidth: 1, borderColor: '#E5E7EB', padding: 8 },
-  pivotTh: { fontSize: 11, fontWeight: '700', color: colors.neutral[700] },
-  pivotTr: { flexDirection: 'row', borderBottomWidth: 1, borderColor: '#F3F4F6', padding: 8 },
-  pivotTd: { fontSize: 11, color: colors.neutral[800] },
 });
+
+

@@ -11,7 +11,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card, Avatar, Button, Input } from '../../src/components';
+import { Card, Avatar, Button, Input, AssignProjectModal } from '../../src/components';
 import { useEmployee, useUpdateEmployee, useDeleteEmployee } from '../../src/hooks/useEmployees';
 import { useAttendanceHistory, useTodayAttendance } from '../../src/hooks/useAttendance';
 import { useMyTasks } from '../../src/hooks/useTasks';
@@ -29,6 +29,8 @@ const ROLE_LABELS: Record<string, string> = {
   accounts: 'Accounts', supervisor: 'Supervisor', worker: 'Worker', client: 'Client',
 };
 
+import { useMyAssignedProjects } from '../../src/hooks/useAssignedProjects';
+
 export default function EmployeeProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -36,9 +38,10 @@ export default function EmployeeProfileScreen() {
   const { data: emp } = useEmployee(id);
   const { data: attendance } = useAttendanceHistory(id, 31);
   const { data: tasks } = useMyTasks(id);
-  const { data: projects = [] } = useProjects();
+  const { data: projects = [] } = useMyAssignedProjects(id);
   const { data: todayAtt } = useTodayAttendance(id);
   const [tab, setTab] = useState<Tab>('Overview');
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
   const updateEmployee = useUpdateEmployee();
   const deleteEmployee = useDeleteEmployee();
 
@@ -152,9 +155,14 @@ export default function EmployeeProfileScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.ink} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Employee Profile</Text>
-        <TouchableOpacity onPress={openEdit} hitSlop={12}>
-          <Ionicons name="create-outline" size={24} color={colors.primary} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => setAssignModalOpen(true)} hitSlop={12}>
+            <Ionicons name="business-outline" size={22} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={openEdit} hitSlop={12}>
+            <Ionicons name="create-outline" size={22} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['6xl'] }}>
@@ -411,6 +419,12 @@ export default function EmployeeProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      <AssignProjectModal
+        visible={assignModalOpen}
+        employee={emp}
+        onClose={() => setAssignModalOpen(false)}
+      />
     </View>
   );
 }

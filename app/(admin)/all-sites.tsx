@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 
@@ -101,10 +102,10 @@ export default function AllSitesScreen() {
       <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
         <View style={styles.headerTop}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={20} color="#1E1815" />
+            <Ionicons name="arrow-back-sharp" size={20} color="#1E1815" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerLabel}>Operations</Text>
+            <Text style={styles.headerLabel}>Operations Hub</Text>
             <Text style={styles.headerTitle}>All Sites</Text>
           </View>
         </View>
@@ -112,23 +113,23 @@ export default function AllSitesScreen() {
         {/* Summary Row */}
         <View style={styles.summaryRow}>
           <View style={styles.summaryCard}>
-            <View style={styles.summaryIconWrap}>
-              <Ionicons name="business" size={16} color="#0F766E" />
-            </View>
+            <LinearGradient colors={['#5B4122', '#8B6840']} style={styles.summaryIconWrap}>
+              <Ionicons name="business-sharp" size={16} color="#FFFFFF" />
+            </LinearGradient>
             <Text style={styles.summaryNum}>{totalSites}</Text>
             <Text style={styles.summaryLabel}>Sites</Text>
           </View>
           <View style={styles.summaryCard}>
-            <View style={[styles.summaryIconWrap, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
-              <Ionicons name="people" size={16} color="#10B981" />
-            </View>
+            <LinearGradient colors={['#059669', '#10B981']} style={styles.summaryIconWrap}>
+              <Ionicons name="people-sharp" size={16} color="#FFFFFF" />
+            </LinearGradient>
             <Text style={[styles.summaryNum, { color: '#10B981' }]}>{totalHeadcount}</Text>
             <Text style={styles.summaryLabel}>On Site Today</Text>
           </View>
           <View style={styles.summaryCard}>
-            <View style={[styles.summaryIconWrap, { backgroundColor: 'rgba(245,158,11,0.1)' }]}>
-              <Ionicons name="alert-circle" size={16} color="#F59E0B" />
-            </View>
+            <LinearGradient colors={['#D97706', '#F59E0B']} style={styles.summaryIconWrap}>
+              <Ionicons name="alert-circle-sharp" size={16} color="#FFFFFF" />
+            </LinearGradient>
             <Text style={[styles.summaryNum, { color: '#F59E0B' }]}>{totalPendingTasks}</Text>
             <Text style={styles.summaryLabel}>Open Tasks</Text>
           </View>
@@ -138,7 +139,7 @@ export default function AllSitesScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#14B8A6" />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#695030" />}
       >
         {(sites || []).map((site) => (
           <TouchableOpacity
@@ -146,11 +147,16 @@ export default function AllSitesScreen() {
             activeOpacity={0.8}
             onPress={() => router.push({ pathname: '/(admin)/project-workspace' as any, params: { id: site.id } })}
           >
-            <View style={styles.siteCard}>
+            <LinearGradient 
+              colors={['#FFFFFF', '#FDFBF7']} 
+              start={{ x: 0, y: 0 }} 
+              end={{ x: 1, y: 1 }} 
+              style={styles.siteCard}
+            >
               <View style={styles.siteHeader}>
-                <View style={styles.siteIconWrap}>
-                  <Ionicons name="business" size={20} color="#0F766E" />
-                </View>
+                <LinearGradient colors={['#5B4122', '#8B6840']} style={styles.siteIconWrap}>
+                  <Ionicons name="business-sharp" size={18} color="#FFFFFF" />
+                </LinearGradient>
                 <View style={styles.siteInfo}>
                   <Text style={styles.siteName}>{site.name}</Text>
                   <Text style={styles.siteCity}>{site.city}</Text>
@@ -160,28 +166,33 @@ export default function AllSitesScreen() {
 
               <View style={styles.progressRow}>
                 <View style={styles.progressTrack}>
-                  <View style={[styles.progressFill, { width: `${site.progress_pct}%` }]} />
+                  <LinearGradient
+                    colors={['#5B4122', '#8B6840', '#A88454']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[styles.progressFill, { width: `${site.progress_pct}%` }]}
+                  />
                 </View>
                 <Text style={styles.progressText}>{site.progress_pct}%</Text>
               </View>
 
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
-                  <Ionicons name="people" size={14} color={colors.neutral[500]} />
+                  <Ionicons name="people-sharp" size={14} color="#695030" />
                   <Text style={styles.statText}>{site.headcount} today</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <Ionicons name="checkmark-circle" size={14} color={colors.neutral[500]} />
+                  <Ionicons name="checkmark-circle-sharp" size={14} color="#695030" />
                   <Text style={styles.statText}>{site.pendingTasks} tasks</Text>
                 </View>
                 {site.pendingPayments > 0 && (
                   <View style={styles.statItem}>
-                    <Ionicons name="cash" size={14} color="#F59E0B" />
+                    <Ionicons name="wallet-sharp" size={14} color="#F59E0B" />
                     <Text style={[styles.statText, { color: '#F59E0B' }]}>{fmtINR(site.pendingPayments)}</Text>
                   </View>
                 )}
               </View>
-            </View>
+            </LinearGradient>
           </TouchableOpacity>
         ))}
 

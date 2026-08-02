@@ -13,7 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Button, Input } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
-import { useProjects } from '../../src/hooks/useProjects';
+import { useMyAssignedProjects } from '../../src/hooks/useAssignedProjects';
+import { useTodayAttendance } from '../../src/hooks/useAttendance';
 import { useTodaySafetyCheck, useSubmitSafetyCheck } from '../../src/hooks/useSafetyChecks';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
@@ -33,8 +34,9 @@ export default function SafetyChecklistScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const profile = useAuthStore((s) => s.profile);
-  const { data: projects } = useProjects();
-  const project = projects?.[0];
+  const { data: projects } = useMyAssignedProjects(profile?.id);
+  const { data: todayAttendance } = useTodayAttendance(profile?.id);
+  const project = (todayAttendance?.project_id ? projects?.find((p: any) => p.id === todayAttendance.project_id) : null) || projects?.[0];
 
   const [checked, setChecked] = useState<Record<string, boolean>>(
     Object.fromEntries(PPE_ITEMS.map((p) => [p.key, false]))
@@ -54,8 +56,8 @@ export default function SafetyChecklistScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!profile?.id || !project?.id) {
-      showAlert('Error', 'Profile or project not loaded');
+    if (!profile?.id) {
+      showAlert('Error', 'Profile session not loaded');
       return;
     }
     if (!allChecked) {
@@ -66,13 +68,13 @@ export default function SafetyChecklistScreen() {
     try {
       await submitCheck.mutateAsync({
         profileId: profile.id,
-        projectId: project.id,
+        projectId: project?.id || null,
         items: checked,
         concernReported: concern || null,
       });
       showAlert('Submitted', 'Safety checklist submitted. Stay safe! 👷');
     } catch (e: any) {
-      showAlert('Error', e.message || 'Failed to submit');
+      showAlert('Error', e.message || 'Failed to submit safety checklist');
     } finally {
       setSubmitting(false);
     }

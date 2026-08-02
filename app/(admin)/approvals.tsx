@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuthStore } from '../../src/stores/authStore';
@@ -51,14 +52,35 @@ export default function ApprovalsScreen() {
   const handleApproveDpr = (id: string) => {
     showAlert('Approve DPR', 'Approve this daily progress report?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Approve', onPress: () => approveDpr.mutate({ dprId: id, reviewerId: profile!.id }) },
+      {
+        text: 'Approve',
+        onPress: async () => {
+          try {
+            await approveDpr.mutateAsync({ dprId: id, reviewerId: profile?.id });
+            showAlert('Approved', 'Daily progress report approved successfully.');
+          } catch (e: any) {
+            showAlert('Error', e?.message || 'Failed to approve DPR');
+          }
+        },
+      },
     ]);
   };
 
   const handleRejectDpr = (id: string) => {
     showAlert('Reject DPR', 'This report will be sent back for revision.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Reject', style: 'destructive', onPress: () => rejectDpr.mutate({ dprId: id, reviewerId: profile!.id, note: 'Rejected by admin' }) },
+      {
+        text: 'Reject',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await rejectDpr.mutateAsync({ dprId: id, reviewerId: profile?.id, note: 'Rejected by admin' });
+            showAlert('Rejected', 'Daily progress report rejected.');
+          } catch (e: any) {
+            showAlert('Error', e?.message || 'Failed to reject DPR');
+          }
+        },
+      },
     ]);
   };
 
@@ -67,11 +89,11 @@ export default function ApprovalsScreen() {
       {/* Light Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
         <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={20} color="#1E1815" />
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+            <Ionicons name="arrow-back-sharp" size={20} color="#1E1815" />
           </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerLabel}>Review</Text>
+          <View style={{ flex: 1, marginLeft: spacing.md }}>
+            <Text style={styles.headerLabel}>Verification & Review</Text>
             <Text style={styles.headerTitle}>Approvals</Text>
           </View>
           {total > 0 && (
@@ -116,43 +138,49 @@ export default function ApprovalsScreen() {
       >
         {/* DPRs */}
         {(filter === 'all' || filter === 'dpr') && (dprs || []).map((dpr) => (
-          <View key={dpr.id} style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={[styles.cardIcon, { backgroundColor: '#EFF6FF' }]}>
-                <Ionicons name="document-text" size={16} color="#2563EB" />
-              </View>
-              <View style={styles.cardInfo}>
-                <Text style={styles.cardTitle}>DPR Report</Text>
-                <Text style={styles.cardDate}>{new Date(dpr.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</Text>
-              </View>
-              <View style={styles.pendingBadge}>
-                <Text style={styles.pendingText}>Pending</Text>
-              </View>
-            </View>
-            <Text style={styles.cardBody}>{dpr.work_done}</Text>
-            {dpr.work_type && <Text style={styles.cardMeta}>Type: {dpr.work_type}</Text>}
-            <View style={styles.actions}>
-              <TouchableOpacity style={styles.rejectBtn} onPress={() => handleRejectDpr(dpr.id)}>
-                <Ionicons name="close" size={15} color={colors.error} />
-                <Text style={styles.rejectText}>Reject</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.approveBtn} onPress={() => handleApproveDpr(dpr.id)}>
-                <View style={styles.approveBtnBg}>
-                  <Ionicons name="checkmark" size={15} color="#fff" />
-                  <Text style={styles.approveText}>Approve</Text>
+          <TouchableOpacity
+            key={dpr.id}
+            activeOpacity={0.85}
+            onPress={() => router.push({ pathname: '/(admin)/dpr-management' as any, params: { dprId: dpr.id } })}
+          >
+            <LinearGradient colors={['#FFFFFF', '#FDFBF7']} start={{x:0, y:0}} end={{x:1, y:1}} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <LinearGradient colors={['#2563EB', '#3B82F6']} style={styles.cardIcon}>
+                  <Ionicons name="document-text-sharp" size={16} color="#FFFFFF" />
+                </LinearGradient>
+                <View style={styles.cardInfo}>
+                  <Text style={styles.cardTitle}>DPR Report</Text>
+                  <Text style={styles.cardDate}>{new Date(dpr.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</Text>
                 </View>
-              </TouchableOpacity>
-            </View>
-          </View>
+                <View style={styles.pendingBadge}>
+                  <Text style={styles.pendingText}>Pending</Text>
+                </View>
+              </View>
+              <Text style={styles.cardBody}>{dpr.work_done}</Text>
+              {dpr.work_type && <Text style={styles.cardMeta}>Type: {dpr.work_type}</Text>}
+              <View style={styles.actions}>
+                <TouchableOpacity style={styles.rejectBtn} onPress={(e) => { e.stopPropagation(); handleRejectDpr(dpr.id); }}>
+                  <Ionicons name="close-sharp" size={15} color={colors.error} />
+                  <Text style={styles.rejectText}>Reject</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.approveBtn} onPress={(e) => { e.stopPropagation(); handleApproveDpr(dpr.id); }}>
+                  <LinearGradient colors={['#059669', '#10B981']} style={styles.approveBtnBg}>
+                    <Ionicons name="checkmark-sharp" size={15} color="#fff" />
+                    <Text style={styles.approveText}>Approve</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
         ))}
 
         {/* Leave */}
         {(filter === 'all' || filter === 'leave') && (leaves || []).map((leave) => (
-          <View key={leave.id} style={styles.card}>
+          <LinearGradient key={leave.id} colors={['#FFFFFF', '#FDFBF7']} start={{x:0, y:0}} end={{x:1, y:1}} style={styles.card}>
             <View style={styles.cardHeader}>
-              <View style={[styles.cardIcon, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="calendar" size={16} color="#D97706" />
-              </View>
+              <LinearGradient colors={['#D97706', '#F59E0B']} style={styles.cardIcon}>
+                <Ionicons name="calendar-sharp" size={16} color="#FFFFFF" />
+              </LinearGradient>
               <View style={styles.cardInfo}>
                 <Text style={styles.cardTitle}>Leave Request</Text>
                 <Text style={styles.cardDate}>
@@ -169,26 +197,26 @@ export default function ApprovalsScreen() {
             <Text style={styles.cardMeta}>Type: {leave.type}</Text>
             <View style={styles.actions}>
               <TouchableOpacity style={styles.rejectBtn} onPress={() => decideLeave.mutate({ id: leave.id, status: 'rejected', decidedBy: profile!.id })}>
-                <Ionicons name="close" size={15} color={colors.error} />
+                <Ionicons name="close-sharp" size={15} color={colors.error} />
                 <Text style={styles.rejectText}>Reject</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.approveBtn} onPress={() => decideLeave.mutate({ id: leave.id, status: 'approved', decidedBy: profile!.id })}>
-                <View style={styles.approveBtnBg}>
-                  <Ionicons name="checkmark" size={15} color="#fff" />
+                <LinearGradient colors={['#059669', '#10B981']} style={styles.approveBtnBg}>
+                  <Ionicons name="checkmark-sharp" size={15} color="#fff" />
                   <Text style={styles.approveText}>Approve</Text>
-                </View>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
-          </View>
+          </LinearGradient>
         ))}
 
         {/* Material */}
         {(filter === 'all' || filter === 'material') && (materials || []).map((mat) => (
-          <View key={mat.id} style={styles.card}>
+          <LinearGradient key={mat.id} colors={['#FFFFFF', '#FDFBF7']} start={{x:0, y:0}} end={{x:1, y:1}} style={styles.card}>
             <View style={styles.cardHeader}>
-              <View style={[styles.cardIcon, { backgroundColor: '#F3E8FF' }]}>
-                <Ionicons name="cube" size={16} color="#7C3AED" />
-              </View>
+              <LinearGradient colors={['#7C3AED', '#8B5CF6']} style={styles.cardIcon}>
+                <Ionicons name="cube-sharp" size={16} color="#FFFFFF" />
+              </LinearGradient>
               <View style={styles.cardInfo}>
                 <Text style={styles.cardTitle}>{mat.material_name}</Text>
                 <Text style={styles.cardDate}>Qty: {mat.qty}{mat.needed_by ? ` · By ${new Date(mat.needed_by).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}</Text>
@@ -200,26 +228,26 @@ export default function ApprovalsScreen() {
             {mat.notes && <Text style={styles.cardBody}>{mat.notes}</Text>}
             <View style={styles.actions}>
               <TouchableOpacity style={styles.rejectBtn} onPress={() => decideMaterial.mutate({ id: mat.id, status: 'rejected' })}>
-                <Ionicons name="close" size={15} color={colors.error} />
+                <Ionicons name="close-sharp" size={15} color={colors.error} />
                 <Text style={styles.rejectText}>Reject</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.approveBtn} onPress={() => decideMaterial.mutate({ id: mat.id, status: 'approved' })}>
-                <View style={styles.approveBtnBg}>
-                  <Ionicons name="checkmark" size={15} color="#fff" />
+                <LinearGradient colors={['#059669', '#10B981']} style={styles.approveBtnBg}>
+                  <Ionicons name="checkmark-sharp" size={15} color="#fff" />
                   <Text style={styles.approveText}>Approve</Text>
-                </View>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
-          </View>
+          </LinearGradient>
         ))}
 
         {/* Advance */}
         {(filter === 'all' || filter === 'advance') && (advances || []).map((adv) => (
-          <View key={adv.id} style={styles.card}>
+          <LinearGradient key={adv.id} colors={['#FFFFFF', '#FDFBF7']} start={{x:0, y:0}} end={{x:1, y:1}} style={styles.card}>
             <View style={styles.cardHeader}>
-              <View style={[styles.cardIcon, { backgroundColor: '#D1FAE5' }]}>
-                <Ionicons name="cash" size={16} color="#059669" />
-              </View>
+              <LinearGradient colors={['#059669', '#10B981']} style={styles.cardIcon}>
+                <Ionicons name="wallet-sharp" size={16} color="#FFFFFF" />
+              </LinearGradient>
               <View style={styles.cardInfo}>
                 <Text style={styles.cardTitle}>Advance Request</Text>
                 <Text style={styles.cardDate}>₹{adv.amount.toLocaleString('en-IN')}</Text>
@@ -231,24 +259,24 @@ export default function ApprovalsScreen() {
             {adv.reason && <Text style={styles.cardBody}>{adv.reason}</Text>}
             <View style={styles.actions}>
               <TouchableOpacity style={styles.rejectBtn} onPress={() => decideAdvance.mutate({ id: adv.id, status: 'rejected', decidedBy: profile!.id })}>
-                <Ionicons name="close" size={15} color={colors.error} />
+                <Ionicons name="close-sharp" size={15} color={colors.error} />
                 <Text style={styles.rejectText}>Reject</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.approveBtn} onPress={() => decideAdvance.mutate({ id: adv.id, status: 'approved', decidedBy: profile!.id })}>
-                <View style={styles.approveBtnBg}>
-                  <Ionicons name="checkmark" size={15} color="#fff" />
+                <LinearGradient colors={['#059669', '#10B981']} style={styles.approveBtnBg}>
+                  <Ionicons name="checkmark-sharp" size={15} color="#fff" />
                   <Text style={styles.approveText}>Approve</Text>
-                </View>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
-          </View>
+          </LinearGradient>
         ))}
 
         {total === 0 && (
           <View style={styles.empty}>
-            <View style={styles.emptyIcon}>
-              <Ionicons name="checkmark-circle-outline" size={40} color="#059669" />
-            </View>
+            <LinearGradient colors={['#059669', '#10B981']} style={styles.emptyIcon}>
+              <Ionicons name="checkmark-circle-sharp" size={38} color="#FFFFFF" />
+            </LinearGradient>
             <Text style={styles.emptyTitle}>All Caught Up!</Text>
             <Text style={styles.emptyText}>No pending approvals at this time.</Text>
           </View>

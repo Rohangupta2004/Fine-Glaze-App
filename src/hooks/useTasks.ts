@@ -41,6 +41,7 @@ export function useCreateTask() {
       completedQuantity?: number;
       startDate?: string | null;
       endDate?: string | null;
+      clientVisible?: boolean;
     }) => {
       let createdBy = params.createdBy;
       if (!createdBy) {
@@ -62,64 +63,25 @@ export function useCreateTask() {
         completed_quantity: params.completedQuantity || 0,
         start_date: params.startDate || null,
         end_date: params.endDate || null,
+        checklist: params.checklist || [],
+        client_visible: params.clientVisible ?? false,
       };
 
       let { data, error } = await supabase.from('tasks').insert(fullPayload).select();
 
       if (error) {
+        console.error('[useCreateTask] Error creating task:', error);
         const msg = (error.message || '').toLowerCase();
-        const code = error.code;
-
-        // If parent_id column does not exist on remote schema or schema cache (PGRST204)
-        if (msg.includes('parent_id') || msg.includes('column') || msg.includes('schema cache') || code === 'PGRST204') {
-          const { data: authData } = await supabase.auth.getUser();
-          const validUser = authData?.user?.id || createdBy;
-
-          const fallbackPayload: Record<string, any> = { ...fullPayload, created_by: validUser };
-          delete fallbackPayload.parent_id;
-
-          const { data: fbData, error: fbErr } = await supabase.from('tasks').insert(fallbackPayload).select();
-          if (fbErr) {
-            const basePayload = {
-              project_id: params.projectId || null,
-              title: params.title,
-              priority: params.priority || 'medium',
-              status: 'pending',
-              created_by: validUser,
-            };
-            const { data: ultimateData, error: ultimateErr } = await supabase.from('tasks').insert(basePayload).select();
-            if (ultimateErr) throw ultimateErr;
-            data = ultimateData;
-          } else {
-            data = fbData;
-          }
-        } else {
-          // If created_by or assigned_to foreign key fails, sanitize user ID but keep parent_id
-          const { data: authData } = await supabase.auth.getUser();
-          const validUser = authData?.user?.id || createdBy;
-
-          const safePayload = {
-            ...fullPayload,
-            created_by: validUser,
-            assigned_to: null,
-          };
-
+        // If client_visible or checklist column is missing in schema cache, sanitize and retry
+        if (msg.includes('client_visible') || msg.includes('checklist') || error.code === 'PGRST204') {
+          const safePayload = { ...fullPayload };
+          delete safePayload.client_visible;
+          delete safePayload.checklist;
           const { data: retryData, error: retryErr } = await supabase.from('tasks').insert(safePayload).select();
-          if (retryErr) {
-            const basePayload = {
-              project_id: params.projectId || null,
-              title: params.title,
-              priority: params.priority || 'medium',
-              status: 'pending',
-              created_by: validUser,
-              parent_id: params.parentId || null,
-            };
-            const { data: ultimateData, error: ultimateErr } = await supabase.from('tasks').insert(basePayload).select();
-            if (ultimateErr) throw ultimateErr;
-            data = ultimateData;
-          } else {
-            data = retryData;
-          }
+          if (retryErr) throw retryErr;
+          data = retryData;
+        } else {
+          throw error;
         }
       }
 
@@ -134,14 +96,17 @@ export function useCreateTask() {
           important: params.priority === 'high',
         });
       }
+
+      return data?.[0] as Task;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['personal-todos'] });
     },
   });
 }
 
-/** Update task MIS details (quantities, category, dates, status). */
+/** Update task MIS details (quantities, category, dates, status, checklist, client_visible). */
 export function useUpdateTaskMIS() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -156,6 +121,8 @@ export function useUpdateTaskMIS() {
       endDate?: string | null;
       status?: TaskStatus;
       parentId?: string | null;
+      checklist?: any[];
+      clientVisible?: boolean;
     }) => {
       const payload: Record<string, any> = {};
       if (params.title !== undefined) payload.title = params.title;
@@ -167,6 +134,8 @@ export function useUpdateTaskMIS() {
       if (params.endDate !== undefined) payload.end_date = params.endDate;
       if (params.status !== undefined) payload.status = params.status;
       if (params.parentId !== undefined) payload.parent_id = params.parentId;
+      if (params.checklist !== undefined) payload.checklist = params.checklist;
+      if (params.clientVisible !== undefined) payload.client_visible = params.clientVisible;
 
       let { error } = await supabase
         .from('tasks')
@@ -174,39 +143,17 @@ export function useUpdateTaskMIS() {
         .eq('id', params.taskId);
 
       if (error) {
+        console.error('[useUpdateTaskMIS] Error updating task:', error);
         const msg = (error.message || '').toLowerCase();
-        const code = error.code;
-
-        // If Postgres check constraint taskstatuscheck fails on 'in_progress'
-        if (code === '23514' || msg.includes('check constraint') || msg.includes('status_check')) {
-          const safeStatus = params.status === 'in_progress' ? 'pending' : params.status || 'pending';
-          const safePayload = { ...payload, status: safeStatus };
+        if (msg.includes('client_visible') || msg.includes('checklist') || error.code === 'PGRST204') {
+          const safePayload = { ...payload };
+          delete safePayload.client_visible;
+          delete safePayload.checklist;
           const { error: retryErr } = await supabase
             .from('tasks')
             .update(safePayload)
             .eq('id', params.taskId);
-          if (retryErr) {
-            // Strip extra columns if needed
-            const basePayload: Record<string, any> = {};
-            if (params.title !== undefined) basePayload.title = params.title;
-            basePayload.status = safeStatus;
-            const { error: baseErr } = await supabase
-              .from('tasks')
-              .update(basePayload)
-              .eq('id', params.taskId);
-            if (baseErr) throw baseErr;
-          }
-        } else if (msg.includes('column') || msg.includes('schema cache') || code === 'PGRST204') {
-          const fallbackPayload: Record<string, any> = {};
-          if (params.title !== undefined) fallbackPayload.title = params.title;
-          if (params.status !== undefined) fallbackPayload.status = params.status === 'in_progress' ? 'pending' : params.status;
-
-          const { error: fbErr } = await supabase
-            .from('tasks')
-            .update(fallbackPayload)
-            .eq('id', params.taskId);
-
-          if (fbErr) throw fbErr;
+          if (retryErr) throw retryErr;
         } else {
           throw error;
         }
@@ -219,7 +166,7 @@ export function useUpdateTaskMIS() {
   });
 }
 
-/** Tasks assigned to the current user, optionally filtered by status. */
+/** Tasks assigned to or created by the current user. */
 export function useMyTasks(profileId: string | null | undefined) {
   return useQuery({
     queryKey: ['tasks', 'mine', profileId],
@@ -228,9 +175,17 @@ export function useMyTasks(profileId: string | null | undefined) {
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
-        .eq('assigned_to', profileId)
-        .order('window_start', { ascending: true, nullsFirst: false });
-      if (error) throw error;
+        .or(`assigned_to.eq.${profileId},created_by.eq.${profileId}`)
+        .order('created_at', { ascending: false });
+      if (error) {
+        // Fallback query if .or fails
+        const { data: fallback, error: fErr } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('assigned_to', profileId);
+        if (fErr) throw fErr;
+        return fallback as Task[];
+      }
       return data as Task[];
     },
     enabled: !!profileId,
@@ -242,14 +197,31 @@ export function useUpdateTaskStatus() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, status }: { taskId: string; status: TaskStatus }) => {
+      const completedAt = status === 'done' ? new Date().toISOString() : null;
       const { error } = await supabase
         .from('tasks')
-        .update({ status })
+        .update({ status, completed_at: completedAt })
         .eq('id', taskId);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onMutate: async ({ taskId, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks'] });
+      const previousTasks = queryClient.getQueryData(['tasks']);
+      const completedAt = status === 'done' ? new Date().toISOString() : null;
+      queryClient.setQueriesData({ queryKey: ['tasks'] }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((t: Task) => (t.id === taskId ? { ...t, status, completed_at: completedAt } : t));
+      });
+      return { previousTasks };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(['tasks'], context.previousTasks);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['project'] });
     },
   });
 }
@@ -265,7 +237,21 @@ export function useUpdateTaskChecklist() {
         .eq('id', taskId);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onMutate: async ({ taskId, checklist }) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks'] });
+      const previousTasks = queryClient.getQueryData(['tasks']);
+      queryClient.setQueriesData({ queryKey: ['tasks'] }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((t: Task) => (t.id === taskId ? { ...t, checklist } : t));
+      });
+      return { previousTasks };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(['tasks'], context.previousTasks);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
   });

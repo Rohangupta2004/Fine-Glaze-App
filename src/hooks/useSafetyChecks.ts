@@ -31,13 +31,15 @@ export function useSubmitSafetyCheck() {
   return useMutation({
     mutationFn: async (params: {
       profileId: string;
-      projectId: string;
+      projectId?: string | null;
       items: Record<string, boolean>;
       concernReported: string | null;
     }) => {
+      const validProjectId = params.projectId && params.projectId.trim() !== '' ? params.projectId : null;
+
       const { error } = await supabase.from('safety_checks').insert({
         profile_id: params.profileId,
-        project_id: params.projectId,
+        project_id: validProjectId,
         date: todayISO(),
         items: params.items,
         concern_reported: params.concernReported,

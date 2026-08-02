@@ -15,6 +15,7 @@
     "@supabase/supabase-js": "^2.110.2",
     "@tanstack/react-query": "^5.101.2",
     "expo": "~57.0.8",
+    "expo-av": "^16.0.8",
     "expo-blur": "~57.0.2",
     "expo-camera": "~57.0.3",
     "expo-constants": "~57.0.3",
@@ -39,6 +40,7 @@
     "expo-sqlite": "~57.0.1",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.1",
+    "expo-task-manager": "~57.0.0",
     "expo-video-thumbnails": "~57.0.1",
     "expo-web-browser": "~57.0.2",
     "i18next": "^26.3.6",
@@ -62,12 +64,14 @@
   "devDependencies": {
     "@types/react": "~19.2.2",
     "cross-env": "^10.1.0",
+    "playwright": "^1.62.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
     "build": "expo export",
     "build:web": "cross-env NODE_OPTIONS=--max-old-space-size=4096 expo export --platform web",
+    "build:apk": "eas build --platform android --profile preview",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start --web"

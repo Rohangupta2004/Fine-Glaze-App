@@ -9,15 +9,16 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Avatar } from '../../src/components';
-import { useAuthStore } from '../../src/stores/authStore';
-import { useMyConversations, useConversationMembers } from '../../src/hooks/useConversations';
-import { useProjects } from '../../src/hooks/useProjects';
-import { colors } from '../../src/theme/colors';
-import { fontFamily } from '../../src/theme/typography';
-import { spacing } from '../../src/theme/spacing';
+import { Avatar } from '../../../src/components';
+import { useAuthStore } from '../../../src/stores/authStore';
+import { useMyConversations, useConversationMembers } from '../../../src/hooks/useConversations';
+import { useProjects } from '../../../src/hooks/useProjects';
+import { colors } from '../../../src/theme/colors';
+import { fontFamily } from '../../../src/theme/typography';
+import { spacing } from '../../../src/theme/spacing';
 
 export default function AdminChatScreen() {
   const insets = useSafeAreaInsets();
@@ -44,21 +45,23 @@ export default function AdminChatScreen() {
       <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.headerLabel}>Team</Text>
+            <Text style={styles.headerLabel}>Team Collaboration</Text>
             <Text style={styles.headerTitle}>Messages</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity
               onPress={() => router.push('/(admin)/new-group' as any)}
               style={styles.newBtn}
+              activeOpacity={0.8}
             >
-              <Ionicons name="people-outline" size={20} color="#1E1815" />
+              <Ionicons name="people-sharp" size={20} color="#695030" />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push('/(admin)/new-message' as any)}
               style={styles.newBtn}
+              activeOpacity={0.8}
             >
-              <Ionicons name="create-outline" size={20} color="#1E1815" />
+              <Ionicons name="create-sharp" size={20} color="#695030" />
             </TouchableOpacity>
           </View>
         </View>
@@ -90,7 +93,7 @@ export default function AdminChatScreen() {
         {/* Project Chats */}
         {projectChats.length > 0 && (
           <>
-            <SectionLabel icon="business" text="Project Chats" />
+            <SectionLabel icon="business-sharp" text="Project Chats" />
             {projectChats.map((conv) => (
               <TouchableOpacity
                 key={conv.id}
@@ -98,14 +101,14 @@ export default function AdminChatScreen() {
                 onPress={() => router.push({ pathname: '/(admin)/conversation', params: { conversationId: conv.id, title: conv.project_id ? projectMap.get(conv.project_id) || 'Project Chat' : 'Project Chat' } })}
               >
                 <View style={styles.chatCard}>
-                  <View style={styles.chatIconGrad}>
-                    <Ionicons name="business" size={20} color="#695030" />
-                  </View>
+                  <LinearGradient colors={['#5B4122', '#8B6840']} style={styles.chatIconGrad}>
+                    <Ionicons name="business-sharp" size={20} color="#FFFFFF" />
+                  </LinearGradient>
                   <View style={styles.chatInfo}>
                     <Text style={styles.chatName}>{conv.project_id ? projectMap.get(conv.project_id) || 'Project Chat' : 'Project Chat'}</Text>
                     <Text style={styles.chatPreview}>Tap to open conversation</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.neutral[300]} />
+                  <Ionicons name="chevron-forward-sharp" size={16} color={colors.neutral[400]} />
                 </View>
               </TouchableOpacity>
             ))}
@@ -115,7 +118,7 @@ export default function AdminChatScreen() {
         {/* Group Chats */}
         {groupChats.length > 0 && (
           <>
-            <SectionLabel icon="people" text="Group Chats" />
+            <SectionLabel icon="people-sharp" text="Group Chats" />
             {groupChats.map((conv) => (
               <TouchableOpacity
                 key={conv.id}
@@ -123,14 +126,14 @@ export default function AdminChatScreen() {
                 onPress={() => router.push({ pathname: '/(admin)/conversation', params: { conversationId: conv.id, title: conv.title || 'Group Chat' } })}
               >
                 <View style={styles.chatCard}>
-                  <View style={[styles.chatIconGrad, { backgroundColor: colors.primary + '15' }]}>
-                    <Ionicons name="people" size={20} color={colors.primary} />
-                  </View>
+                  <LinearGradient colors={['#4338CA', '#6366F1']} style={styles.chatIconGrad}>
+                    <Ionicons name="people-sharp" size={20} color="#FFFFFF" />
+                  </LinearGradient>
                   <View style={styles.chatInfo}>
                     <Text style={styles.chatName}>{conv.title || 'Group Chat'}</Text>
                     <Text style={styles.chatPreview}>Tap to open group</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.neutral[300]} />
+                  <Ionicons name="chevron-forward-sharp" size={16} color={colors.neutral[400]} />
                 </View>
               </TouchableOpacity>
             ))}
@@ -140,7 +143,7 @@ export default function AdminChatScreen() {
         {/* Direct Messages */}
         {directChats.length > 0 && (
           <>
-            <SectionLabel icon="person" text="Direct Messages" />
+            <SectionLabel icon="person-sharp" text="Direct Messages" />
             {directChats.map((conv) => (
               <TouchableOpacity
                 key={conv.id}
@@ -151,9 +154,9 @@ export default function AdminChatScreen() {
                   <Avatar name={directTitle(conv.id)} size={44} />
                   <View style={styles.chatInfo}>
                     <Text style={styles.chatName}>{directTitle(conv.id)}</Text>
-                    <Text style={styles.chatPreview}>Tap to open</Text>
+                    <Text style={styles.chatPreview}>Tap to open message</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.neutral[300]} />
+                  <Ionicons name="chevron-forward-sharp" size={16} color={colors.neutral[400]} />
                 </View>
               </TouchableOpacity>
             ))}
@@ -162,9 +165,9 @@ export default function AdminChatScreen() {
 
         {(!conversations || conversations.length === 0) && (
           <View style={styles.empty}>
-            <View style={styles.emptyIcon}>
-              <Ionicons name="chatbubbles-outline" size={40} color="#695030" />
-            </View>
+            <LinearGradient colors={['#5B4122', '#8B6840']} style={styles.emptyIcon}>
+              <Ionicons name="chatbubbles-sharp" size={38} color="#FFFFFF" />
+            </LinearGradient>
             <Text style={styles.emptyTitle}>No conversations yet</Text>
             <Text style={styles.emptyText}>Messages from project chats and direct messages will appear here</Text>
           </View>
@@ -177,7 +180,7 @@ export default function AdminChatScreen() {
 function SectionLabel({ icon, text }: { icon: string; text: string }) {
   return (
     <View style={styles.sectionRow}>
-      <Ionicons name={icon as any} size={13} color={colors.neutral[500]} />
+      <Ionicons name={icon as any} size={14} color="#695030" />
       <Text style={styles.sectionLabel}>{text}</Text>
     </View>
   );

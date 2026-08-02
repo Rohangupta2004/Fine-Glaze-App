@@ -11,12 +11,13 @@ import {
   Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { StatusChip, Card, Button, GradientButton } from '../../src/components';
+import { SignedImage } from '../../src/components/SignedImage';
 import { supabase } from '../../src/lib/supabase';
 import { useAuthStore } from '../../src/stores/authStore';
 import { colors } from '../../src/theme/colors';
@@ -111,6 +112,7 @@ function useDprReview() {
 export default function DprManagementScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { dprId } = useLocalSearchParams<{ dprId?: string }>();
   const profile = useAuthStore((s) => s.profile);
   const { data: dprs, refetch, isRefetching } = useAllDprs();
   const { approve, reject } = useDprReview();
@@ -121,6 +123,41 @@ export default function DprManagementScreen() {
   const [reviewNote, setReviewNote] = useState('');
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | 'changes'>('approve');
   const [exporting, setExporting] = useState(false);
+
+  React.useEffect(() => {
+    if (dprId && dprs && dprs.length > 0 && !selectedDpr) {
+      const found = dprs.find((d) => d.id === dprId);
+      if (found) setSelectedDpr(found);
+    }
+  }, [dprId, dprs]);
+
+  const { data: dprMedia = [] } = useQuery({
+    queryKey: ['dpr-media', selectedDpr?.id],
+    queryFn: async () => {
+      if (!selectedDpr?.id) return [];
+      const { data, error } = await supabase
+        .from('dpr_media')
+        .select('*')
+        .eq('dpr_id', selectedDpr.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedDpr?.id,
+  });
+
+  const { data: dprBoqItems = [] } = useQuery({
+    queryKey: ['dpr-boq-items', selectedDpr?.id],
+    queryFn: async () => {
+      if (!selectedDpr?.id) return [];
+      const { data, error } = await supabase
+        .from('dpr_boq_items')
+        .select('*, project_boq_items(item_name, unit)')
+        .eq('dpr_id', selectedDpr.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedDpr?.id,
+  });
 
   const handleExportRegister = async () => {
     const projectId = filteredDprs[0]?.project_id;
@@ -166,10 +203,15 @@ export default function DprManagementScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Approve',
-          onPress: () => {
-            if (!selectedDpr || !profile) return;
-            approve.mutate({ dprId: selectedDpr.id, reviewerId: profile.id, note: reviewNote || undefined });
-            setSelectedDpr(null);
+          onPress: async () => {
+            if (!selectedDpr) return;
+            try {
+              await approve.mutateAsync({ dprId: selectedDpr.id, reviewerId: profile?.id || '', note: reviewNote || undefined });
+              showAlert('Approved', 'DPR approved successfully!');
+              setSelectedDpr(null);
+            } catch (e: any) {
+              showAlert('Error', e?.message || 'Failed to approve DPR');
+            }
           },
         },
       ]);
@@ -178,15 +220,20 @@ export default function DprManagementScreen() {
     }
   };
 
-  const submitReview = () => {
-    if (!selectedDpr || !profile || !reviewNote.trim()) {
+  const submitReview = async () => {
+    if (!selectedDpr || !reviewNote.trim()) {
       showAlert('Note Required', 'Please provide a note explaining the changes needed.');
       return;
     }
-    reject.mutate({ dprId: selectedDpr.id, reviewerId: profile.id, note: reviewNote });
-    setShowReviewModal(false);
-    setReviewNote('');
-    setSelectedDpr(null);
+    try {
+      await reject.mutateAsync({ dprId: selectedDpr.id, reviewerId: profile?.id || '', note: reviewNote });
+      showAlert('DPR Status Updated', reviewAction === 'changes' ? 'Requested changes on DPR.' : 'DPR rejected.');
+      setShowReviewModal(false);
+      setReviewNote('');
+      setSelectedDpr(null);
+    } catch (e: any) {
+      showAlert('Error', e?.message || 'Failed to submit review');
+    }
   };
 
   const FILTERS = [
@@ -248,10 +295,36 @@ export default function DprManagementScreen() {
               {selectedDpr.level_zone && <Text style={styles.workType}>Zone: {selectedDpr.level_zone}</Text>}
             </Card>
 
-            {(selectedDpr.media_count || 0) > 0 && (
+            {dprBoqItems.length > 0 && (
               <Card style={styles.detailCard} padding={spacing.lg}>
-                <Text style={styles.sectionLabel}>Photos ({selectedDpr.media_count})</Text>
-                <Text style={styles.mediaNote}>Media attachments available in DPR web dashboard.</Text>
+                <Text style={styles.sectionLabel}>Quantities Reported Today</Text>
+                {dprBoqItems.map((item: any) => (
+                  <View key={item.id} style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, color: colors.ink, fontFamily: fontFamily.medium, flex: 1 }}>
+                      {item.project_boq_items?.item_name || 'BOQ Item'}
+                    </Text>
+                    <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: '#695030' }}>
+                      {item.quantity_reported} {item.project_boq_items?.unit || ''}
+                    </Text>
+                  </View>
+                ))}
+              </Card>
+            )}
+
+            {dprMedia.length > 0 && (
+              <Card style={styles.detailCard} padding={spacing.lg}>
+                <Text style={styles.sectionLabel}>Site Photos ({dprMedia.length})</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md, marginTop: spacing.xs }}>
+                  {dprMedia.map((m: any) => (
+                    <SignedImage
+                      key={m.id}
+                      bucket="dpr-media"
+                      storagePath={m.storage_path}
+                      style={{ width: 130, height: 130, borderRadius: 12, backgroundColor: colors.neutral[100] }}
+                      resizeMode="cover"
+                    />
+                  ))}
+                </ScrollView>
               </Card>
             )}
 
@@ -436,7 +509,18 @@ export default function DprManagementScreen() {
                 
                 {dpr.status === 'submitted' && (
                   <View style={styles.cardActions}>
-                    <TouchableOpacity style={styles.qApprove} onPress={(e) => { e.stopPropagation(); if(profile) approve.mutate({ dprId: dpr.id, reviewerId: profile.id }); }}>
+                    <TouchableOpacity
+                      style={styles.qApprove}
+                      onPress={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          await approve.mutateAsync({ dprId: dpr.id, reviewerId: profile?.id || '' });
+                          showAlert('Approved', 'DPR approved successfully!');
+                        } catch (err: any) {
+                          showAlert('Error', err?.message || 'Failed to approve DPR');
+                        }
+                      }}
+                    >
                       <Ionicons name="checkmark" size={12} color="#fff" />
                       <Text style={styles.qTextApprove}>Approve</Text>
                     </TouchableOpacity>

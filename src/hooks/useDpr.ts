@@ -44,15 +44,37 @@ export function useMyDprs(profileId: string | null | undefined, limit = 30) {
   });
 }
 
+/** DPRs linked to a specific task. */
+export function useTaskDprs(taskId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['dprs', 'task', taskId],
+    queryFn: async (): Promise<Dpr[]> => {
+      if (!taskId) return [];
+      const { data, error } = await supabase
+        .from('dprs')
+        .select('*')
+        .eq('task_id', taskId)
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return data as Dpr[];
+    },
+    enabled: !!taskId,
+  });
+}
+
 interface SubmitDprParams {
   projectId: string;
   submittedBy: string;
-  workType: string;
-  levelZone: string;
+  workType?: string;
+  levelZone?: string;
   workDone: string;
+  taskId?: string | null;
+  quantityCompleted?: number;
+  date?: string;
+  status?: 'submitted' | 'approved';
 }
 
-/** Submit a Daily Progress Report (status: submitted, ready for supervisor/admin review). */
+/** Submit a Daily Progress Report (status: submitted or approved, ready for supervisor/admin review). */
 export function useSubmitDpr() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -62,51 +84,57 @@ export function useSubmitDpr() {
         .insert({
           project_id: params.projectId,
           submitted_by: params.submittedBy,
-          date: todayISO(),
-          work_type: params.workType,
-          level_zone: params.levelZone,
+          date: params.date || todayISO(),
+          work_type: params.workType || 'Daily Progress',
+          level_zone: params.levelZone || null,
           work_done: params.workDone,
-          status: 'submitted',
+          task_id: params.taskId || null,
+          quantity_completed: params.quantityCompleted || 0,
+          status: params.status || 'submitted',
           synced: true,
         })
         .select()
         .single();
       if (error) throw error;
 
-      // Dispatch notifications to company Admins and Project Managers
-      try {
-        const { data: admins } = await supabase
-          .from('profiles')
-          .select('id')
-          .in('role', ['owner', 'project_manager', 'admin', 'hr']);
+      // Dispatch notifications to company Admins and Project Managers if submitted
+      if (params.status !== 'approved') {
+        try {
+          const { data: admins } = await supabase
+            .from('profiles')
+            .select('id')
+            .in('role', ['owner', 'project_manager', 'admin', 'hr']);
 
-        if (admins && admins.length > 0) {
-          const notifs = admins
-            .filter((adm) => adm.id !== params.submittedBy)
-            .map((adm) => ({
-              recipient_id: adm.id,
-              kind: 'dpr_submission',
-              title: 'New DPR Submitted',
-              body: `New progress report submitted for ${params.workType || 'site work'}: "${params.workDone.slice(0, 60)}${params.workDone.length > 60 ? '...' : ''}"`,
-              ref_table: 'dprs',
-              ref_id: data.id,
-              important: true,
-            }));
+          if (admins && admins.length > 0) {
+            const notifs = admins
+              .filter((adm) => adm.id !== params.submittedBy)
+              .map((adm) => ({
+                recipient_id: adm.id,
+                kind: 'dpr_submission',
+                title: 'New DPR Submitted',
+                body: `New progress report submitted for ${params.workType || 'site work'}: "${params.workDone.slice(0, 60)}${params.workDone.length > 60 ? '...' : ''}"`,
+                ref_table: 'dprs',
+                ref_id: data.id,
+                important: true,
+              }));
 
-          if (notifs.length > 0) {
-            await supabase.from('notifications').insert(notifs);
+            if (notifs.length > 0) {
+              await supabase.from('notifications').insert(notifs);
+            }
           }
+        } catch (notifErr) {
+          console.warn('[useSubmitDpr] Failed to send admin notifications:', notifErr);
         }
-      } catch (notifErr) {
-        console.warn('[useSubmitDpr] Failed to send admin notifications:', notifErr);
       }
 
       return data as Dpr;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dprs'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
       queryClient.invalidateQueries({ queryKey: ['home'] });
+      queryClient.invalidateQueries({ queryKey: ['project'] });
     },
   });
 }
@@ -121,7 +149,9 @@ export function useDeleteDpr() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dprs'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['dpr-timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['project'] });
     },
   });
 }

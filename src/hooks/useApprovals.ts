@@ -83,16 +83,95 @@ export function usePendingAdvances() {
 export function useApproveDpr() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ dprId, reviewerId, note }: { dprId: string; reviewerId: string; note?: string }) => {
-      const { error } = await supabase.from('dprs').update({
-        status: 'approved',
-        reviewed_by: reviewerId,
-        reviewed_at: new Date().toISOString(),
-        review_note: note || null,
-      }).eq('id', dprId);
-      if (error) throw error;
+    mutationFn: async ({ dprId, reviewerId, note }: { dprId: string; reviewerId?: string; note?: string }) => {
+      // Resolve reviewer ID if not provided
+      let uid = reviewerId;
+      if (!uid) {
+        const { data: authData } = await supabase.auth.getUser();
+        uid = authData.user?.id;
+      }
+
+      // 1. Update status to approved FIRST so approval always succeeds
+      const { data: updatedDpr, error: updateErr } = await supabase
+        .from('dprs')
+        .update({
+          status: 'approved',
+          reviewed_by: uid || null,
+          reviewed_at: new Date().toISOString(),
+          review_note: note || null,
+        })
+        .eq('id', dprId)
+        .select()
+        .maybeSingle();
+
+      if (updateErr) throw updateErr;
+
+      const dpr = updatedDpr;
+
+      // 2. Recalculate task & subtask progress roll-up if task_id exists
+      if (dpr?.task_id) {
+        try {
+          await supabase.rpc('recalculate_task_and_project_progress', { p_task_id: dpr.task_id });
+        } catch (tErr) {
+          console.warn('[useApproveDpr] RPC task rollup warning:', tErr);
+        }
+      }
+
+      // 3. Update linked BOQ items if dpr_boq_items exist
+      try {
+        const { data: reportedItems } = await supabase
+          .from('dpr_boq_items')
+          .select('project_boq_item_id, quantity_reported')
+          .eq('dpr_id', dprId);
+
+        if (reportedItems && reportedItems.length > 0) {
+          for (const item of reportedItems) {
+            const { data: boqItem } = await supabase
+              .from('project_boq_items')
+              .select('completed_quantity')
+              .eq('id', item.project_boq_item_id)
+              .maybeSingle();
+
+            const currentQty = boqItem?.completed_quantity || 0;
+            const newQty = currentQty + (item.quantity_reported || 0);
+
+            await supabase
+              .from('project_boq_items')
+              .update({ completed_quantity: newQty })
+              .eq('id', item.project_boq_item_id);
+          }
+        }
+      } catch (boqErr) {
+        console.warn('[useApproveDpr] BOQ update warning:', boqErr);
+      }
+
+      // 4. Send notification to submitter
+      if (dpr?.submitted_by) {
+        try {
+          await supabase.from('notifications').insert({
+            recipient_id: dpr.submitted_by,
+            kind: 'dpr_approved',
+            title: 'DPR Approved',
+            body: `Your daily progress report for ${dpr.work_type || 'site work'} has been approved!`,
+            ref_table: 'dprs',
+            ref_id: dprId,
+            important: false,
+          });
+        } catch (nErr) {
+          console.warn('[useApproveDpr] Notification warning:', nErr);
+        }
+      }
+
+      return dpr;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['approvals'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['approvals'] });
+      qc.invalidateQueries({ queryKey: ['dprs'] });
+      qc.invalidateQueries({ queryKey: ['admin-dprs-all'] });
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+      qc.invalidateQueries({ queryKey: ['project'] });
+      qc.invalidateQueries({ queryKey: ['boq'] });
+    },
   });
 }
 
@@ -100,16 +179,51 @@ export function useApproveDpr() {
 export function useRejectDpr() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ dprId, reviewerId, note }: { dprId: string; reviewerId: string; note: string }) => {
-      const { error } = await supabase.from('dprs').update({
-        status: 'rejected',
-        reviewed_by: reviewerId,
-        reviewed_at: new Date().toISOString(),
-        review_note: note,
-      }).eq('id', dprId);
+    mutationFn: async ({ dprId, reviewerId, note }: { dprId: string; reviewerId?: string; note: string }) => {
+      let uid = reviewerId;
+      if (!uid) {
+        const { data: authData } = await supabase.auth.getUser();
+        uid = authData.user?.id;
+      }
+
+      const { data: dpr, error } = await supabase
+        .from('dprs')
+        .update({
+          status: 'rejected',
+          reviewed_by: uid || null,
+          reviewed_at: new Date().toISOString(),
+          review_note: note,
+        })
+        .eq('id', dprId)
+        .select()
+        .maybeSingle();
+
       if (error) throw error;
+
+      if (dpr?.submitted_by) {
+        try {
+          await supabase.from('notifications').insert({
+            recipient_id: dpr.submitted_by,
+            kind: 'dpr_rejected',
+            title: 'DPR Needs Changes / Rejected',
+            body: `Your DPR for ${dpr.work_type || 'site work'} was rejected: "${note}"`,
+            ref_table: 'dprs',
+            ref_id: dprId,
+            important: true,
+          });
+        } catch (nErr) {
+          console.warn('[useRejectDpr] Notification warning:', nErr);
+        }
+      }
+
+      return dpr;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['approvals'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['approvals'] });
+      qc.invalidateQueries({ queryKey: ['dprs'] });
+      qc.invalidateQueries({ queryKey: ['admin-dprs-all'] });
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+    },
   });
 }
 

@@ -14,19 +14,20 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Avatar, Card } from '../../src/components';
-import { useAuthStore } from '../../src/stores/authStore';
-import { usePermissions } from '../../src/hooks/usePermissions';
-import { colors } from '../../src/theme/colors';
-import { fontFamily } from '../../src/theme/typography';
-import { spacing } from '../../src/theme/spacing';
-import { showAlert } from '../../src/utils/alert';
+import { Avatar, Card } from '../../../src/components';
+import { useAuthStore } from '../../../src/stores/authStore';
+import { usePermissions } from '../../../src/hooks/usePermissions';
+import { colors } from '../../../src/theme/colors';
+import { fontFamily } from '../../../src/theme/typography';
+import { spacing } from '../../../src/theme/spacing';
+import { showAlert } from '../../../src/utils/alert';
 
 interface MenuItem {
   icon: string;
+  textIcon?: string;
   label: string;
   route: string;
-  color?: string;
+  gradient?: [string, string];
   badge?: number;
   perm?: string;
 }
@@ -34,42 +35,42 @@ interface MenuItem {
 const SECTIONS: { title: string; items: MenuItem[]; gradient: string[] }[] = [
   {
     title: 'Management',
-    gradient: ['#695030', '#7D5F3A'],
+    gradient: ['#5B4122', '#8B6840'],
     items: [
-      { icon: 'document-text', label: 'DPR Management', route: '/(admin)/dpr-management', color: '#2563EB', perm: 'dpr_approvals' },
-      { icon: 'folder', label: 'Documents Vault', route: '/(admin)/documents', color: '#695030' },
-      { icon: 'cube', label: 'Materials', route: '/(admin)/materials', color: '#D97706', perm: 'materials' },
-      { icon: 'business', label: 'Clients', route: '/(admin)/clients', color: '#2563EB', perm: 'clients' },
-      { icon: 'calendar', label: 'Calendar', route: '/(admin)/calendar', color: '#695030' },
-      { icon: 'people', label: 'Attendance Report', route: '/(admin)/attendance-report', color: '#059669', perm: 'attendance' },
-      { icon: 'search', label: 'Global Search', route: '/(admin)/global-search', color: '#D97706' },
-      { icon: 'people-circle', label: 'Assign Site & Workers', route: '/(admin)/assign-site', color: '#2563EB' },
-      { icon: 'person-add', label: 'Employee Requests', route: '/(admin)/employee-requests', color: '#D97706' },
-      { icon: 'repeat', label: 'Recurring Tasks', route: '/(admin)/recurring-tasks', color: '#059669' },
-      { icon: 'document-attach', label: 'Upload BOQ', route: '/(admin)/import-boq', color: '#695030' },
-      { icon: 'qr-code', label: 'Project QR Codes', route: '/(admin)/project-qr', color: '#695030' },
+      { icon: 'document-text-sharp', label: 'DPR Management', route: '/(admin)/dpr-management', gradient: ['#2563EB', '#3B82F6'], perm: 'dpr_approvals' },
+      { icon: 'folder-open-sharp', label: 'Documents Vault', route: '/(admin)/documents', gradient: ['#1E293B', '#334155'] },
+      { icon: 'cube-sharp', label: 'Materials', route: '/(admin)/materials', gradient: ['#E11D48', '#F43F5E'], perm: 'materials' },
+      { icon: 'briefcase-sharp', label: 'Clients', route: '/(admin)/clients', gradient: ['#0D9488', '#14B8A6'], perm: 'clients' },
+      { icon: 'calendar-sharp', label: 'Calendar', route: '/(admin)/calendar', gradient: ['#8B6840', '#B89047'] },
+      { icon: 'people-sharp', label: 'Attendance Report', route: '/(admin)/attendance-report', gradient: ['#059669', '#10B981'], perm: 'attendance' },
+      { icon: 'search-sharp', label: 'Global Search', route: '/(admin)/global-search', gradient: ['#D97706', '#F59E0B'] },
+      { icon: 'map-sharp', label: 'Assign Site & Workers', route: '/(admin)/assign-site', gradient: ['#6D28D9', '#8B5CF6'] },
+      { icon: 'person-add-sharp', label: 'Employee Requests', route: '/(admin)/employee-requests', gradient: ['#EA580C', '#F97316'] },
+      { icon: 'repeat-sharp', label: 'Recurring Tasks', route: '/(admin)/recurring-tasks', gradient: ['#0D9488', '#2DD4BF'] },
+      { icon: 'document-attach-sharp', label: 'Upload BOQ', route: '/(admin)/import-boq', gradient: ['#4A3728', '#695030'] },
+      { icon: 'qr-code-sharp', label: 'Project QR Codes', route: '/(admin)/project-qr', gradient: ['#374151', '#4B5563'] },
     ],
   },
   {
     title: 'Reports & Analytics',
     gradient: ['#2563EB', '#3B82F6'],
     items: [
-      { icon: 'bar-chart', label: 'Analytics', route: '/(admin)/analytics', color: '#2563EB' },
-      { icon: 'list', label: 'Audit Log', route: '/(admin)/audit-log', color: '#6B7280' },
+      { icon: 'stats-chart-sharp', label: 'Analytics', route: '/(admin)/analytics', gradient: ['#2563EB', '#3B82F6'] },
+      { icon: 'list-sharp', label: 'Audit Log', route: '/(admin)/audit-log', gradient: ['#475569', '#64748B'] },
     ],
   },
   {
     title: 'Settings',
     gradient: ['#7C3AED', '#8B5CF6'],
     items: [
-      { icon: 'person-circle', label: 'My Profile', route: '/(admin)/my-profile', color: '#695030' },
-      { icon: 'business', label: 'Company Settings', route: '/(admin)/company-settings', color: '#374151', perm: 'settings' },
-      { icon: 'shield-checkmark', label: 'Roles & Permissions', route: '/(admin)/roles-permissions', color: '#D97706', perm: 'settings' },
-      { icon: 'notifications', label: 'Notification Settings', route: '/(admin)/notification-settings', color: '#2563EB' },
-      { icon: 'language', label: 'Language', route: '/(admin)/language-settings', color: '#059669' },
-      { icon: 'cloud-download', label: 'Backup & Restore', route: '/(admin)/backup-restore', color: '#7C3AED' },
-      { icon: 'help-circle', label: 'Help & Support', route: '/(admin)/help-about', color: '#6B7280' },
-      { icon: 'information-circle', label: 'About Fine Glaze', route: '/(admin)/help-about', color: '#695030' },
+      { icon: 'person-circle-sharp', textIcon: 'ME', label: 'My Profile', route: '/(admin)/my-profile', gradient: ['#5B4122', '#8B6840'] },
+      { icon: 'business-sharp', label: 'Company Settings', route: '/(admin)/company-settings', gradient: ['#374151', '#4B5563'], perm: 'settings' },
+      { icon: 'shield-checkmark-sharp', label: 'Roles & Permissions', route: '/(admin)/roles-permissions', gradient: ['#D97706', '#F59E0B'], perm: 'settings' },
+      { icon: 'notifications-sharp', label: 'Notification Settings', route: '/(admin)/notification-settings', gradient: ['#2563EB', '#3B82F6'] },
+      { icon: 'language-sharp', label: 'Language', route: '/(admin)/language-settings', gradient: ['#059669', '#10B981'] },
+      { icon: 'cloud-download-sharp', label: 'Backup & Restore', route: '/(admin)/backup-restore', gradient: ['#7C3AED', '#8B5CF6'] },
+      { icon: 'help-circle-sharp', label: 'Help & Support', route: '/(admin)/help-about', gradient: ['#6B7280', '#9CA3AF'] },
+      { icon: 'information-circle-sharp', label: 'About Fine Glaze', route: '/(admin)/help-about', gradient: ['#8B6840', '#B89047'] },
     ],
   },
 ];
@@ -121,7 +122,7 @@ export default function AdminMoreScreen() {
               <Text style={styles.profilePhone}>{profile?.phone || ''}</Text>
             </View>
             <View style={styles.profileArrow}>
-              <Ionicons name="chevron-forward" size={16} color={colors.neutral[500]} />
+              <Ionicons name="chevron-forward-sharp" size={16} color={colors.neutral[500]} />
             </View>
           </View>
         </Card>
@@ -147,16 +148,25 @@ export default function AdminMoreScreen() {
                   onPress={() => router.push(item.route as any)}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.menuIconWrap}>
-                    <Ionicons name={item.icon as any} size={18} color="#695030" />
-                  </View>
+                  <LinearGradient 
+                    colors={item.gradient || ['#5B4122', '#8B6840']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.menuIconWrap}
+                  >
+                    {item.textIcon ? (
+                      <Text style={{ color: '#FFFFFF', fontFamily: fontFamily.bold, fontSize: 11 }}>{item.textIcon}</Text>
+                    ) : (
+                      <Ionicons name={item.icon as any} size={18} color="#FFFFFF" />
+                    )}
+                  </LinearGradient>
                   <Text style={styles.menuLabel}>{item.label}</Text>
                   {item.badge && item.badge > 0 && (
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>{item.badge}</Text>
                     </View>
                   )}
-                  <Ionicons name="chevron-forward" size={16} color={colors.neutral[300]} />
+                  <Ionicons name="chevron-forward-sharp" size={16} color={colors.neutral[300]} />
                 </TouchableOpacity>
               ))}
             </Card>
@@ -170,14 +180,14 @@ export default function AdminMoreScreen() {
           style={styles.logoutCard}
         >
           <View style={styles.logoutRow}>
-            <View style={styles.logoutIconBadge}>
-              <Ionicons name="log-out-outline" size={20} color="#DC2626" />
-            </View>
+            <LinearGradient colors={['#EF4444', '#B91C1C']} style={styles.logoutIconBadge}>
+              <Ionicons name="log-out-sharp" size={20} color="#FFFFFF" />
+            </LinearGradient>
             <View style={styles.logoutTextWrap}>
               <Text style={styles.logoutTitle}>Log Out</Text>
               <Text style={styles.logoutSub}>Sign out of your account</Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color="rgba(220, 38, 38, 0.4)" />
+            <Ionicons name="chevron-forward-sharp" size={16} color="rgba(220, 38, 38, 0.4)" />
           </View>
         </TouchableOpacity>
       </View>

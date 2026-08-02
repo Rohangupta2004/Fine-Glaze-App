@@ -10,12 +10,17 @@ import {
   Poppins_700Bold,
 } from '@expo-google-fonts/poppins';
 import * as Sentry from '@sentry/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '../src/lib/queryClient';
+
 
 import '../src/i18n';
+import '../src/lib/backgroundGeofence';
 import { useAuthStore } from '../src/stores/authStore';
 import { setupInactivityTracking, recordLogin, type LockAction } from '../src/lib/inactivityLock';
 import { colors } from '../src/theme/colors';
+import { PremiumLoadingScreen } from '../src/components';
+
 
 // Keep splash visible while loading
 SplashScreen.preventAutoHideAsync();
@@ -27,14 +32,6 @@ Sentry.init({
   enabled: !__DEV__,
 });
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 2,
-    },
-  },
-});
 
 function RootLayoutInner() {
   const router = useRouter();
@@ -123,7 +120,7 @@ function RootLayoutInner() {
   }, [appReady, userId, isAuthenticated, hasPin, segments, profile]);
 
   if (!appReady) {
-    return <View style={styles.loading} />;
+    return <PremiumLoadingScreen />;
   }
 
   return <Slot />;

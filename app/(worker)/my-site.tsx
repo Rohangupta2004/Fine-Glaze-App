@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -14,16 +14,36 @@ import { Ionicons } from '@expo/vector-icons';
 import { Card, StatusChip, Avatar } from '../../src/components';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useProjects } from '../../src/hooks/useProjects';
+import { useMyAssignedProjects } from '../../src/hooks/useAssignedProjects';
+import { useProjectBOQ } from '../../src/hooks/useBOQ';
+import { useProjectTasks } from '../../src/hooks/useTasks';
 import { colors } from '../../src/theme/colors';
 import { typography, fontFamily } from '../../src/theme/typography';
 import { spacing, radius } from '../../src/theme/spacing';
+
+import { useTodayAttendance } from '../../src/hooks/useAttendance';
 
 export default function MySiteScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const profile = useAuthStore((s) => s.profile);
-  const { data: projects } = useProjects();
-  const site = projects?.[0] ?? null;
+
+  const { data: assignedProjects = [] } = useMyAssignedProjects(profile?.id);
+  const { data: todayAttendance } = useTodayAttendance(profile?.id);
+  const availableProjects = assignedProjects;
+
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const punchedInSite = todayAttendance?.project_id ? availableProjects.find(p => p.id === todayAttendance.project_id) : null;
+  const site = selectedProjectId
+    ? (availableProjects.find(p => p.id === selectedProjectId) || null)
+    : (punchedInSite || availableProjects[0] || null);
+
+  const { data: boqItems = [] } = useProjectBOQ(site?.id);
+  const { data: siteTasks = [] } = useProjectTasks(site?.id);
+
+  const totalBOQItems = boqItems.length;
+  const completedBOQItems = boqItems.filter(i => (i.completed_quantity || 0) >= (i.quantity || 1)).length;
+  const boqPct = totalBOQItems > 0 ? Math.round((completedBOQItems / totalBOQItems) * 100) : (site?.progress_pct ?? 0);
 
   const handleCall = (phone: string) => {
     Linking.openURL(`tel:${phone}`);
@@ -33,6 +53,10 @@ export default function MySiteScreen() {
     if (site?.lat && site?.lng) {
       Linking.openURL(
         `https://www.google.com/maps/search/?api=1&query=${site.lat},${site.lng}`
+      );
+    } else if (site?.address) {
+      Linking.openURL(
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(site.address)}`
       );
     }
   };
@@ -44,7 +68,7 @@ export default function MySiteScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={colors.ink} />
         </TouchableOpacity>
-        <Text style={styles.title}>My Site</Text>
+        <Text style={styles.title}>Project Workspace</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -52,6 +76,36 @@ export default function MySiteScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {/* Site Selector Chips if multiple assigned */}
+        {availableProjects.length > 1 && (
+          <View style={{ marginBottom: spacing.md }}>
+            <Text style={styles.sectionTitle}>Select Assigned Workspace</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 4 }}>
+              {availableProjects.map((p) => {
+                const isSel = p.id === site?.id;
+                return (
+                  <TouchableOpacity
+                    key={p.id}
+                    onPress={() => setSelectedProjectId(p.id)}
+                    style={{
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: 8,
+                      borderRadius: radius.full,
+                      backgroundColor: isSel ? colors.primary : colors.neutral[100],
+                      borderWidth: 1,
+                      borderColor: isSel ? colors.primary : colors.neutral[300],
+                    }}
+                  >
+                    <Text style={{ color: isSel ? '#fff' : colors.ink, fontFamily: fontFamily.semiBold, fontSize: 12 }}>
+                      {p.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {!site ? (
           <Card style={styles.emptyCard} variant="flat">
             <Ionicons name="business-outline" size={48} color={colors.neutral[300]} />
@@ -63,21 +117,21 @@ export default function MySiteScreen() {
             <Card style={styles.siteCard}>
               <View style={styles.siteTop}>
                 <View style={styles.siteInfo}>
-                  <Text style={styles.siteLabel}>Active Site</Text>
+                  <Text style={styles.siteLabel}>ACTIVE SITE WORKSPACE</Text>
                   <Text style={styles.siteName}>{site.name}</Text>
-                  <Text style={styles.siteStage}>{site.stage ?? '—'}</Text>
+                  <Text style={styles.siteStage}>{site.stage ? `Stage: ${site.stage}` : 'In Progress'}</Text>
                 </View>
-                <StatusChip status={site.status} />
+                <StatusChip status={site.status || 'on_track'} />
               </View>
 
               {/* Progress */}
               <View style={styles.progressRow}>
-                <Text style={styles.progressLabel}>Progress</Text>
-                <Text style={styles.progressPct}>{site.progress_pct ?? 0}%</Text>
+                <Text style={styles.progressLabel}>Overall Scope Completion</Text>
+                <Text style={styles.progressPct}>{boqPct}%</Text>
               </View>
               <View style={styles.progressBar}>
                 <View
-                  style={[styles.progressFill, { width: `${site.progress_pct ?? 0}%` as any }]}
+                  style={[styles.progressFill, { width: `${boqPct}%` as any }]}
                 />
               </View>
 
@@ -85,7 +139,7 @@ export default function MySiteScreen() {
               <View style={styles.detailsGrid}>
                 <View style={styles.detailItem}>
                   <Ionicons name="location-outline" size={16} color={colors.neutral[500]} />
-                  <Text style={styles.detailText}>{site.address ?? site.city ?? '—'}</Text>
+                  <Text style={styles.detailText}>{site.address ?? site.city ?? 'Location N/A'}</Text>
                 </View>
                 {site.start_date && (
                   <View style={styles.detailItem}>
@@ -99,61 +153,90 @@ export default function MySiteScreen() {
                   <View style={styles.detailItem}>
                     <Ionicons name="flag-outline" size={16} color={colors.neutral[500]} />
                     <Text style={styles.detailText}>
-                      Due {new Date(site.expected_end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      Target {new Date(site.expected_end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </Text>
                   </View>
                 )}
               </View>
 
-              {/* Map button */}
-              {(site.lat && site.lng) && (
-                <TouchableOpacity style={styles.mapBtn} onPress={handleMap}>
+              {/* Action buttons */}
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity style={[styles.mapBtn, { flex: 1 }]} onPress={handleMap}>
                   <Ionicons name="map-outline" size={18} color={colors.primary} />
-                  <Text style={styles.mapBtnText}>Open in Maps</Text>
+                  <Text style={styles.mapBtnText}>Open Map</Text>
                 </TouchableOpacity>
-              )}
+                <TouchableOpacity
+                  style={[styles.mapBtn, { flex: 1, backgroundColor: colors.primary, borderColor: colors.primary }]}
+                  onPress={() => router.push('/(worker)/dpr' as any)}
+                >
+                  <Ionicons name="document-text-outline" size={18} color="#fff" />
+                  <Text style={[styles.mapBtnText, { color: '#fff' }]}>Submit DPR</Text>
+                </TouchableOpacity>
+              </View>
             </Card>
+
+            {/* BOQ Scope Items */}
+            {boqItems.length > 0 && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Project BOQ Scope Items ({boqItems.length})</Text>
+                </View>
+                <Card style={[styles.infoCard, { gap: 10, marginBottom: spacing.xl }]}>
+                  {boqItems.slice(0, 5).map((item) => {
+                    const doneQty = item.completed_quantity || 0;
+                    const totalQty = item.quantity || 1;
+                    const itemPct = Math.min(100, Math.round((doneQty / totalQty) * 100));
+                    return (
+                      <View key={item.id} style={{ paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.neutral[100] }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <Text style={{ fontSize: 13, fontFamily: fontFamily.semiBold, color: colors.ink }}>{item.item_name}</Text>
+                          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.primary }}>{itemPct}%</Text>
+                        </View>
+                        <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                          {doneQty} / {totalQty} {item.unit}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </Card>
+              </>
+            )}
+
+            {/* Site Tasks */}
+            {siteTasks.length > 0 && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Site Tasks ({siteTasks.length})</Text>
+                </View>
+                <Card style={[styles.infoCard, { gap: 10, marginBottom: spacing.xl }]}>
+                  {siteTasks.slice(0, 4).map((t: any) => (
+                    <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.neutral[100] }}>
+                      <View style={{ flex: 1, marginRight: 8 }}>
+                        <Text style={{ fontSize: 13, fontFamily: fontFamily.medium, color: colors.ink }}>{t.title}</Text>
+                        <Text style={{ fontSize: 11, color: colors.neutral[500] }}>{t.level_zone || 'General Zone'}</Text>
+                      </View>
+                      <StatusChip status={t.status || 'pending'} />
+                    </View>
+                  ))}
+                </Card>
+              </>
+            )}
 
             {/* Shift info */}
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Shift Info</Text>
+              <Text style={styles.sectionTitle}>Shift Info & Radius</Text>
             </View>
             <Card style={styles.infoCard}>
               <InfoRow
                 icon="time-outline"
-                label="Shift Start"
-                value="08:00 AM"
-              />
-              <InfoRow
-                icon="time-outline"
-                label="Shift End"
-                value="06:00 PM"
+                label="Shift Hours"
+                value="08:00 AM – 06:00 PM"
               />
               <InfoRow
                 icon="locate-outline"
-                label="Geofence Radius"
+                label="Attendance Radius"
                 value={`${site.geofence_radius_m ?? 100} m`}
               />
-            </Card>
-
-            {/* Emergency contact */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Emergency Contact</Text>
-            </View>
-            <Card style={styles.infoCard}>
-              <View style={styles.contactRow}>
-                <Avatar name="Site Safety" size={40} />
-                <View style={styles.contactInfo}>
-                  <Text style={styles.contactName}>Site Safety Officer</Text>
-                  <Text style={styles.contactRole}>Emergency</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.callBtn}
-                  onPress={() => handleCall('100')}
-                >
-                  <Ionicons name="call" size={20} color={colors.white} />
-                </TouchableOpacity>
-              </View>
             </Card>
           </>
         )}

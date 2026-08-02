@@ -5,11 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Avatar, Card } from '../../src/components';
-import { useAuthStore } from '../../src/stores/authStore';
-import { colors } from '../../src/theme/colors';
-import { typography, fontFamily } from '../../src/theme/typography';
-import { spacing, radius } from '../../src/theme/spacing';
+import { Avatar, Card } from '../../../src/components';
+import { useAuthStore } from '../../../src/stores/authStore';
+import { colors } from '../../../src/theme/colors';
+import { typography, fontFamily } from '../../../src/theme/typography';
+import { spacing, radius } from '../../../src/theme/spacing';
 
 interface MenuItem {
   icon: keyof typeof Ionicons.glyphMap;

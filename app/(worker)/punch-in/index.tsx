@@ -20,11 +20,13 @@ import { useMyAssignedProjects } from '../../../src/hooks/useAssignedProjects';
 import { useOutboxStore } from '../../../src/stores/outboxStore';
 import { SyncStatusBadge } from '../../../src/components/SyncStatusBadge';
 import { checkGeofence, formatDistance, type GeofenceResult } from '../../../src/lib/geofence';
+import { startShiftGeofence } from '../../../src/lib/backgroundGeofence';
 import { useTodaySafetyCheck, useSubmitSafetyCheck } from '../../../src/hooks/useSafetyChecks';
 import { colors } from '../../../src/theme/colors';
 import { typography, fontFamily } from '../../../src/theme/typography';
 import { spacing, radius, shadows } from '../../../src/theme/spacing';
 import { showAlert } from '../../../src/utils/alert';
+
 
 // Must match the keys used on the standalone Daily Safety Checklist screen.
 const PPE_ITEMS = [
@@ -137,7 +139,17 @@ export default function PunchInScreen() {
         locationVerified: geoResult.isWithinRadius,
         capturedAt: new Date().toISOString(),
       });
+      if (activeProject?.lat && activeProject?.lng) {
+        startShiftGeofence(
+          activeProject.id,
+          activeProject.name || 'Site',
+          activeProject.lat,
+          activeProject.lng,
+          activeProject.geofence_radius_m || 100
+        );
+      }
       setSubmitting(false);
+
       showAlert(
         'Punch In Recorded',
         geoResult.isWithinRadius

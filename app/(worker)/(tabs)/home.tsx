@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Linking,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,15 +14,15 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { Card, Avatar, StatusChip, Button, ProgressRing } from '../../src/components';
-import { useAuthStore } from '../../src/stores/authStore';
-import { useMyTasks } from '../../src/hooks/useTasks';
-import { usePersonalTodos, useTogglePersonalTodo } from '../../src/hooks/usePersonalTodos';
-import { useMyAssignedProjects } from '../../src/hooks/useAssignedProjects';
-import { useTodayAttendance, usePunchOut } from '../../src/hooks/useAttendance';
-import { colors } from '../../src/theme/colors';
-import { typography, fontFamily } from '../../src/theme/typography';
-import { spacing, radius, shadows } from '../../src/theme/spacing';
+import { Card, Avatar, StatusChip, Button, ProgressRing, ShiftCheckOutModal } from '../../../src/components';
+import { useAuthStore } from '../../../src/stores/authStore';
+import { useMyTasks, useUpdateTaskStatus } from '../../../src/hooks/useTasks';
+import { usePersonalTodos, useTogglePersonalTodo } from '../../../src/hooks/usePersonalTodos';
+import { useMyAssignedProjects } from '../../../src/hooks/useAssignedProjects';
+import { useTodayAttendance, usePunchOut } from '../../../src/hooks/useAttendance';
+import { colors } from '../../../src/theme/colors';
+import { typography, fontFamily } from '../../../src/theme/typography';
+import { spacing, radius, shadows } from '../../../src/theme/spacing';
 
 const PRIORITY_COLOR: Record<string, string> = {
   high: colors.error,
@@ -41,19 +42,26 @@ export default function WorkerHomeScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const profile = useAuthStore((s) => s.profile);
+  const userId = useAuthStore((s) => s.userId);
+  const effectiveId = profile?.id || userId;
 
   const firstName = profile?.full_name?.split(' ')[0] || 'Worker';
 
-  const { data: tasks } = useMyTasks(profile?.id);
-  const { data: todos } = usePersonalTodos(profile?.id);
+  const { data: tasks, refetch: refetchTasks, isRefetching: isRefetchingTasks } = useMyTasks(effectiveId);
+  const { data: todos, refetch: refetchTodos, isRefetching: isRefetchingTodos } = usePersonalTodos(effectiveId);
   const toggleTodo = useTogglePersonalTodo();
-  const { data: projects } = useMyAssignedProjects(profile?.id);
-  const { data: todayAttendance } = useTodayAttendance(profile?.id);
+  const updateTaskStatus = useUpdateTaskStatus();
+  const { data: projects } = useMyAssignedProjects(effectiveId);
+  const { data: todayAttendance } = useTodayAttendance(effectiveId);
   const punchOut = usePunchOut();
-  const activeProject = projects?.[0]; // Always use the worker's assigned site for geofence attendance.
+  const [showCheckOutModal, setShowCheckOutModal] = React.useState(false);
+
+  const assignedProjects = projects || [];
+  const activeProject = (todayAttendance?.project_id ? assignedProjects.find(p => p.id === todayAttendance.project_id) : null) || assignedProjects[0];
   
+  const isTaskDone = (s?: string) => s === 'done' || s === 'completed';
   const totalTasks = tasks?.length || 0;
-  const pendingTasksList = (tasks || []).filter((t) => t.status !== 'done');
+  const pendingTasksList = (tasks || []).filter((t) => !isTaskDone(t.status));
   const doneTasks = totalTasks - pendingTasksList.length;
 
   const totalTodos = todos?.length || 0;
@@ -64,19 +72,49 @@ export default function WorkerHomeScreen() {
   const combinedDone = doneTasks + doneTodos;
   const taskProgress = combinedTotal > 0 ? (combinedDone / combinedTotal) * 100 : 0;
 
-  const displayTasks = pendingTasksList.slice(0, 2);
-  const displayTodos = pendingTodosList.slice(0, 2);
+  // Show up to 4 total pending items (tasks + todos) so newly added tasks are displayed
+  const displayTasks = pendingTasksList.slice(0, 4);
+  const displayTodos = displayTasks.length < 4 ? pendingTodosList.slice(0, 4 - displayTasks.length) : [];
 
   const hasPunchedIn = !!todayAttendance?.check_in_at;
   const hasPunchedOut = !!todayAttendance?.check_out_at;
 
+  const [shiftTimer, setShiftTimer] = React.useState('00h 00m 00s');
+
+  React.useEffect(() => {
+    if (!todayAttendance?.check_in_at) {
+      setShiftTimer('00h 00m 00s');
+      return;
+    }
+
+    const checkInMs = new Date(todayAttendance.check_in_at).getTime();
+    const checkOutMs = todayAttendance.check_out_at ? new Date(todayAttendance.check_out_at).getTime() : null;
+
+    const calcTimer = () => {
+      const targetMs = checkOutMs || Date.now();
+      const diffMs = Math.max(0, targetMs - checkInMs);
+      const secs = Math.floor((diffMs / 1000) % 60);
+      const mins = Math.floor((diffMs / (1000 * 60)) % 60);
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      setShiftTimer(
+        `${String(hours).padStart(2, '0')}h ${String(mins).padStart(2, '0')}m ${String(secs).padStart(2, '0')}s`
+      );
+    };
+
+    calcTimer();
+    if (!checkOutMs) {
+      const interval = setInterval(calcTimer, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [todayAttendance?.check_in_at, todayAttendance?.check_out_at]);
+
   const handleAttendanceAction = () => {
-    if (!hasPunchedIn) {
+    if (!hasPunchedIn || hasPunchedOut) {
       router.push('/(worker)/punch-in' as any);
       return;
     }
-    if (!hasPunchedOut && todayAttendance) {
-      punchOut.mutate({ attendanceId: todayAttendance.id, checkInAt: todayAttendance.check_in_at });
+    if (hasPunchedIn && !hasPunchedOut && todayAttendance) {
+      setShowCheckOutModal(true);
     }
   };
 
@@ -91,9 +129,19 @@ export default function WorkerHomeScreen() {
       <ScrollView
         contentContainerStyle={{
           paddingTop: insets.top + spacing.xl,
-          paddingBottom: spacing['6xl'],
+          paddingBottom: 130,
         }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetchingTasks || isRefetchingTodos}
+            onRefresh={() => {
+              refetchTasks();
+              refetchTodos();
+            }}
+            tintColor={colors.primary}
+          />
+        }
       >
         {/* Header */}
         <View style={styles.header}>
@@ -129,55 +177,121 @@ export default function WorkerHomeScreen() {
           </View>
         </View>
 
-        {/* Bento Grid — Site Info & Punch Row */}
-        <View style={styles.bentoRow}>
-          {/* Site Card */}
-          <Card style={[styles.bentoCard, styles.siteCard, { overflow: 'hidden' }]} padding={spacing.lg}>
-            <LinearGradient colors={['#FFFFFF', '#F6F3EC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-            <Ionicons name="business" size={80} color={colors.primary} style={styles.siteWatermark} />
-            <Text style={styles.bentoLabel}>{t('worker.todaysSite')}</Text>
-            <Text style={styles.siteName} numberOfLines={2}>{activeProject?.name || '—'}</Text>
-            <Text style={styles.siteDetail}>{activeProject?.city || '—'}</Text>
-            <View style={{ marginTop: spacing.md, alignSelf: 'flex-start' }}>
-              <StatusChip status={activeProject?.status || 'on_track'} />
-            </View>
-          </Card>
 
-          {/* Attendance Punch Card */}
-          <TouchableOpacity
-            style={[styles.bentoCard, styles.punchCard]}
-            activeOpacity={0.85}
-            disabled={hasPunchedOut || punchOut.isPending}
-            onPress={handleAttendanceAction}
+        <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.lg }}>
+          <LinearGradient
+            colors={hasPunchedOut ? ['#065F46', '#047857'] : hasPunchedIn ? ['#B45309', '#D97706'] : ['#854D0E', '#A16207']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              borderRadius: radius.xl,
+              padding: spacing.lg,
+              shadowColor: '#000',
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 4 },
+            }}
           >
-            <LinearGradient
-              colors={hasPunchedOut ? ['#10B981', '#059669'] : hasPunchedIn ? ['#D97706', '#B45309'] : ['#695030', '#918050']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.punchInnerContent}>
-              <View style={styles.punchIconCircle}>
-                <Ionicons
-                  name={hasPunchedOut ? 'checkmark-circle' : hasPunchedIn ? 'log-out-outline' : 'finger-print'}
-                  size={32}
-                  color={colors.white}
-                />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Ionicons name="location" size={16} color={hasPunchedIn ? '#10B981' : '#F59E0B'} />
+                  <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: hasPunchedIn ? '#A7F3D0' : '#FCD34D', letterSpacing: 0.8 }}>
+                    {hasPunchedOut ? 'SHIFT 1 COMPLETED' : hasPunchedIn ? 'ACTIVE SITE WORKSPACE' : 'TODAY\'S ASSIGNED SITE'}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: '#FFFFFF', marginBottom: 2 }} numberOfLines={1}>
+                  {activeProject?.name || 'No Site Assigned'}
+                </Text>
               </View>
-              <Text style={styles.punchStatusLabel}>
-                {hasPunchedOut ? 'SHIFT ENDED' : hasPunchedIn ? 'PUNCHED IN' : 'TAP TO START'}
-              </Text>
-              <Text style={styles.punchActionText}>
-                {punchOut.isPending
-                  ? 'Saving…'
-                  : hasPunchedOut
-                    ? 'Shift Done'
-                    : hasPunchedIn
-                      ? 'Punch Out'
-                      : t('worker.punchIn')}
-              </Text>
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: hasPunchedOut ? '#10B981' : hasPunchedIn ? '#D97706' : '#695030',
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  borderRadius: radius.md,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+                disabled={punchOut.isPending}
+                onPress={handleAttendanceAction}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={hasPunchedOut ? 'add-circle-outline' : hasPunchedIn ? 'log-out-outline' : 'finger-print'}
+                  size={18}
+                  color="#FFFFFF"
+                />
+                <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: '#FFFFFF' }}>
+                  {hasPunchedOut ? 'Punch In (2nd Shift)' : hasPunchedIn ? 'Punch Out' : 'Punch In'}
+                </Text>
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+
+            {hasPunchedIn ? (
+              <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name={hasPunchedOut ? "checkmark-circle-outline" : "stopwatch-outline"} size={16} color={hasPunchedOut ? "#A7F3D0" : "#FCD34D"} />
+                  <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: hasPunchedOut ? "#A7F3D0" : "#FCD34D", letterSpacing: 0.5 }}>
+                    {hasPunchedOut ? "SHIFT 1 DONE • TAP TO START NEXT SHIFT" : "LIVE SHIFT TRACKING"}
+                  </Text>
+                </View>
+                <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full }}>
+                  <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: '#FFFFFF' }}>
+                    ⏱️ {shiftTimer}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="information-circle-outline" size={15} color="#FCD34D" />
+                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', flex: 1 }}>
+                  Punch in within site geofence to activate today's site tasks & DPR submission.
+                </Text>
+              </View>
+            )}
+          </LinearGradient>
+        </View>
+
+        {/* Worker Quick Actions Grid */}
+        <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.xl }}>
+          <Text style={styles.sectionTitle}>WORKER QUICK ACTIONS</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
+            {[
+              { label: 'Submit DPR', icon: 'document-text', route: '/(worker)/dpr', color: colors.primary, bg: '#F6F3EC' },
+              { label: 'My Site Scope', icon: 'business', route: '/(worker)/my-site', color: '#0284C7', bg: '#E0F2FE' },
+              { label: 'Attendance', icon: 'finger-print', route: '/(worker)/attendance', color: '#16A34A', bg: '#DCFCE7' },
+              { label: 'Drawings & Docs', icon: 'folder-open', route: '/(worker)/documents', color: '#9333EA', bg: '#F3E8FF' },
+              { label: 'Safety Checklist', icon: 'shield-checkmark', route: '/(worker)/safety-checklist', color: '#EA580C', bg: '#FFEDD5' },
+              { label: 'Apply Leave', icon: 'calendar-outline', route: '/(worker)/leave-request', color: '#D97706', bg: '#FEF3C7' },
+            ].map((act, i) => (
+              <TouchableOpacity
+                key={i}
+                style={{
+                  width: '31%',
+                  backgroundColor: '#FFFFFF',
+                  paddingVertical: 12,
+                  paddingHorizontal: 6,
+                  borderRadius: radius.md,
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: colors.neutral[200],
+                  opacity: !hasPunchedIn && act.route === '/(worker)/dpr' ? 0.6 : 1,
+                }}
+                activeOpacity={0.8}
+                onPress={() => router.push(act.route as any)}
+              >
+                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: act.bg, alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+                  <Ionicons name={act.icon as any} size={20} color={act.color} />
+                </View>
+                <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: colors.ink, textAlign: 'center' }}>
+                  {act.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* Bento Task Overview Card */}
@@ -250,7 +364,7 @@ export default function WorkerHomeScreen() {
 
           <TouchableOpacity 
             style={styles.seeAllBtn}
-            onPress={() => router.push('/(worker)/tasks')}
+            onPress={() => router.push('/(worker)/tasks' as any)}
           >
             <Text style={styles.seeAllText}>View All Tasks</Text>
             <Ionicons name="arrow-forward" size={14} color={colors.primary} />
@@ -290,9 +404,31 @@ export default function WorkerHomeScreen() {
         <EmergencyRow icon="alert-circle" label="National Emergency" phone="112" />
       </Card>
     </ScrollView>
+
+    <ShiftCheckOutModal
+      visible={showCheckOutModal}
+      onClose={() => setShowCheckOutModal(false)}
+      onConfirmPunchOut={() => {
+        if (todayAttendance) {
+          punchOut.mutate({ attendanceId: todayAttendance.id, checkInAt: todayAttendance.check_in_at });
+        }
+        setShowCheckOutModal(false);
+      }}
+      isPunchingOut={punchOut.isPending}
+      pendingTasks={pendingTasksList}
+      onToggleTaskDone={(taskId) => {
+        updateTaskStatus.mutate({ taskId, status: 'done' });
+      }}
+      hasSubmittedDpr={false}
+      onNavigateDpr={() => {
+        setShowCheckOutModal(false);
+        router.push('/(worker)/dpr' as any);
+      }}
+    />
     </View>
   );
 }
+
 
 function EmergencyRow({ icon, label, phone }: { icon: string; label: string; phone: string }) {
   return (

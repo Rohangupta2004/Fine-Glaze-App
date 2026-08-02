@@ -61,32 +61,48 @@ export default function ProfileScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
+      base64: true,
     });
-    if (result.canceled || !profile) return;
+    if (result.canceled || !profile || !result.assets[0]) return;
 
     setUploading(true);
     try {
-      const uri = result.assets[0].uri;
-      const response = await fetch(uri);
-      const bytes = await response.arrayBuffer();
-      const path = `avatars/${profile.id}.jpg`;
+      const asset = result.assets[0];
+      let photoUrl = asset.uri;
 
-      const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(path, bytes, { contentType: 'image/jpeg', upsert: true });
-      if (uploadError) throw uploadError;
+      // Create base64 fallback or upload to storage
+      if (asset.base64) {
+        photoUrl = `data:image/jpeg;base64,${asset.base64}`;
+      }
 
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
-      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+      try {
+        const response = await fetch(asset.uri);
+        const bytes = await response.arrayBuffer();
+        const path = `avatars/${profile.id}_${Date.now()}.jpg`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload(path, bytes, { contentType: 'image/jpeg', upsert: true });
+
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
+          if (urlData?.publicUrl) {
+            photoUrl = urlData.publicUrl;
+          }
+        }
+      } catch (uploadFail) {
+        console.warn('Storage upload fallback to data URI:', uploadFail);
+      }
 
       const { error: dbError } = await supabase
         .from('profiles')
-        .update({ avatar_url: urlData.publicUrl })
+        .update({ avatar_url: photoUrl })
         .eq('id', profile.id);
+
       if (dbError) throw dbError;
 
-      useAuthStore.setState({ profile: { ...profile, avatar_url: publicUrl } });
-      showAlert('Success ✅', 'Profile photo updated.');
+      useAuthStore.setState({ profile: { ...profile, avatar_url: photoUrl } });
+      showAlert('Success ✅', 'Profile photo updated successfully.');
     } catch (e: any) {
       showAlert('Upload failed', e?.message || 'Please try again.');
     } finally {
@@ -286,7 +302,7 @@ export default function ProfileScreen() {
         {activeTab === 'settings' && (
           <>
             <Card style={styles.card}>
-              <Text style={styles.sectionTitle}>Language</Text>
+              <Text style={styles.sectionTitle}>App Language</Text>
               <View style={styles.langRow}>
                 {[
                   { code: 'en', label: 'English' },
@@ -316,25 +332,28 @@ export default function ProfileScreen() {
 
             <Card style={styles.menuCard} padding={0}>
               {[
-                { icon: 'key-outline' as const, label: 'Change PIN', route: '/(auth)/forgot-pin' },
+                { icon: 'key-outline' as const, label: 'Change App PIN', route: '/(auth)/forgot-pin' },
+                { icon: 'notifications-outline' as const, label: 'Push Notifications', route: '/(worker)/notifications' },
+                { icon: 'shield-checkmark-outline' as const, label: 'Daily Safety PPE Check', route: '/(worker)/safety-checklist' },
                 { icon: 'help-circle-outline' as const, label: 'Help & Support', route: null },
-                { icon: 'shield-outline' as const, label: 'Privacy Policy', route: null },
               ].map((item, index, arr) => (
                 <TouchableOpacity
                   key={item.label}
                   style={[styles.menuItem, index < arr.length - 1 && styles.menuItemBorder]}
                   onPress={() => item.route && router.push(item.route as any)}
                 >
-                  <Ionicons name={item.icon} size={22} color={colors.neutral[600]} />
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.neutral[100], alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name={item.icon} size={18} color={colors.neutral[700]} />
+                  </View>
                   <Text style={styles.menuLabel}>{item.label}</Text>
                   <Ionicons name="chevron-forward" size={18} color={colors.neutral[300]} />
                 </TouchableOpacity>
               ))}
             </Card>
 
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={22} color={colors.error} />
-              <Text style={styles.logoutText}>Log Out</Text>
+            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+              <Ionicons name="log-out-outline" size={20} color={colors.error} />
+              <Text style={styles.logoutText}>Log Out of Account</Text>
             </TouchableOpacity>
           </>
         )}

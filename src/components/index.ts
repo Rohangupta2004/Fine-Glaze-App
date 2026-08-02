@@ -26,13 +26,24 @@ export { AddressAutocomplete, StaticMapPreview } from './AddressAutocomplete';
 // SVG Progress Ring (v1.3)
 export { ProgressRing } from './ProgressRing';
 
-// Interactive CAD Viewer Modal (v1.4)
+// Interactive CAD, PDF & Excel Viewers (v1.7)
 export { CadViewerModal } from './CadViewerModal';
+export { PdfViewerModal } from './PdfViewerModal';
+export { XlsxViewerModal } from './XlsxViewerModal';
+
+
 
 // Animated State Views with 3D Generated Illustrations (v1.5)
 export { AnimatedStateView } from './AnimatedStateView';
+export { PremiumLoadingScreen } from './PremiumLoadingScreen';
+export { TypingIndicator } from './TypingIndicator';
+export { AudioPlayer } from './AudioPlayer';
 
 // MIS Task Grid & Analytics (v1.6)
 export { ExcelTaskMISGrid } from './ExcelTaskMISGrid';
 export { MISAnalyticsCharts } from './MISAnalyticsCharts';
+export { AssignProjectModal } from './AssignProjectModal';
+export { ShiftCheckOutModal } from './ShiftCheckOutModal';
+
+
 

@@ -23,6 +23,8 @@ interface ProgressRingProps {
   endColor?: string;
   /** Track color */
   trackColor?: string;
+  /** Optional children elements inside ring */
+  children?: React.ReactNode;
 }
 
 export function ProgressRing({

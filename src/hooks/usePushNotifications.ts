@@ -7,61 +7,68 @@
 
 import { Platform } from 'react-native';
 import { useEffect, useRef } from 'react';
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 
-// Set notification handler for foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
-
-async function registerForPushNotifications(): Promise<string | null> {
-  if (!Device.isDevice) {
-    console.log('Push notifications require a physical device');
-    return null;
-  }
-
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'Default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#695030',
-      sound: 'default',
+let Notifications: any = null;
+try {
+  Notifications = require('expo-notifications');
+  if (Notifications && typeof Notifications.setNotificationHandler === 'function') {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
     });
   }
+} catch (e) {
+  // Expo Go SDK 53 removes remote notifications from standard Expo Go client
+}
 
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
 
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-
-  if (finalStatus !== 'granted') {
-    console.log('Push notification permission not granted');
+async function registerForPushNotifications(): Promise<string | null> {
+  if (!Notifications || !Device.isDevice) {
+    console.log('Push notifications unavailable or require a physical device');
     return null;
   }
 
-  // Get Expo push token
   try {
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'Default',
+        importance: Notifications.AndroidImportance?.MAX || 4,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#695030',
+        sound: 'default',
+      });
+    }
+
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') {
+      console.log('Push notification permission not granted');
+      return null;
+    }
+
+    // Get Expo push token
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
     const tokenData = await Notifications.getExpoPushTokenAsync({
       projectId,
     });
     return tokenData.data;
   } catch (error) {
-    console.error('Failed to get push token:', error);
+    console.warn('Failed to get push token:', error);
     return null;
   }
 }
@@ -72,11 +79,11 @@ async function registerForPushNotifications(): Promise<string | null> {
  */
 export function usePushNotifications() {
   const profile = useAuthStore((s) => s.profile);
-  const notificationListener = useRef<Notifications.Subscription | null>(null);
-  const responseListener = useRef<Notifications.Subscription | null>(null);
+  const notificationListener = useRef<any>(null);
+  const responseListener = useRef<any>(null);
 
   useEffect(() => {
-    if (!profile?.id) return;
+    if (!profile?.id || !Notifications) return;
 
     // Register and store token
     registerForPushNotifications().then(async (token) => {
@@ -89,28 +96,32 @@ export function usePushNotifications() {
     });
 
     // Listen for notifications received while app is foregrounded
-    notificationListener.current = Notifications.addNotificationReceivedListener(
-      (notification) => {
-        console.log('Notification received:', notification);
-      }
-    );
+    if (typeof Notifications.addNotificationReceivedListener === 'function') {
+      notificationListener.current = Notifications.addNotificationReceivedListener(
+        (notification: any) => {
+          console.log('Notification received:', notification);
+        }
+      );
+    }
 
     // Listen for notification taps (deep linking)
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        const data = response.notification.request.content.data;
-        console.log('Notification tapped:', data);
-        // TODO: Navigate based on data.kind, data.refTable, data.refId
-      }
-    );
+    if (typeof Notifications.addNotificationResponseReceivedListener === 'function') {
+      responseListener.current = Notifications.addNotificationResponseReceivedListener(
+        (response: any) => {
+          const data = response.notification.request.content.data;
+          console.log('Notification tapped:', data);
+        }
+      );
+    }
 
     return () => {
-      if (notificationListener.current) {
+      if (notificationListener.current && typeof notificationListener.current.remove === 'function') {
         notificationListener.current.remove();
       }
-      if (responseListener.current) {
+      if (responseListener.current && typeof responseListener.current.remove === 'function') {
         responseListener.current.remove();
       }
     };
   }, [profile?.id]);
 }
+

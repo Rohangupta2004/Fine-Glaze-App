@@ -7,7 +7,6 @@ import { useTranslation } from 'react-i18next';
 import { colors } from '../../src/theme/colors';
 import { fontFamily } from '../../src/theme/typography';
 
-/** Gradient background rendered behind the tab bar */
 function TabBarBackground() {
   return (
     <LinearGradient
@@ -17,14 +16,13 @@ function TabBarBackground() {
       style={[
         StyleSheet.absoluteFill,
         {
-          borderRadius: 24,
+          borderRadius: 28,
         }
       ]}
     />
   );
 }
 
-/** Glowing active indicator pill under active tab */
 function ActiveDot() {
   return (
     <View style={styles.activeDot} />
@@ -35,6 +33,7 @@ export default function SupervisorLayout() {
   const { t } = useTranslation();
   return (
     <Tabs
+      backBehavior="history"
       screenOptions={({ route }) => {
         return {
           headerShown: false,
@@ -44,21 +43,21 @@ export default function SupervisorLayout() {
           tabBarStyle: {
             display: 'flex',
             position: 'absolute',
-            bottom: 16,
-            left: 16,
-            right: 16,
+            bottom: 12,
+            left: 12,
+            right: 12,
             backgroundColor: 'transparent',
             borderTopWidth: 0,
-            elevation: 15,
-            height: 72,
-            paddingBottom: 12,
+            elevation: 18,
+            height: 82,
+            paddingBottom: 14,
             paddingTop: 10,
-            borderRadius: 24,
-            boxShadow: '0px 10px 30px rgba(139, 104, 64, 0.15)',
+            borderRadius: 28,
+            boxShadow: '0px 12px 36px rgba(139, 104, 64, 0.18)',
           } as any,
           tabBarLabelStyle: {
-            fontFamily: fontFamily.medium,
-            fontSize: 10,
+            fontFamily: fontFamily.semiBold,
+            fontSize: 11.5,
           },
         };
       }}
@@ -68,7 +67,7 @@ export default function SupervisorLayout() {
         options={{
           title: t('supervisor.home'),
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={25} color={color} />
           ),
           tabBarLabel: ({ color, focused }) => (
             <View style={styles.labelWrap}>
@@ -83,7 +82,7 @@ export default function SupervisorLayout() {
         options={{
           title: t('supervisor.tasks'),
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'list' : 'list-outline'} size={22} color={color} />
+            <Ionicons name={focused ? 'list' : 'list-outline'} size={25} color={color} />
           ),
           tabBarLabel: ({ color, focused }) => (
             <View style={styles.labelWrap}>
@@ -98,7 +97,7 @@ export default function SupervisorLayout() {
         options={{
           title: t('supervisor.materials'),
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'cube' : 'cube-outline'} size={22} color={color} />
+            <Ionicons name={focused ? 'cube' : 'cube-outline'} size={25} color={color} />
           ),
           tabBarLabel: ({ color, focused }) => (
             <View style={styles.labelWrap}>
@@ -113,7 +112,7 @@ export default function SupervisorLayout() {
         options={{
           title: t('supervisor.messages'),
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={22} color={color} />
+            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={25} color={color} />
           ),
           tabBarLabel: ({ color, focused }) => (
             <View style={styles.labelWrap}>
@@ -128,7 +127,7 @@ export default function SupervisorLayout() {
         options={{
           title: t('supervisor.more'),
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'grid' : 'grid-outline'} size={22} color={color} />
+            <Ionicons name={focused ? 'grid' : 'grid-outline'} size={25} color={color} />
           ),
           tabBarLabel: ({ color, focused }) => (
             <View style={styles.labelWrap}>
@@ -139,20 +138,8 @@ export default function SupervisorLayout() {
         }}
       />
       {/* Sub-screens (no tab bar) */}
-      <Tabs.Screen
-        name="team-attendance"
-        options={{
-          href: null, // not in tab bar
-          tabBarStyle: { display: 'none' },
-        }}
-      />
-      <Tabs.Screen
-        name="dpr"
-        options={{
-          href: null,
-          tabBarStyle: { display: 'none' },
-        }}
-      />
+      <Tabs.Screen name="team-attendance" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="dpr" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       <Tabs.Screen name="new-message" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       <Tabs.Screen name="new-group" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       <Tabs.Screen name="conversation" options={{ href: null, tabBarStyle: { display: 'none' } }} />
@@ -166,20 +153,20 @@ const styles = StyleSheet.create({
   labelWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
+    marginTop: 3,
   },
   labelText: {
-    fontFamily: fontFamily.medium,
-    fontSize: 10,
+    fontFamily: fontFamily.semiBold,
+    fontSize: 11.5,
     letterSpacing: 0.2,
   },
   activeDot: {
-    width: 16,
-    height: 3,
-    borderRadius: 1.5,
+    width: 18,
+    height: 3.5,
+    borderRadius: 2,
     backgroundColor: '#695030',
     marginTop: 4,
     position: 'absolute',
-    bottom: -8,
+    bottom: -9,
   },
 });

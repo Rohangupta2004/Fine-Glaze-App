@@ -13,17 +13,17 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Card, Avatar } from '../../src/components';
-import { useAuthStore } from '../../src/stores/authStore';
+import { Card, Avatar } from '../../../src/components';
+import { useAuthStore } from '../../../src/stores/authStore';
 import {
   useMyConversations,
   useMessages,
   useSendMessage,
-} from '../../src/hooks/useConversations';
-import { colors } from '../../src/theme/colors';
-import { typography, fontFamily } from '../../src/theme/typography';
-import { spacing, radius } from '../../src/theme/spacing';
-import type { Conversation } from '../../src/types';
+} from '../../../src/hooks/useConversations';
+import { colors } from '../../../src/theme/colors';
+import { typography, fontFamily } from '../../../src/theme/typography';
+import { spacing, radius } from '../../../src/theme/spacing';
+import type { Conversation } from '../../../src/types';
 
 type FilterKey = 'all' | 'site' | 'team' | 'admin';
 
@@ -89,25 +89,51 @@ function ConversationList({
         data={filtered}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.convList}
-        renderItem={({ item }) => (
-          <TouchableOpacity onPress={() => onSelect(item)}>
-            <Card style={styles.convCard} variant="interactive">
-              <View style={styles.convRow}>
-                <Avatar
-                  name={item.type === 'project' ? 'Site' : 'Admin'}
-                  size={48}
-                />
-                <View style={styles.convInfo}>
-                  <Text style={styles.convName}>
-                    {item.type === 'project' ? 'Site Chat' : 'Admin'}
-                  </Text>
-                  <Text style={styles.convType}>{item.type === 'project' ? 'Project Group' : 'Direct Message'}</Text>
+        renderItem={({ item }) => {
+          const isProject = item.type === 'project';
+          return (
+            <TouchableOpacity onPress={() => onSelect(item)} activeOpacity={0.85}>
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: radius.lg,
+                  padding: spacing.lg,
+                  borderWidth: 1,
+                  borderColor: colors.neutral[200],
+                  marginBottom: spacing.sm,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.04,
+                  shadowRadius: 6,
+                  elevation: 2,
+                }}
+              >
+                <View style={styles.convRow}>
+                  <View style={{ position: 'relative' }}>
+                    <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: isProject ? '#E0F2FE' : '#F6F3EC', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name={isProject ? "business" : "person"} size={22} color={isProject ? "#0284C7" : colors.primary} />
+                    </View>
+                    <View style={{ position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: isProject ? '#10B981' : colors.primary, borderWidth: 2, borderColor: '#fff' }} />
+                  </View>
+
+                  <View style={styles.convInfo}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                      <Text style={{ fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink }}>
+                        {isProject ? 'Site Team Chat' : 'Admin Support'}
+                      </Text>
+                      <Text style={{ fontSize: 11, fontFamily: fontFamily.medium, color: colors.neutral[400] }}>
+                        {formatDate(item.created_at)}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: colors.neutral[500] }}>
+                      {isProject ? 'Project Workspace Channel' : 'Direct Support Channel'}
+                    </Text>
+                  </View>
                 </View>
-                <Text style={styles.convTime}>{formatDate(item.created_at)}</Text>
               </View>
-            </Card>
-          </TouchableOpacity>
-        )}
+            </TouchableOpacity>
+          );
+        }}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="chatbubbles-outline" size={64} color={colors.neutral[300]} />
@@ -154,13 +180,13 @@ function ChatThread({
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.bottom + 60}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
     >
       <FlatList
         ref={flatRef}
         data={messages ?? []}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.chatContent}
+        contentContainerStyle={[styles.chatContent, { paddingBottom: 110 }]}
         onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
         renderItem={({ item }) => {
           const isMe = item.sender_id === profileId;
@@ -185,8 +211,8 @@ function ChatThread({
         }
       />
 
-      {/* Input bar */}
-      <View style={[styles.inputBar, { paddingBottom: insets.bottom + spacing.sm }]}>
+      {/* Input bar — clear bottom navbar by adding 75px bottom padding */}
+      <View style={[styles.inputBar, { paddingBottom: insets.bottom + 75 }]}>
         <TextInput
           style={styles.textInput}
           value={body}
@@ -200,8 +226,9 @@ function ChatThread({
           style={[styles.sendBtn, !body.trim() && styles.sendBtnDisabled]}
           onPress={handleSend}
           disabled={!body.trim()}
+          activeOpacity={0.8}
         >
-          <Ionicons name="send" size={20} color={colors.white} />
+          <Ionicons name="send" size={18} color={colors.white} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -405,13 +432,18 @@ const styles = StyleSheet.create({
   },
   inputBar: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: colors.neutral[200],
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
   },
   textInput: {
     flex: 1,
@@ -426,12 +458,13 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.full,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 2,
   },
   sendBtnDisabled: {
     backgroundColor: colors.neutral[300],

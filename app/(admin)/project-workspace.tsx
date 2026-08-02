@@ -21,6 +21,9 @@ import {
   Switch,
   Linking,
   Image,
+  Share,
+  TouchableWithoutFeedback,
+
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,12 +31,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Picker } from '@react-native-picker/picker';
 
-import { Card, StatusChip, Avatar, Button, GradientCard, ProgressRing, SearchBar, Input, ExcelTaskMISGrid, MISAnalyticsCharts } from '../../src/components';
+import { Card, StatusChip, Avatar, Button, GradientCard, ProgressRing, SearchBar, Input, DatePickerField, ExcelTaskMISGrid, MISAnalyticsCharts, CadViewerModal, PdfViewerModal, XlsxViewerModal } from '../../src/components';
+
+
 import { useProject, useUpdateProject } from '../../src/hooks/useProjects';
 import { useEmployees } from '../../src/hooks/useEmployees';
 import { useProjectDprs } from '../../src/hooks/useDpr';
 import { useProjectPayments, useUpdatePayment, useCreatePayment, useDeletePayment } from '../../src/hooks/usePayments';
-import { useMaterialRequests } from '../../src/hooks/useMaterials';
+import { useMaterialRequests, useSubmitMaterialRequest } from '../../src/hooks/useMaterials';
 import { useDocuments } from '../../src/hooks/useDocuments';
 import { useDocumentUpload } from '../../src/hooks/useDocumentUpload';
 import { useProjectAttendance, TeamAttendanceRow } from '../../src/hooks/useAttendance';
@@ -48,10 +53,6 @@ import {
   useApproveVariation,
   useInventoryLedger,
   useCreateInventoryLedgerEntry,
-  useFacadeSections,
-  useInitializeFacadeSections,
-  useUpdateFacadeSectionStatus,
-  FacadeSection,
   useSuppliers,
   useMaterialStock,
   useProjectEvents,
@@ -68,16 +69,16 @@ import { spacing, radius, shadows } from '../../src/theme/spacing';
 import type { Task, Dpr, DocumentRow, Expense, Payment, MaterialRequest, Attendance } from '../../src/types';
 import { showAlert } from '../../src/utils/alert';
 
-// ── Tab Definition ────────────────────────────────────────────────────────────
+// ─ Tab Definition ─
 
 const TABS = [
   'Overview', 'BOQ', 'Tasks', 'Employees', 'Attendance',
-  'DPR', 'Photos', 'Documents', 'Materials', 'Variations', 'Facade Map', 'Procurement',
+  'DPR', 'Photos', 'Documents', 'Materials', 'Variations', 'Procurement',
   'Expenses', 'Payments', 'Communication', 'Timeline', 'Reports',
 ] as const;
 type Tab = typeof TABS[number];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ─ Helpers ─
 
 function fmt(date: string | null, opts?: Intl.DateTimeFormatOptions) {
   if (!date) return '—';
@@ -92,7 +93,7 @@ function fmtINR(amount: number) {
   return `₹${amount.toLocaleString('en-IN')}`;
 }
 
-// ── Shared Sub-components ─────────────────────────────────────────────────────
+// ─ Shared Sub-components ─
 
 function InfoRow({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
@@ -164,7 +165,7 @@ function StatusBadge({ status, map }: { status: string; map?: Record<string, { c
   );
 }
 
-// ── Tab Sections ──────────────────────────────────────────────────────────────
+// ─ Tab Sections ─
 
 // BOQ Tab Component
 function BOQTab({ projectId, projectName }: { projectId: string; projectName: string }) {
@@ -561,37 +562,60 @@ function OverviewTab({
 
   return (
     <View style={ovStyles.content}>
-      {/* 6 core Health Check KPIs */}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.md }}>
-        <Card style={{ flex: 1, minWidth: '45%', padding: spacing.md, alignItems: 'center' }}>
-          <Ionicons name="trending-up" size={20} color={colors.primary} />
-          <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 }}>{project.progress_pct || 0}%</Text>
-          <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Physical Progress</Text>
+      {/* 6 core Health Check KPIs (Awwwards Double-Bezel Architecture) */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: spacing.md }}>
+        <Card style={{ flex: 1, minWidth: '47%', padding: 14, borderRadius: 18, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 9, fontFamily: fontFamily.bold, color: '#64748B', letterSpacing: 0.6 }}>PHYSICAL PROGRESS</Text>
+            <Ionicons name="trending-up" size={16} color="#2563EB" />
+          </View>
+          <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: '#0F172A', marginTop: 4 }}>{project.progress_pct || 0}%</Text>
+          <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>Scope completion rate</Text>
         </Card>
-        <Card style={{ flex: 1, minWidth: '45%', padding: spacing.md, alignItems: 'center' }}>
-          <Ionicons name="cash" size={20} color={colors.success} />
-          <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 }}>{financialProgress}%</Text>
-          <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Financial Progress</Text>
+
+        <Card style={{ flex: 1, minWidth: '47%', padding: 14, borderRadius: 18, borderWidth: 1, borderColor: '#BBF7D0', backgroundColor: '#FFFFFF' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 9, fontFamily: fontFamily.bold, color: '#16A34A', letterSpacing: 0.6 }}>FINANCIAL PROGRESS</Text>
+            <Ionicons name="cash" size={16} color="#16A34A" />
+          </View>
+          <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: '#0F172A', marginTop: 4 }}>{financialProgress}%</Text>
+          <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>Billed vs Total Value</Text>
         </Card>
-        <Card style={{ flex: 1, minWidth: '45%', padding: spacing.md, alignItems: 'center' }}>
-          <Ionicons name="cube" size={20} color={colors.info} />
-          <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 }}>{materialIssuedPct}%</Text>
-          <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Materials Issued</Text>
+
+        <Card style={{ flex: 1, minWidth: '47%', padding: 14, borderRadius: 18, borderWidth: 1, borderColor: '#BFDBFE', backgroundColor: '#FFFFFF' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 9, fontFamily: fontFamily.bold, color: '#2563EB', letterSpacing: 0.6 }}>MATERIALS ISSUED</Text>
+            <Ionicons name="cube" size={16} color="#2563EB" />
+          </View>
+          <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: '#0F172A', marginTop: 4 }}>{materialIssuedPct}%</Text>
+          <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>Site dispatch ratio</Text>
         </Card>
-        <Card style={{ flex: 1, minWidth: '45%', padding: spacing.md, alignItems: 'center' }}>
-          <Ionicons name="document-text" size={20} color="#7C3AED" />
-          <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 }}>₹{approvedVars.toLocaleString('en-IN')}</Text>
-          <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Approved Variations</Text>
+
+        <Card style={{ flex: 1, minWidth: '47%', padding: 14, borderRadius: 18, borderWidth: 1, borderColor: '#DDD6FE', backgroundColor: '#FFFFFF' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 9, fontFamily: fontFamily.bold, color: '#7C3AED', letterSpacing: 0.6 }}>APPROVED VARIATIONS</Text>
+            <Ionicons name="document-text" size={16} color="#7C3AED" />
+          </View>
+          <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: '#0F172A', marginTop: 4 }}>₹{approvedVars.toLocaleString('en-IN')}</Text>
+          <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>Extra scope value</Text>
         </Card>
-        <Card style={{ flex: 1, minWidth: '45%', padding: spacing.md, alignItems: 'center' }}>
-          <Ionicons name="alert-circle" size={20} color={colors.error} />
-          <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 }}>{pendingSnags}</Text>
-          <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Pending Tasks / Snags</Text>
+
+        <Card style={{ flex: 1, minWidth: '47%', padding: 14, borderRadius: 18, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FFFFFF' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 9, fontFamily: fontFamily.bold, color: '#DC2626', letterSpacing: 0.6 }}>PENDING TASKS</Text>
+            <Ionicons name="alert-circle" size={16} color="#DC2626" />
+          </View>
+          <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: '#0F172A', marginTop: 4 }}>{pendingSnags}</Text>
+          <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>Open work items</Text>
         </Card>
-        <Card style={{ flex: 1, minWidth: '45%', padding: spacing.md, alignItems: 'center' }}>
-          <Ionicons name="time" size={20} color={colors.warning} />
-          <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink, marginTop: 4 }}>{daysLeft} Days</Text>
-          <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Days Remaining</Text>
+
+        <Card style={{ flex: 1, minWidth: '47%', padding: 14, borderRadius: 18, borderWidth: 1, borderColor: '#FDE68A', backgroundColor: '#FFFFFF' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 9, fontFamily: fontFamily.bold, color: '#D97706', letterSpacing: 0.6 }}>DAYS REMAINING</Text>
+            <Ionicons name="time" size={16} color="#D97706" />
+          </View>
+          <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: '#0F172A', marginTop: 4 }}>{daysLeft} Days</Text>
+          <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>Target completion</Text>
         </Card>
       </View>
 
@@ -974,6 +998,11 @@ function DprTab({ dprs, employees, project }: { dprs: Dpr[]; employees: any[]; p
   const [directToClient, setDirectToClient] = useState<boolean>(project?.dpr_direct_to_client || false);
   const [clientVisibleMap, setClientVisibleMap] = useState<Record<string, boolean>>({});
 
+  // Extended View Modal states
+  const [selectedDpr, setSelectedDpr] = useState<Dpr | null>(null);
+  const [dprMedia, setDprMedia] = useState<any[]>([]);
+  const [loadingMedia, setLoadingMedia] = useState(false);
+
   const employeeMap = useMemo(
     () => new Map(employees.map(e => [e.id, e.full_name])),
     [employees]
@@ -984,6 +1013,25 @@ function DprTab({ dprs, employees, project }: { dprs: Dpr[]; employees: any[]; p
     submitted: { color: colors.info, bg: colors.infoBg },
     approved: { color: colors.success, bg: colors.successBg },
     rejected: { color: colors.error, bg: colors.errorBg },
+  };
+
+  const handleOpenExtendedDpr = async (dpr: Dpr) => {
+    setSelectedDpr(dpr);
+    setLoadingMedia(true);
+    setDprMedia([]);
+    try {
+      const { data, error } = await supabase
+        .from('dpr_media')
+        .select('*')
+        .eq('dpr_id', dpr.id);
+      if (!error && data) {
+        setDprMedia(data);
+      }
+    } catch (e) {
+      console.warn('[DprTab] Error loading media:', e);
+    } finally {
+      setLoadingMedia(false);
+    }
   };
 
   const handleToggleDirectClient = async (val: boolean) => {
@@ -1051,72 +1099,193 @@ function DprTab({ dprs, employees, project }: { dprs: Dpr[]; employees: any[]; p
           : directToClient || dpr.client_visible || dpr.status === 'approved';
 
         return (
-          <Card key={dpr.id} style={styles.listCard}>
-            <View style={styles.listRow}>
-              <View style={[styles.iconBox, { backgroundColor: statusColors[dpr.status]?.bg || colors.neutral[100] }]}>
-                <Ionicons name="document-text" size={20} color={statusColors[dpr.status]?.color || colors.neutral[600]} />
-              </View>
-              <View style={styles.listInfo}>
-                <Text style={styles.listTitle}>
-                  {fmt(dpr.date, { day: 'numeric', month: 'short', year: 'numeric' })}
-                  {dpr.work_type ? ` — ${dpr.work_type}` : ''}
-                </Text>
-                <Text style={styles.listSubtitle} numberOfLines={2}>
-                  {dpr.work_done}
-                </Text>
-                <Text style={[styles.listSubtitle, { marginTop: 2 }]}>
-                  By: {employeeMap.get(dpr.submitted_by) || dpr.submitted_by}
-                  {dpr.level_zone ? ` · ${dpr.level_zone}` : ''}
-                </Text>
-              </View>
-              <StatusBadge status={dpr.status} />
-            </View>
-
-            {/* Admin Client Release Control Button */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                borderTopWidth: 1,
-                borderTopColor: '#F3F4F6',
-                marginTop: spacing.xs,
-                paddingTop: spacing.xs,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Ionicons
-                  name={isVisibleToClient ? 'eye-outline' : 'eye-off-outline'}
-                  size={14}
-                  color={isVisibleToClient ? '#16A34A' : colors.neutral[400]}
-                />
-                <Text style={{ fontSize: 11, color: isVisibleToClient ? '#16A34A' : colors.neutral[500], fontWeight: '600' }}>
-                  {isVisibleToClient ? 'Client Visible' : 'Admin Only (Hidden from Client)'}
-                </Text>
+          <TouchableOpacity
+            key={dpr.id}
+            onPress={() => handleOpenExtendedDpr(dpr)}
+            activeOpacity={0.8}
+          >
+            <Card style={styles.listCard}>
+              <View style={styles.listRow}>
+                <View style={[styles.iconBox, { backgroundColor: statusColors[dpr.status]?.bg || colors.neutral[100] }]}>
+                  <Ionicons name="document-text" size={20} color={statusColors[dpr.status]?.color || colors.neutral[600]} />
+                </View>
+                <View style={styles.listInfo}>
+                  <Text style={styles.listTitle}>
+                    {fmt(dpr.date, { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {dpr.work_type ? ` — ${dpr.work_type}` : ''}
+                  </Text>
+                  <Text style={styles.listSubtitle} numberOfLines={2}>
+                    {dpr.work_done}
+                  </Text>
+                  <Text style={[styles.listSubtitle, { marginTop: 2 }]}>
+                    By: {employeeMap.get(dpr.submitted_by) || dpr.submitted_by}
+                    {dpr.level_zone ? ` · ${dpr.level_zone}` : ''}
+                  </Text>
+                </View>
+                <StatusBadge status={dpr.status} />
               </View>
 
-              <TouchableOpacity
+              {/* Extended View Button + Admin Client Release Control Button */}
+              <View
                 style={{
-                  backgroundColor: isVisibleToClient ? '#FEF2F2' : '#F0FDF4',
-                  borderColor: isVisibleToClient ? '#FECACA' : '#BBF7D0',
-                  borderWidth: 1,
-                  paddingHorizontal: spacing.sm,
-                  paddingVertical: 4,
-                  borderRadius: radius.sm,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  borderTopWidth: 1,
+                  borderTopColor: '#F3F4F6',
+                  marginTop: spacing.xs,
+                  paddingTop: spacing.xs,
                 }}
-                onPress={() => handleToggleClientPublish(dpr.id, isVisibleToClient)}
               >
-                <Text style={{ fontSize: 11, fontWeight: '600', color: isVisibleToClient ? '#DC2626' : '#15803D' }}>
-                  {isVisibleToClient ? 'Revoke Client View' : 'Publish to Client'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Card>
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                  onPress={() => handleOpenExtendedDpr(dpr)}
+                >
+                  <Ionicons name="open-outline" size={14} color={colors.primary} />
+                  <Text style={{ fontSize: 11, color: colors.primary, fontFamily: fontFamily.bold }}>
+                    Open Extended View
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: isVisibleToClient ? '#FEF2F2' : '#F0FDF4',
+                    borderColor: isVisibleToClient ? '#FECACA' : '#BBF7D0',
+                    borderWidth: 1,
+                    paddingHorizontal: spacing.sm,
+                    paddingVertical: 4,
+                    borderRadius: radius.sm,
+                  }}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleToggleClientPublish(dpr.id, isVisibleToClient);
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: isVisibleToClient ? '#DC2626' : '#15803D' }}>
+                    {isVisibleToClient ? 'Revoke Client View' : 'Publish to Client'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Card>
+          </TouchableOpacity>
         );
       })}
+
+      {/* Extended DPR Details Modal */}
+      <Modal
+        visible={!!selectedDpr}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedDpr(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.xl, maxHeight: '90%' }}>
+            {/* Modal Handle */}
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.neutral[300], alignSelf: 'center', marginBottom: spacing.md }} />
+
+            {/* Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+              <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink }}>
+                  Extended DPR Details
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.neutral[500] }}>
+                  {selectedDpr ? fmt(selectedDpr.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setSelectedDpr(null)} hitSlop={12}>
+                <Ionicons name="close-circle" size={26} color={colors.neutral[400]} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedDpr && (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
+                {/* Meta details card */}
+                <Card style={{ padding: spacing.md, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
+                    <Text style={{ fontSize: 14, fontFamily: fontFamily.bold, color: colors.ink }}>
+                      {selectedDpr.work_type || 'General Work'}
+                    </Text>
+                    <StatusBadge status={selectedDpr.status} />
+                  </View>
+                  <Text style={{ fontSize: 12, color: colors.neutral[600] }}>
+                    Submitted By: <Text style={{ fontFamily: fontFamily.bold, color: colors.ink }}>{employeeMap.get(selectedDpr.submitted_by) || selectedDpr.submitted_by}</Text>
+                  </Text>
+                  {selectedDpr.level_zone ? (
+                    <Text style={{ fontSize: 12, color: colors.neutral[600], marginTop: 2 }}>
+                      Level / Zone: <Text style={{ fontFamily: fontFamily.bold, color: colors.ink }}>{selectedDpr.level_zone}</Text>
+                    </Text>
+                  ) : null}
+                </Card>
+
+                {/* Work Accomplished Description */}
+                <View>
+                  <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4 }}>
+                    📝 Detailed Work Description
+                  </Text>
+                  <Card style={{ padding: spacing.md, backgroundColor: '#FFFFFF' }}>
+                    <Text style={{ fontSize: 13, color: colors.neutral[700], lineHeight: 20 }}>
+                      {selectedDpr.work_done || 'No detailed description logged.'}
+                    </Text>
+                  </Card>
+                </View>
+
+                {/* Attached Site Photos & Videos */}
+                <View>
+                  <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 6 }}>
+                    📸 Attached Site Photos & Videos ({dprMedia.length})
+                  </Text>
+
+                  {loadingMedia ? (
+                    <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.md }} />
+                  ) : dprMedia.length === 0 ? (
+                    <Card style={{ padding: spacing.md, alignItems: 'center', backgroundColor: '#F8FAFC' }}>
+                      <Ionicons name="images-outline" size={28} color={colors.neutral[300]} />
+                      <Text style={{ fontSize: 12, color: colors.neutral[500], marginTop: 4 }}>No photos attached to this DPR</Text>
+                    </Card>
+                  ) : (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
+                      {dprMedia.map((m: any, idx: number) => (
+                        <View key={m.id || idx} style={{ width: 120, height: 120, borderRadius: radius.md, overflow: 'hidden', backgroundColor: colors.neutral[200] }}>
+                          <Image source={{ uri: supabase.storage.from('dpr-media').getPublicUrl(m.storage_path).data.publicUrl }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+                        </View>
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
+
+                {/* Review Notes (if available) */}
+                {selectedDpr.review_note ? (
+                  <View>
+                    <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink, marginBottom: 4 }}>
+                      💬 Supervisor / Admin Review Note
+                    </Text>
+                    <Card style={{ padding: spacing.md, backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }}>
+                      <Text style={{ fontSize: 12, color: '#166534' }}>
+                        {selectedDpr.review_note}
+                      </Text>
+                    </Card>
+                  </View>
+                ) : null}
+
+                {/* Client Release Status Button */}
+                <Button
+                  title={selectedDpr.client_visible ? "Revoke Client Visibility" : "Publish DPR to Client"}
+                  variant={selectedDpr.client_visible ? "secondary" : "primary"}
+                  onPress={() => {
+                    handleToggleClientPublish(selectedDpr.id, !!selectedDpr.client_visible);
+                    setSelectedDpr(null);
+                  }}
+                />
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
+
 
 // Photos (from DPR media — show placeholder with DPR count as signal)
 function PhotosTab({ dprs }: { dprs: Dpr[] }) {
@@ -1146,7 +1315,7 @@ function PhotosTab({ dprs }: { dprs: Dpr[] }) {
       )}
       <Card style={{ ...styles.sectionCard, backgroundColor: colors.infoBg }}>
         <Text style={[typography.caption, { color: colors.info }]}>
-          💡 Workers upload site photos when submitting their daily progress reports. Photos are linked to specific work completed each day.
+          ðŸ’¡ Workers upload site photos when submitting their daily progress reports. Photos are linked to specific work completed each day.
         </Text>
       </Card>
     </>
@@ -1173,6 +1342,11 @@ function DocumentsTab({ documents, projectId }: { documents: DocumentRow[], proj
   const [uploadModal, setUploadModal] = useState(false);
   const [upCategory, setUpCategory] = useState('drawings');
   const upload = useDocumentUpload();
+
+  // In-app PDF, CAD & Excel Viewers state
+  const [cadViewerDoc, setCadViewerDoc] = useState<{ url: string; title: string } | null>(null);
+  const [pdfViewerDoc, setPdfViewerDoc] = useState<{ url: string; title: string } | null>(null);
+  const [xlsxViewerDoc, setXlsxViewerDoc] = useState<{ url: string; title: string } | null>(null);
 
   const doUpload = async () => {
     try {
@@ -1223,8 +1397,26 @@ function DocumentsTab({ documents, projectId }: { documents: DocumentRow[], proj
       if (signErr) throw signErr;
 
       if (data?.signedUrl) {
-        setViewerUrl(data.signedUrl);
-        setSelectedDoc(doc);
+        const fileName = latestVersion.file_name || doc.title || '';
+        const ext = fileName.split('.').pop()?.toLowerCase() || '';
+
+        const cadExts = ['step', 'stp', 'dxf', 'dwg', 'stl', 'glb', '3mf', 'gcode'];
+        const xlsxExts = ['xlsx', 'xls', 'csv'];
+
+        const displayTitle = fileName.includes('.') ? fileName : (ext ? `${doc.title}.${ext}` : doc.title);
+
+        if (cadExts.includes(ext) || doc.category === 'drawings') {
+          setCadViewerDoc({ url: data.signedUrl, title: displayTitle });
+        } else if (xlsxExts.includes(ext) || doc.category === 'boq') {
+          setXlsxViewerDoc({ url: data.signedUrl, title: displayTitle });
+        } else if (ext === 'pdf' || doc.category === 'contracts' || doc.category === 'invoices' || doc.category === 'quotation') {
+          setPdfViewerDoc({ url: data.signedUrl, title: displayTitle });
+        } else {
+          setViewerUrl(data.signedUrl);
+          setSelectedDoc(doc);
+        }
+
+
       }
     } catch (e: any) {
       showAlert('Error', e.message || 'Failed to open document file link');
@@ -1232,6 +1424,7 @@ function DocumentsTab({ documents, projectId }: { documents: DocumentRow[], proj
       setLoadingFile(false);
     }
   };
+
 
   const isImageFile = (url: string | null) => {
     if (!url) return false;
@@ -1253,7 +1446,7 @@ function DocumentsTab({ documents, projectId }: { documents: DocumentRow[], proj
       {loadingFile && (
         <View style={{ padding: spacing.md, alignItems: 'center' }}>
           <ActivityIndicator color={colors.primary} />
-          <Text style={{ fontSize: 11, color: colors.neutral[500], marginTop: 4 }}>Retrieving secure attachment link...</Text>
+          <Text style={{ fontSize: 11, color: colors.neutral[500], marginTop: 4 }}>Opening in-app viewer...</Text>
         </View>
       )}
       {documents.length === 0 && <EmptyState icon="folder-open-outline" text="No documents uploaded yet" />}
@@ -1279,40 +1472,76 @@ function DocumentsTab({ documents, projectId }: { documents: DocumentRow[], proj
         </View>
       ))}
 
-      {/* In-app Document Viewer Modal */}
+      {/* In-App Interactive CAD Viewer Modal */}
+      <CadViewerModal
+        visible={!!cadViewerDoc}
+        onClose={() => setCadViewerDoc(null)}
+        fileUrl={cadViewerDoc?.url || null}
+        fileName={cadViewerDoc?.title || 'CAD Model'}
+      />
+
+      {/* In-App Native PDF Viewer Modal */}
+      <PdfViewerModal
+        visible={!!pdfViewerDoc}
+        onClose={() => setPdfViewerDoc(null)}
+        fileUrl={pdfViewerDoc?.url || null}
+        fileName={pdfViewerDoc?.title || 'Document.pdf'}
+      />
+
+      {/* In-App Excel / CSV Spreadsheet Viewer Modal */}
+      <XlsxViewerModal
+        visible={!!xlsxViewerDoc}
+        onClose={() => setXlsxViewerDoc(null)}
+        fileUrl={xlsxViewerDoc?.url || null}
+        fileName={xlsxViewerDoc?.title || 'Spreadsheet.xlsx'}
+      />
+
+
+      {/* In-App Image Document Viewer Modal */}
       <Modal visible={!!selectedDoc} animationType="slide" onRequestClose={() => setSelectedDoc(null)}>
         <View style={{ flex: 1, backgroundColor: '#1E293B' }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderColor: '#334155', backgroundColor: '#0F172A' }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: '#fff', fontSize: 14, fontFamily: fontFamily.bold }} numberOfLines={1}>{selectedDoc?.title}</Text>
-              <Text style={{ color: '#94A3B8', fontSize: 10 }}>Category: {selectedDoc?.category}</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderColor: '#334155', backgroundColor: '#0F172A', height: 56 }}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TouchableOpacity onPress={() => setSelectedDoc(null)} style={{ padding: 6 }}>
+                <Ionicons name="close" size={24} color="#F8FAFC" />
+              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#fff', fontSize: 14, fontFamily: fontFamily.bold }} numberOfLines={1}>{selectedDoc?.title}</Text>
+                <Text style={{ color: '#94A3B8', fontSize: 10 }}>Category: {selectedDoc?.category?.toUpperCase()}</Text>
+              </View>
             </View>
-            <TouchableOpacity onPress={() => setSelectedDoc(null)} style={{ padding: 6 }}>
-              <Ionicons name="close-circle" size={26} color="#94A3B8" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (viewerUrl) {
+                    if (Platform.OS === 'web') window.open(viewerUrl, '_blank');
+                    else Share.share({ message: `Fine Glaze Image (${selectedDoc?.title}):\n${viewerUrl}` });
+                  }
+                }}
+                style={{ padding: 6 }}
+              >
+                <Ionicons name="open-outline" size={20} color="#F8FAFC" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  if (viewerUrl) Share.share({ message: `Fine Glaze Image (${selectedDoc?.title}):\n${viewerUrl}` });
+                }}
+                style={{ padding: 6 }}
+              >
+                <Ionicons name="share-social-outline" size={20} color="#F8FAFC" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A', padding: spacing.md }}>
-            {viewerUrl && isImageFile(viewerUrl) ? (
+            {viewerUrl ? (
               <Image source={{ uri: viewerUrl }} style={{ width: '100%', height: '100%', resizeMode: 'contain' }} />
-            ) : (
-              <View style={{ alignItems: 'center', gap: spacing.md }}>
-                <Ionicons name="document-attach-outline" size={80} color="#64748B" />
-                <Text style={{ color: '#E2E8F0', fontSize: 14, fontFamily: fontFamily.semiBold }}>Non-Image Document Format</Text>
-                <Text style={{ color: '#94A3B8', fontSize: 11, textAlign: 'center', paddingHorizontal: spacing.xl }}>
-                  PDF and CAD blueprints are opened externally in secure viewing frames.
-                </Text>
-                <TouchableOpacity
-                  onPress={() => viewerUrl && Linking.openURL(viewerUrl)}
-                  style={{ backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8, marginTop: spacing.md }}
-                >
-                  <Text style={{ color: '#fff', fontFamily: fontFamily.bold, fontSize: 13 }}>Open Document Externally</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            ) : null}
           </View>
         </View>
       </Modal>
+
+
 
       {/* Upload modal */}
       <Modal visible={uploadModal} transparent animationType="slide" onRequestClose={() => setUploadModal(false)}>
@@ -1362,6 +1591,7 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
   const { data: stockItems = [], refetch: refetchStock } = useMaterialStock(projectId);
   const { data: suppliers = [] } = useSuppliers();
   const { data: materialsMaster = [] } = useMaterialMaster();
+  const { data: boqItems = [] } = useProjectBOQ(projectId);
 
   const createLedgerEntryMutation = useCreateInventoryLedgerEntry();
   const issueMutation = useIssueMaterialRequest();
@@ -1369,6 +1599,7 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
   // Transaction form states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMaterialId, setSelectedMaterialId] = useState('');
+  const [customMaterialName, setCustomMaterialName] = useState('');
   const [txType, setTxType] = useState<'opening' | 'received' | 'used' | 'return' | 'transfer' | 'adjustment' | 'wastage' | 'scrap'>('received');
   const [qty, setQty] = useState('');
   const [notes, setNotes] = useState('');
@@ -1382,16 +1613,42 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
   const [issueBatch, setIssueBatch] = useState('');
 
   const handleSaveEntry = async () => {
-    if (!selectedMaterialId || !qty) {
-      showAlert('Error', 'Please select material and enter quantity.');
+    let matId = selectedMaterialId;
+
+    if (!matId && customMaterialName.trim()) {
+      const match = materialsMaster.find(m => m.name.toLowerCase() === customMaterialName.trim().toLowerCase());
+      if (match) {
+        matId = match.id;
+      } else {
+        const { data: createdMat, error: createErr } = await supabase
+          .from('material_master')
+          .insert({
+            name: customMaterialName.trim(),
+            category: 'General',
+            unit: 'pcs',
+          })
+          .select('id')
+          .single();
+
+        if (createErr) {
+          showAlert('Error', 'Failed to create material record: ' + createErr.message);
+          return;
+        }
+        matId = createdMat.id;
+      }
+    }
+
+    const parsedQty = parseFloat(qty);
+    if (!matId || isNaN(parsedQty) || parsedQty <= 0) {
+      showAlert('Error', 'Please select or type a material name and enter a valid quantity.');
       return;
     }
     try {
       await createLedgerEntryMutation.mutateAsync({
         projectId,
-        materialMasterId: selectedMaterialId,
+        materialMasterId: matId,
         transactionType: txType,
-        quantity: parseFloat(qty),
+        quantity: parsedQty,
         notes: notes.trim(),
         createdBy: currentUserId,
         batchNumber: batchNumber.trim() || undefined,
@@ -1399,6 +1656,7 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
       });
       setIsModalOpen(false);
       setSelectedMaterialId('');
+      setCustomMaterialName('');
       setQty('');
       setNotes('');
       setBatchNumber('');
@@ -1446,6 +1704,43 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
     }
   };
 
+  const submitMaterialRequest = useSubmitMaterialRequest();
+
+  // Create Request Modal state
+  const [isReqModalOpen, setIsReqModalOpen] = useState(false);
+  const [reqMaterialName, setReqMaterialName] = useState('');
+  const [reqQty, setReqQty] = useState('');
+  const [reqSpec, setReqSpec] = useState('');
+  const [reqNeededBy, setReqNeededBy] = useState('');
+  const [reqNotes, setReqNotes] = useState('');
+
+  const handleCreateMaterialRequest = async () => {
+    if (!reqMaterialName.trim() || !reqQty || parseFloat(reqQty) <= 0) {
+      showAlert('Error', 'Please enter a material name and valid quantity.');
+      return;
+    }
+    try {
+      await submitMaterialRequest.mutateAsync({
+        projectId,
+        requestedBy: currentUserId,
+        materialName: reqMaterialName.trim(),
+        qty: parseFloat(reqQty),
+        spec: reqSpec.trim() || undefined,
+        neededBy: reqNeededBy || undefined,
+        notes: reqNotes.trim() || undefined,
+      });
+      setIsReqModalOpen(false);
+      setReqMaterialName('');
+      setReqQty('');
+      setReqSpec('');
+      setReqNeededBy('');
+      setReqNotes('');
+      showAlert('Success', 'Material request submitted successfully.');
+    } catch (e: any) {
+      showAlert('Error', e.message || 'Failed to submit material request');
+    }
+  };
+
   const grouped = useMemo(() => {
     const g: Record<string, MaterialRequest[]> = {};
     materialReqs.forEach(m => {
@@ -1476,7 +1771,7 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
 
       {subTab === 'requests' ? (
         <>
-          <SectionHeader title={`Material Requests (${materialReqs.length})`} />
+          <SectionHeader title={`Material Requests (${materialReqs.length})`} action="Request Material" onAction={() => setIsReqModalOpen(true)} />
           {materialReqs.length === 0 && <EmptyState icon="cube-outline" text="No material requests yet" />}
           {Object.entries(grouped).map(([status, items]) => (
             <View key={status}>
@@ -1515,6 +1810,68 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
               ))}
             </View>
           ))}
+
+          {/* Create Material Request Modal */}
+          <Modal visible={isReqModalOpen} animationType="slide" onRequestClose={() => setIsReqModalOpen(false)}>
+            <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.md, backgroundColor: '#FAF8F5' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink }}>Create Material Request</Text>
+                <TouchableOpacity onPress={() => setIsReqModalOpen(false)} style={{ padding: 4 }}>
+                  <Ionicons name="close" size={24} color={colors.ink} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={{ fontSize: 12, color: colors.neutral[600] }}>
+                Submit a site material requisition for glass, mullions, brackets, silicon sealant, or hardware.
+              </Text>
+
+              <Input
+                label="Material Name *"
+                placeholder="e.g. 12mm Toughened Glass / Sealant"
+                value={reqMaterialName}
+                onChangeText={setReqMaterialName}
+              />
+
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <View style={{ flex: 1 }}>
+                  <Input
+                    label="Quantity *"
+                    keyboardType="numeric"
+                    placeholder="e.g. 100"
+                    value={reqQty}
+                    onChangeText={setReqQty}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Input
+                    label="Spec / Grade"
+                    placeholder="e.g. Grade A6"
+                    value={reqSpec}
+                    onChangeText={setReqSpec}
+                  />
+                </View>
+              </View>
+
+              <DatePickerField
+                label="Needed By Date"
+                value={reqNeededBy}
+                onChange={setReqNeededBy}
+                placeholder="Select date (e.g. YYYY-MM-DD)"
+              />
+
+              <Input
+                label="Notes / Delivery Location"
+                placeholder="e.g. Deliver to Tower B, 4th Floor"
+                value={reqNotes}
+                onChangeText={setReqNotes}
+              />
+
+              <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg, marginBottom: spacing['2xl'] }}>
+                <Button title="Cancel" onPress={() => setIsReqModalOpen(false)} variant="secondary" style={{ flex: 1 }} />
+                <Button title="Submit Request" onPress={handleCreateMaterialRequest} loading={submitMaterialRequest.isPending} variant="primary" style={{ flex: 1, backgroundColor: '#2563EB' }} />
+              </View>
+            </ScrollView>
+          </Modal>
         </>
       ) : (
         <>
@@ -1533,7 +1890,7 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
           {stockItems.map(item => {
             const isOutOfStock = item.available_quantity <= 0;
             const isBelowMin = item.available_quantity < item.minimum_stock;
-            const statusLabel = isOutOfStock ? '❌ Out of Stock' : (isBelowMin ? '⚠ Below Minimum' : '✔ Healthy');
+            const statusLabel = isOutOfStock ? '❌ Out of Stock' : (isBelowMin ? '⚠️ Below Minimum' : '✔ Healthy');
             const statusColor = isOutOfStock ? colors.error : (isBelowMin ? colors.warning : colors.success);
             
             return (
@@ -1596,16 +1953,37 @@ function MaterialsTab({ materialReqs, projectId, currentUserId }: { materialReqs
             <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.md }}>
               <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: colors.ink }}>Log Material Transaction</Text>
 
+              <Text style={{ fontSize: 13, fontFamily: fontFamily.semiBold, color: colors.neutral[700] }}>Select Material (Master or BOQ)</Text>
               <Picker
                 selectedValue={selectedMaterialId}
-                onValueChange={(val) => setSelectedMaterialId(val)}
+                onValueChange={(val) => {
+                  setSelectedMaterialId(val);
+                  if (val) setCustomMaterialName('');
+                }}
                 style={{ backgroundColor: '#FAF9F6', borderRadius: 8 }}
               >
-                <Picker.Item label="-- Select Material Master --" value="" />
+                <Picker.Item label="-- Select Material Master or BOQ Item --" value="" />
                 {materialsMaster.map(m => (
-                  <Picker.Item key={m.id} label={m.name} value={m.id} />
+                  <Picker.Item key={m.id} label={`${m.name} (${m.unit || 'pcs'})`} value={m.id} />
+                ))}
+                {boqItems.map(b => (
+                  <Picker.Item key={`boq-${b.id}`} label={`BOQ: ${b.item_name} (${b.unit})`} value={b.id} />
                 ))}
               </Picker>
+
+              <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: colors.neutral[500], marginVertical: 2, textAlign: 'center' }}>
+                — OR WRITE / TYPE A CUSTOM MATERIAL —
+              </Text>
+
+              <Input
+                label="Custom Material Name"
+                placeholder="e.g. 12mm Toughened Glass / Structural Sealant"
+                value={customMaterialName}
+                onChangeText={(text) => {
+                  setCustomMaterialName(text);
+                  if (text) setSelectedMaterialId('');
+                }}
+              />
 
               <Text style={{ fontSize: 13, fontFamily: fontFamily.semiBold, color: colors.neutral[700] }}>Transaction Type</Text>
               <Picker
@@ -1884,180 +2262,6 @@ function VariationsTab({ projectId, currentUserId }: { projectId: string; curren
   );
 }
 
-// Facade Elevation Progress Map
-function OldFacadeMapTab({ projectId }: { projectId: string }) {
-  const { data: sections = [], refetch } = useFacadeSections(projectId);
-  const initSections = useInitializeFacadeSections();
-  const updateSectionStatus = useUpdateFacadeSectionStatus();
-
-  const [selectedSection, setSelectedSection] = useState<FacadeSection | null>(null);
-
-  const handleInitMap = async () => {
-    try {
-      await initSections.mutateAsync(projectId);
-      showAlert('Success', 'Elevation matrix initialized successfully (Level 1 to 4, Bays A to D).');
-      refetch();
-    } catch (e: any) {
-      showAlert('Error', e.message || 'Failed to initialize elevation matrix');
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    if (status === 'completed') return '#16A34A'; // Green
-    if (status === 'in_progress') return '#CA8A04'; // Yellow
-    return '#DC2626'; // Red
-  };
-
-  const getStatusBg = (status: string) => {
-    if (status === 'completed') return 'rgba(22, 163, 74, 0.15)';
-    if (status === 'in_progress') return 'rgba(202, 138, 4, 0.15)';
-    return 'rgba(220, 38, 38, 0.15)';
-  };
-
-  const levels = ['L4', 'L3', 'L2', 'L1'];
-  const bays = ['BayA', 'BayB', 'BayC', 'BayD'];
-
-  const gridMap = useMemo(() => {
-    const map: Record<string, FacadeSection> = {};
-    sections.forEach(s => {
-      map[s.label] = s;
-    });
-    return map;
-  }, [sections]);
-
-  return (
-    <View style={{ gap: spacing.md }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink }}>Facade Elevation Progress Map</Text>
-        {sections.length > 0 && (
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#DC2626' }} />
-              <Text style={{ fontSize: 10, color: colors.neutral[500] }}>Pending</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#CA8A04' }} />
-              <Text style={{ fontSize: 10, color: colors.neutral[500] }}>Active</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#16A34A' }} />
-              <Text style={{ fontSize: 10, color: colors.neutral[500] }}>Done</Text>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {sections.length === 0 ? (
-        <Card style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.md }}>
-          <Ionicons name="images-outline" size={48} color={colors.neutral[300]} />
-          <Text style={{ fontSize: 15, fontFamily: fontFamily.bold, color: colors.ink }}>No Elevation Map Initialized</Text>
-          <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center' }}>
-            Auto-generate a default grid representing building floors and bays to track panel installation status visually.
-          </Text>
-          <Button title="Initialize Grid Map" onPress={handleInitMap} variant="primary" loading={initSections.isPending} />
-        </Card>
-      ) : (
-        <Card style={{ padding: spacing.md, backgroundColor: '#FFFDF9', borderWidth: 1, borderColor: '#EAE6DF' }}>
-          <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: colors.neutral[400], textAlign: 'center', marginBottom: 12, letterSpacing: 1 }}>
-            BUILDING ELEVATION VIEW
-          </Text>
-          
-          <View style={{ gap: 8 }}>
-            {levels.map(level => (
-              <View key={level} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={{ width: 24, fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[600] }}>{level}</Text>
-                
-                <View style={{ flex: 1, flexDirection: 'row', gap: 8 }}>
-                  {bays.map(bay => {
-                    const label = `${level}-${bay}`;
-                    const sec = gridMap[label];
-                    if (!sec) return <View key={bay} style={{ flex: 1, height: 50, backgroundColor: colors.neutral[100], borderRadius: 6 }} />;
-                    
-                    return (
-                      <TouchableOpacity
-                        key={bay}
-                        onPress={() => setSelectedSection(sec)}
-                        style={{
-                          flex: 1,
-                          height: 50,
-                          backgroundColor: getStatusBg(sec.status),
-                          borderWidth: 1.5,
-                          borderColor: getStatusColor(sec.status),
-                          borderRadius: 8,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          elevation: 1,
-                        }}
-                      >
-                        <Text style={{ fontSize: 10, fontFamily: fontFamily.bold, color: colors.neutral[800] }}>{bay.replace('Bay', '')}</Text>
-                        <Text style={{ fontSize: 8, color: colors.neutral[500], textTransform: 'uppercase', marginTop: 1 }}>{sec.status.replace('_', ' ')}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            ))}
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}>
-            <View style={{ width: 24 }} />
-            <View style={{ flex: 1, flexDirection: 'row', gap: 8 }}>
-              {bays.map(bay => (
-                <Text key={bay} style={{ flex: 1, fontSize: 10, fontFamily: fontFamily.bold, color: colors.neutral[500], textAlign: 'center' }}>
-                  {bay}
-                </Text>
-              ))}
-            </View>
-          </View>
-        </Card>
-      )}
-
-      {selectedSection && (
-        <Modal visible={!!selectedSection} animationType="slide" transparent>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: spacing.xl }}>
-            <View style={{ backgroundColor: '#fff', borderRadius: radius.xl, padding: spacing.xl, gap: spacing.md }}>
-              <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: colors.ink }}>
-                Segment Detail: {selectedSection.label}
-              </Text>
-              <Text style={{ fontSize: 12, color: colors.neutral[500] }}>
-                Track execution status and logs for this specific elevation panel.
-              </Text>
-
-              <View style={{ height: 1, backgroundColor: colors.neutral[200] }} />
-
-              <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700] }}>Set Progress Status</Text>
-              <View style={{ flexDirection: 'row', gap: 6, backgroundColor: '#EAE6DF', padding: 4, borderRadius: 8 }}>
-                {(['not_started', 'in_progress', 'completed'] as const).map((st) => (
-                  <TouchableOpacity
-                    key={st}
-                    onPress={async () => {
-                      try {
-                        await updateSectionStatus.mutateAsync({ sectionId: selectedSection.id, status: st, projectId });
-                        setSelectedSection((prev: FacadeSection | null) => prev ? { ...prev, status: st } : null);
-                        refetch();
-                      } catch (e: any) {
-                        showAlert('Error', e.message || 'Failed to update status');
-                      }
-                    }}
-                    style={{ flex: 1, paddingVertical: 8, alignItems: 'center', backgroundColor: selectedSection.status === st ? '#fff' : 'transparent', borderRadius: 6 }}
-                  >
-                    <Text style={{ fontSize: 10, fontFamily: fontFamily.semiBold, color: selectedSection.status === st ? colors.ink : colors.neutral[600] }}>
-                      {st.toUpperCase().replace('_', ' ')}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.md }}>
-                <Button title="Close" onPress={() => setSelectedSection(null)} variant="primary" style={{ flex: 1 }} />
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-    </View>
-  );
-}
 
 // Expenses
 function ExpensesTab({
@@ -2246,7 +2450,7 @@ function PaymentsTab({ payments, projectId }: { payments: Payment[]; projectId: 
     <>
       <SectionHeader title="Payment Milestones" action="Add" onAction={() => setShowAdd(true)} />
 
-      {/* ── Gradient Hero Summary Card ─────────────────────────────────── */}
+      {/* â”€â”€ Gradient Hero Summary Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {payments.length > 0 && (
         <View style={payStyles.heroWrap}>
           <LinearGradient
@@ -2297,7 +2501,7 @@ function PaymentsTab({ payments, projectId }: { payments: Payment[]; projectId: 
         </View>
       )}
 
-      {/* ── Add Payment Modal (glassy + gradient button) ───────────────── */}
+      {/* â”€â”€ Add Payment Modal (glassy + gradient button) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Modal visible={showAdd} transparent animationType="slide" onRequestClose={() => setShowAdd(false)}>
         <View style={payStyles.overlay}>
           <View style={payStyles.sheet}>
@@ -2351,14 +2555,11 @@ function PaymentsTab({ payments, projectId }: { payments: Payment[]; projectId: 
               </View>
 
               {/* Field: Due date */}
-              <Text style={payStyles.fieldLabel}>Due date <Text style={payStyles.optional}>(optional)</Text></Text>
-              <TextInput
-                style={payStyles.input}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.neutral[400]}
+              <DatePickerField
+                label="Due date (optional)"
                 value={dueDate}
-                onChangeText={setDueDate}
-                keyboardType="numbers-and-punctuation"
+                onChange={setDueDate}
+                placeholder="Select milestone due date"
               />
 
               {/* Action buttons */}
@@ -2398,7 +2599,7 @@ function PaymentsTab({ payments, projectId }: { payments: Payment[]; projectId: 
         </View>
       </Modal>
 
-      {/* ── Empty State ────────────────────────────────────────────────── */}
+      {/* â”€â”€ Empty State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {payments.length === 0 && (
         <View style={payStyles.emptyWrap}>
           <LinearGradient
@@ -2423,7 +2624,7 @@ function PaymentsTab({ payments, projectId }: { payments: Payment[]; projectId: 
         </View>
       )}
 
-      {/* ── Milestone cards ────────────────────────────────────────────── */}
+      {/* â”€â”€ Milestone cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {payments.map(p => {
         const isPaid = p.status === 'paid';
         return (
@@ -2532,7 +2733,7 @@ function CommunicationTab({
 
       <Card style={{ ...styles.sectionCard, backgroundColor: colors.infoBg, marginTop: spacing.md }}>
         <Text style={[typography.caption, { color: colors.info }]}>
-          💬 Project conversations include all team members assigned to this project. Use the Messages tab in the main nav to start a new conversation.
+          ðŸ’¬ Project conversations include all team members assigned to this project. Use the Messages tab in the main nav to start a new conversation.
         </Text>
       </Card>
     </>
@@ -2688,7 +2889,7 @@ function ReportsTab({
       <SectionHeader title="Project Reports" />
       <MISAnalyticsCharts tasks={tasks} overallProgressPct={project.progress_pct} />
       <Card style={styles.reportCard}>
-        <Text style={styles.sectionCardTitle}>📊 Project Summary</Text>
+        <Text style={styles.sectionCardTitle}>ðŸ“Š Project Summary</Text>
         <ReportRow label="Progress" value={`${project.progress_pct}%`} />
         <ReportRow label="Stage" value={project.stage || '—'} />
         <ReportRow label="Start Date" value={fmt(project.start_date)} />
@@ -2696,7 +2897,7 @@ function ReportsTab({
       </Card>
 
       <Card style={styles.reportCard}>
-        <Text style={styles.sectionCardTitle}>👥 Team</Text>
+        <Text style={styles.sectionCardTitle}>ðŸ‘¥ Team</Text>
         <ReportRow label="Total Members" value={employees.length.toString()} />
         <ReportRow label="Active" value={employees.filter(e => e.status === 'active').length.toString()} />
       </Card>
@@ -2710,14 +2911,14 @@ function ReportsTab({
       </Card>
 
       <Card style={styles.reportCard}>
-        <Text style={styles.sectionCardTitle}>📋 DPRs</Text>
+        <Text style={styles.sectionCardTitle}>ðŸ“‹ DPRs</Text>
         <ReportRow label="Total Submitted" value={dprs.length.toString()} />
         <ReportRow label="Approved" value={dprApproved.toString()} />
         <ReportRow label="Pending Review" value={dprs.filter(d => d.status === 'submitted').length.toString()} />
       </Card>
 
       <Card style={styles.reportCard}>
-        <Text style={styles.sectionCardTitle}>💰 Financials</Text>
+        <Text style={styles.sectionCardTitle}>ðŸ’° Financials</Text>
         <ReportRow label="Total Billed" value={fmtINR(totalBilled)} />
         <ReportRow label="Collected" value={fmtINR(totalPaid)} />
         <ReportRow label="Outstanding" value={fmtINR(totalBilled - totalPaid)} />
@@ -2725,7 +2926,7 @@ function ReportsTab({
       </Card>
 
       <Card style={styles.reportCard}>
-        <Text style={styles.sectionCardTitle}>📦 Materials</Text>
+        <Text style={styles.sectionCardTitle}>ðŸ“¦ Materials</Text>
         <ReportRow label="Total Requests" value={materialReqs.length.toString()} />
         <ReportRow label="Approved" value={materialReqs.filter(m => m.status === 'approved').length.toString()} />
         <ReportRow label="Pending" value={materialReqs.filter(m => m.status === 'pending').length.toString()} />
@@ -3140,265 +3341,7 @@ function ProcurementTab({ projectId, companyId }: { projectId: string; companyId
   );
 }
 
-// Facade Map Tab
-function FacadeMapTab({ projectId }: { projectId: string }) {
-  const { data: boqItems = [] } = useProjectBOQ(projectId);
-  
-  const [zones, setZones] = useState<any[]>([
-    { id: '1', label: 'L5-North-01', status: 'completed', floor: 'Level 5', elevation: 'North', points: [{x: 0.1, y: 0.1}, {x: 0.35, y: 0.1}, {x: 0.35, y: 0.35}, {x: 0.1, y: 0.35}], boq_names: ['12mm Glass', 'Aluminium Mullions'] },
-    { id: '2', label: 'L5-North-02', status: 'in_progress', floor: 'Level 5', elevation: 'North', points: [{x: 0.4, y: 0.1}, {x: 0.65, y: 0.1}, {x: 0.65, y: 0.35}, {x: 0.4, y: 0.35}], boq_names: ['10mm Glass', 'Silicon Sealant'] },
-    { id: '3', label: 'L6-North-01', status: 'not_started', floor: 'Level 6', elevation: 'North', points: [{x: 0.1, y: 0.45}, {x: 0.35, y: 0.45}, {x: 0.35, y: 0.7}, {x: 0.1, y: 0.7}], boq_names: ['Transoms', 'Brackets'] },
-  ]);
-
-  const [showAddZone, setShowAddZone] = useState(false);
-  const [newLabel, setNewLabel] = useState('');
-  const [newFloor, setNewFloor] = useState('Level 1');
-  const [newElevation, setNewElevation] = useState('North Facade');
-  const [selectedBOQItems, setSelectedBOQItems] = useState<string[]>([]);
-  const [drawPoints, setDrawPoints] = useState<{ x: number; y: number }[]>([]);
-  const [canvasLayout, setCanvasLayout] = useState<{ width: number; height: number }>({ width: 320, height: 180 });
-
-  const handleDrawTap = (x: number, y: number) => {
-    setDrawPoints([...drawPoints, { x, y }]);
-  };
-
-  const handleQuickPresetZone = (gridCol: number, gridRow: number) => {
-    const startX = 0.05 + gridCol * 0.28;
-    const startY = 0.08 + gridRow * 0.26;
-    const width = 0.24;
-    const height = 0.22;
-
-    const presetPoints = [
-      { x: startX, y: startY },
-      { x: startX + width, y: startY },
-      { x: startX + width, y: startY + height },
-      { x: startX, y: startY + height },
-    ];
-    setDrawPoints(presetPoints);
-  };
-
-  const handleSaveZone = () => {
-    if (!newLabel) {
-      alert('Please enter a zone label (e.g. L5-North-03).');
-      return;
-    }
-    if (drawPoints.length < 3) {
-      alert('Please tap at least 3 points on the blueprint canvas or use Quick Box Preset.');
-      return;
-    }
-    const selectedNames = selectedBOQItems.map(id => boqItems.find(b => b.id === id)?.item_name || 'Item');
-    const newZone = {
-      id: String(Date.now()),
-      label: newLabel,
-      floor: newFloor || 'Level 1',
-      elevation: newElevation || 'North Facade',
-      status: 'not_started',
-      points: drawPoints,
-      boq_names: selectedNames.length ? selectedNames : ['Glass Panel', 'Frame'],
-    };
-    setZones([...zones, newZone]);
-    setShowAddZone(false);
-    setNewLabel('');
-    setNewFloor('Level 1');
-    setNewElevation('North Facade');
-    setDrawPoints([]);
-    setSelectedBOQItems([]);
-  };
-
-  const getStatusColor = (status: string) => {
-    if (status === 'completed') return '#10B981';
-    if (status === 'in_progress') return '#F59E0B';
-    return '#EF4444';
-  };
-
-  return (
-    <>
-      <Card variant="flat" padding={spacing.md} style={{ marginBottom: spacing.md, backgroundColor: '#FAF6EF', borderColor: 'rgba(139,104,64,0.2)' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 4 }}>
-          <Ionicons name="information-circle" size={20} color="#695030" />
-          <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: '#695030' }}>What is Elevation Mapping?</Text>
-        </View>
-        <Text style={{ fontSize: 11, color: colors.neutral[600], lineHeight: 16 }}>
-          Elevation Zones divide facade building faces (North, South, East, West) into visual grid panels. Use this map to track panel installation status (Red = Pending, Amber = In Progress, Green = Done) and link exact BOQ materials to specific building coordinates.
-        </Text>
-      </Card>
-
-      <SectionHeader title="Interactive Elevation Progress Map" />
-
-      <View style={{ backgroundColor: '#0F172A', borderRadius: 12, height: 260, position: 'relative', overflow: 'hidden', padding: 8, borderWidth: 1.5, borderColor: '#334155' }}>
-        <Text style={{ color: '#94A3B8', fontSize: 10, fontFamily: fontFamily.bold, marginBottom: 4 }}>BUILDING ELEVATION INTERACTIVE MAP</Text>
-        <View style={{ position: 'absolute', top: 40, left: 16, right: 16, bottom: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: '#334155', opacity: 0.5 }} />
-
-        {zones.map((z) => {
-          const xs = z.points.map((p: any) => p.x);
-          const ys = z.points.map((p: any) => p.y);
-          const minX = Math.min(...xs) * 100;
-          const minY = Math.min(...ys) * 100;
-          const width = (Math.max(...xs) - Math.min(...xs)) * 100;
-          const height = (Math.max(...ys) - Math.min(...ys)) * 100;
-
-          return (
-            <TouchableOpacity
-              key={z.id}
-              style={{
-                position: 'absolute',
-                left: `${minX}%`,
-                top: `${minY}%`,
-                width: `${Math.max(12, width)}%`,
-                height: `${Math.max(12, height)}%`,
-                backgroundColor: getStatusColor(z.status),
-                opacity: 0.75,
-                borderRadius: 6,
-                borderWidth: 1.5,
-                borderColor: '#FFFFFF',
-                justifyContent: 'center',
-                alignItems: 'center',
-                boxShadow: '0px 2px 8px rgba(0,0,0,0.3)',
-              } as any}
-              onPress={() => {
-                alert(`Zone Details:\nLabel: ${z.label}\nFloor: ${z.floor}\nElevation: ${z.elevation}\nLinked BOQ Items: ${z.boq_names.join(', ')}\nStatus: ${z.status.toUpperCase()}`);
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 10, fontFamily: fontFamily.bold, textAlign: 'center' }}>{z.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md }}>
-        <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink }}>Elevation Zones Register ({zones.length})</Text>
-        <TouchableOpacity onPress={() => setShowAddZone(true)} style={{ backgroundColor: '#695030', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="add-circle" size={16} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 12, fontFamily: fontFamily.bold }}>+ Draw Zone</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={{ marginTop: spacing.sm, maxHeight: 260 }}>
-        {zones.map((z) => (
-          <Card key={z.id} style={{ padding: spacing.md, marginBottom: spacing.xs, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }} variant="flat">
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, color: colors.ink }}>{z.label} ({z.floor} • {z.elevation})</Text>
-              <Text style={{ fontSize: 11, color: colors.neutral[500], marginTop: 2 }}>Linked Materials: {z.boq_names.join(', ')}</Text>
-            </View>
-            <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, backgroundColor: getStatusColor(z.status) }}>
-              <Text style={{ color: '#fff', fontSize: 10, fontFamily: fontFamily.bold }}>{z.status.toUpperCase()}</Text>
-            </View>
-          </Card>
-        ))}
-      </ScrollView>
-
-      <Modal visible={showAddZone} animationType="slide">
-        <ScrollView style={{ backgroundColor: '#FAF8F5' }} contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
-            <Text style={{ fontSize: 20, fontFamily: fontFamily.bold, color: colors.ink }}>Draw Elevation Zone</Text>
-            <TouchableOpacity onPress={() => setShowAddZone(false)} style={{ padding: 6 }}>
-              <Ionicons name="close" size={24} color={colors.ink} />
-            </TouchableOpacity>
-          </View>
-
-          <Text style={{ fontSize: 12, color: colors.neutral[600], marginBottom: spacing.sm }}>
-            Tap 3 or more points on the blueprint canvas to draw custom zone coordinates, OR pick a quick preset box:
-          </Text>
-
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: spacing.md }}>
-            <TouchableOpacity onPress={() => handleQuickPresetZone(0, 0)} style={{ backgroundColor: '#695030', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}>
-              <Text style={{ color: '#fff', fontSize: 11, fontFamily: fontFamily.medium }}>Grid Box A1</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleQuickPresetZone(1, 0)} style={{ backgroundColor: '#695030', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}>
-              <Text style={{ color: '#fff', fontSize: 11, fontFamily: fontFamily.medium }}>Grid Box B1</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleQuickPresetZone(0, 1)} style={{ backgroundColor: '#695030', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}>
-              <Text style={{ color: '#fff', fontSize: 11, fontFamily: fontFamily.medium }}>Grid Box A2</Text>
-            </TouchableOpacity>
-            {drawPoints.length > 0 && (
-              <TouchableOpacity onPress={() => setDrawPoints([])} style={{ backgroundColor: '#EF4444', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}>
-                <Text style={{ color: '#fff', fontSize: 11, fontFamily: fontFamily.medium }}>Clear Points</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          
-          <TouchableOpacity
-            activeOpacity={1}
-            onLayout={(e) => {
-              const { width, height } = e.nativeEvent.layout;
-              if (width > 0 && height > 0) setCanvasLayout({ width, height });
-            }}
-            onPress={(e) => {
-              const { locationX, locationY } = e.nativeEvent;
-              const x = Math.min(1, Math.max(0, locationX / canvasLayout.width));
-              const y = Math.min(1, Math.max(0, locationY / canvasLayout.height));
-              handleDrawTap(x, y);
-            }}
-            style={{ width: '100%', height: 200, backgroundColor: '#0F172A', borderRadius: 12, position: 'relative', overflow: 'hidden', borderWidth: 1.5, borderColor: '#334155' }}
-          >
-            {drawPoints.map((pt, idx) => (
-              <View 
-                key={idx} 
-                style={{ 
-                  position: 'absolute', 
-                  left: `${pt.x * 100}%`, 
-                  top: `${pt.y * 100}%`, 
-                  width: 12, 
-                  height: 12, 
-                  borderRadius: 6, 
-                  backgroundColor: '#3B82F6', 
-                  borderWidth: 2,
-                  borderColor: '#FFFFFF',
-                  transform: [{ translateX: -6 }, { translateY: -6 }],
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }} 
-              />
-            ))}
-            
-            <Text style={{ color: '#94A3B8', fontSize: 10, padding: 8, fontFamily: fontFamily.bold }}>
-              BLUEPRINT CANVAS ({drawPoints.length} points plotted) {drawPoints.length >= 3 ? '✓ Polygon Ready' : ''}
-            </Text>
-          </TouchableOpacity>
-
-          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginTop: spacing.lg, marginBottom: 4 }}>Zone Label *</Text>
-          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 10, padding: 12, backgroundColor: '#fff', marginBottom: spacing.sm, fontSize: 14 }} value={newLabel} onChangeText={setNewLabel} placeholder="L5-North-03" />
-
-          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Floor / Level</Text>
-          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 10, padding: 12, backgroundColor: '#fff', marginBottom: spacing.sm, fontSize: 14 }} value={newFloor} onChangeText={setNewFloor} placeholder="Level 5" />
-
-          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 4 }}>Elevation Orientation</Text>
-          <TextInput style={{ borderWidth: 1, borderColor: '#EAE6DF', borderRadius: 10, padding: 12, backgroundColor: '#fff', marginBottom: spacing.md, fontSize: 14 }} value={newElevation} onChangeText={setNewElevation} placeholder="North Facade" />
-
-          <Text style={{ fontSize: 12, fontFamily: fontFamily.bold, color: colors.neutral[700], marginBottom: 6 }}>Link BOQ Materials</Text>
-          {boqItems.map(item => {
-            const isSelected = selectedBOQItems.includes(item.id);
-            return (
-              <TouchableOpacity
-                key={item.id}
-                onPress={() => {
-                  if (isSelected) {
-                    setSelectedBOQItems(selectedBOQItems.filter(id => id !== item.id));
-                  } else {
-                    setSelectedBOQItems([...selectedBOQItems, item.id]);
-                  }
-                }}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}
-              >
-                <View style={{ width: 18, height: 18, borderWidth: 1.5, borderColor: '#695030', borderRadius: 4, backgroundColor: isSelected ? '#695030' : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
-                  {isSelected && <Ionicons name="checkmark" size={12} color="#fff" />}
-                </View>
-                <Text style={{ fontSize: 13, color: colors.ink }}>{item.item_name} ({item.unit})</Text>
-              </TouchableOpacity>
-            );
-          })}
-
-          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl, marginBottom: spacing.xl }}>
-            <Button title="Cancel" onPress={() => setShowAddZone(false)} variant="secondary" style={{ flex: 1 }} />
-            <Button title="Save Zone" onPress={handleSaveZone} variant="primary" style={{ flex: 1 }} />
-          </View>
-        </ScrollView>
-      </Modal>
-    </>
-  );
-}
-
-// ── Main Screen ───────────────────────────────────────────────────────────────
+// ─ Main Screen ─
 
 export default function ProjectWorkspaceScreen() {
   const insets = useSafeAreaInsets();
@@ -3418,8 +3361,8 @@ export default function ProjectWorkspaceScreen() {
   const [tab, setTab] = useState<Tab>('Overview');
   const [showMoreTabs, setShowMoreTabs] = useState(false);
 
-  const VISIBLE_TABS = TABS.slice(0, 3);
-  const EXTRA_TABS = TABS.slice(3) as Tab[];
+  const VISIBLE_TABS: Tab[] = ['Overview', 'BOQ', 'Tasks', 'DPR', 'Materials', 'Reports'];
+  const EXTRA_TABS: Tab[] = ['Photos', 'Documents', 'Employees', 'Attendance', 'Variations', 'Procurement', 'Expenses', 'Payments', 'Communication', 'Timeline'];
 
   if (!project) {
     return (
@@ -3430,45 +3373,59 @@ export default function ProjectWorkspaceScreen() {
     );
   }
 
+  const handleBack = () => {
+    router.push('/(admin)/projects' as any);
+  };
+
   const currentUserId = profile?.id || '';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Gradient Header */}
+      {/* Premium Brand Header (Awwwards-Tier Architectural Glass Design) */}
       <LinearGradient
-        colors={['#3E2A18', '#6B4423', '#A9713F']}
+        colors={['#695030', '#7E6144', '#918050']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
+
+
         <View style={styles.topbar}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
-            <Ionicons name="chevron-back" size={20} color="#fff" />
+          <TouchableOpacity onPress={handleBack} hitSlop={12} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={18} color="#FFF" />
           </TouchableOpacity>
-          <Text style={styles.projTitle} numberOfLines={1}>{project.name}</Text>
+          <View style={{ flex: 1, marginHorizontal: 10, alignItems: 'center' }}>
+            <Text style={styles.projTitle} numberOfLines={1}>{project.name}</Text>
+            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', fontFamily: fontFamily.medium, marginTop: 1 }}>
+              {project.city || 'Mumbai'} · Project Workspace
+            </Text>
+          </View>
           <View style={styles.statusPillTop}>
             <View style={styles.statusDotTop} />
             <Text style={styles.statusTextTop}>On Track</Text>
           </View>
         </View>
 
-        {/* Tab Bar */}
+        {/* Floating Glass Pill Navigation Bar */}
         <View style={styles.tabsWrapper}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.tabBar}
-            contentContainerStyle={{ gap: 8, paddingHorizontal: spacing.lg, paddingVertical: 4 }}
+            contentContainerStyle={{ gap: 6, paddingHorizontal: spacing.lg, paddingVertical: 4 }}
           >
-            {VISIBLE_TABS.map((t) => (
-              <TouchableOpacity
-                key={t}
-                style={[styles.tabPill, tab === t && styles.tabPillActive]}
-                onPress={() => setTab(t)}
-              >
-                <Text style={[styles.tabPillText, tab === t && styles.tabPillTextActive]}>{t}</Text>
-              </TouchableOpacity>
-            ))}
+            {VISIBLE_TABS.map((t) => {
+              const isActive = tab === t;
+              return (
+                <TouchableOpacity
+                  key={t}
+                  style={[styles.tabPill, isActive && styles.tabPillActive]}
+                  onPress={() => setTab(t)}
+                >
+                  <Text style={[styles.tabPillText, isActive && styles.tabPillTextActive]}>{t}</Text>
+                </TouchableOpacity>
+              );
+            })}
             
             <TouchableOpacity
               style={[styles.tabPill, EXTRA_TABS.includes(tab) && styles.tabPillActive]}
@@ -3530,9 +3487,6 @@ export default function ProjectWorkspaceScreen() {
         {tab === 'Variations' && (
           <VariationsTab projectId={id} currentUserId={currentUserId} />
         )}
-        {tab === 'Facade Map' && (
-          <FacadeMapTab projectId={id} />
-        )}
         {tab === 'Procurement' && (
           <ProcurementTab projectId={id} companyId={profile?.company_id || ''} />
         )}
@@ -3561,65 +3515,145 @@ export default function ProjectWorkspaceScreen() {
         )}
       </ScrollView>
 
-      {/* More Tabs Modal */}
-      <Modal visible={showMoreTabs} transparent animationType="fade" onRequestClose={() => setShowMoreTabs(false)}>
+      {/* High-End Architectural Glass More Modules Bottom Sheet Modal */}
+      <Modal visible={showMoreTabs} transparent animationType="slide" onRequestClose={() => setShowMoreTabs(false)}>
         <TouchableOpacity style={styles.moreOverlay} activeOpacity={1} onPress={() => setShowMoreTabs(false)}>
-          <View style={styles.moreDropdown}>
-            {EXTRA_TABS.map(t => (
-              <TouchableOpacity
-                key={t}
-                style={[styles.moreOption, tab === t && styles.moreOptionActive]}
-                onPress={() => { setTab(t); setShowMoreTabs(false); }}
-              >
-                <Text style={[styles.moreOptionText, tab === t && styles.moreOptionTextActive]}>{t}</Text>
-                {tab === t && <Ionicons name="checkmark" size={18} color={colors.primary} />}
-              </TouchableOpacity>
-            ))}
-          </View>
+          <TouchableWithoutFeedback>
+            <View style={styles.moreSheetContent}>
+              <View style={styles.moreSheetHeader}>
+                <View>
+                  <Text style={styles.moreSheetTitle}>Project Modules & Tools</Text>
+                  <Text style={styles.moreSheetSub}>Select a workspace section to manage</Text>
+                </View>
+                <TouchableOpacity style={styles.moreCloseBtn} onPress={() => setShowMoreTabs(false)}>
+                  <Ionicons name="close" size={18} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                <View style={styles.moreGrid}>
+                  {EXTRA_TABS.map((t) => {
+                    const isSel = tab === t;
+                    const iconMap: Record<string, string> = {
+                      Photos: 'images-outline',
+                      Documents: 'folder-open-outline',
+                      Employees: 'people-outline',
+                      Attendance: 'time-outline',
+                      Variations: 'git-compare-outline',
+                      Procurement: 'cart-outline',
+                      Expenses: 'receipt-outline',
+                      Payments: 'cash-outline',
+                      Communication: 'chatbubbles-outline',
+                      Timeline: 'analytics-outline',
+                    };
+                    return (
+                      <TouchableOpacity
+                        key={t}
+                        style={[styles.moreGridItem, isSel && styles.moreGridItemActive]}
+                        onPress={() => {
+                          setTab(t);
+                          setShowMoreTabs(false);
+                        }}
+                      >
+                        <View style={[styles.moreGridIcon, isSel && { backgroundColor: '#2563EB' }]}>
+                          <Ionicons
+                            name={(iconMap[t] || 'apps-outline') as any}
+                            size={16}
+                            color={isSel ? '#FFF' : '#64748B'}
+                          />
+                        </View>
+                        <Text style={[styles.moreGridLabel, isSel && styles.moreGridLabelActive]}>
+                          {t}
+                        </Text>
+                        {isSel && <Ionicons name="checkmark-circle" size={14} color="#2563EB" />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            </View>
+          </TouchableWithoutFeedback>
         </TouchableOpacity>
       </Modal>
     </View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// ─ Styles ─
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FAF8F5' },
   center: { justifyContent: 'center', alignItems: 'center' },
   loadingText: { ...typography.bodyMedium, color: colors.neutral[400] },
 
-  // Header
+  // Header (High-End Architectural Glass)
   header: {
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.xl,
-    paddingBottom: spacing.lg, overflow: 'hidden',
-    borderBottomLeftRadius: 26,
-    borderBottomRightRadius: 26,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
+    overflow: 'hidden',
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    shadowColor: '#3E2A18',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
   },
   topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 1 },
   backBtn: {
-    width: 34, height: 34, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    alignItems: 'center', justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  projTitle: { flex: 1, textAlign: 'center', fontFamily: fontFamily.semiBold, fontSize: 19, color: '#fff', letterSpacing: 0.2 },
+  projTitle: { fontFamily: fontFamily.bold, fontSize: 18, color: '#FFFFFF', letterSpacing: 0.2 },
   statusPillTop: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
   },
-  statusDotTop: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#3FA65B' },
-  statusTextTop: { fontSize: 11.5, fontFamily: fontFamily.bold, color: '#3FA65B' },
+  statusDotTop: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#16A34A' },
+  statusTextTop: { fontSize: 11, fontFamily: fontFamily.bold, color: '#16A34A' },
 
-  // Tab bar
-  tabsWrapper: { marginTop: 20, zIndex: 1, marginHorizontal: -spacing.lg },
-  tabBar: { },
+  // Floating Glass Tab Bar
+  tabsWrapper: { marginTop: 16, zIndex: 1, marginHorizontal: -spacing.lg },
+  tabBar: {},
   tabPill: {
-    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 100,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
-  tabPillActive: { backgroundColor: '#fff', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 14 },
-  tabPillText: { fontSize: 13, fontFamily: fontFamily.semiBold, color: 'rgba(255,255,255,0.75)' },
-  tabPillTextActive: { color: '#3E2A18' },
+  tabPillActive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+  },
+  tabPillText: { fontSize: 12, fontFamily: fontFamily.semiBold, color: 'rgba(255, 255, 255, 0.85)' },
+  tabPillTextActive: { color: '#695030', fontFamily: fontFamily.bold },
+
+
 
   // Overview
   overviewCard: { padding: spacing.xl, marginBottom: spacing.md },
@@ -3723,16 +3757,68 @@ const styles = StyleSheet.create({
   },
   picker: { height: 50 },
 
-  // More Dropdown
-  moreOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
-  moreDropdown: { width: 220, backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing.sm, ...shadows.lg },
-  moreOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderRadius: radius.md },
-  moreOptionActive: { backgroundColor: colors.neutral[100] },
-  moreOptionText: { ...typography.bodyMedium, color: colors.ink },
-  moreOptionTextActive: { fontFamily: fontFamily.semiBold, color: colors.primary },
+  // More Dropdown Grid Sheet
+  moreOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.45)', justifyContent: 'flex-end' },
+  moreSheetContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl + (Platform.OS === 'ios' ? 24 : 0),
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  moreSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    paddingBottom: spacing.xs,
+    borderBottomWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  moreSheetTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
+  moreSheetSub: { fontSize: 11, color: '#64748B', marginTop: 2 },
+  moreCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  moreGridItem: {
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  moreGridItemActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+  },
+  moreGridIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreGridLabel: { fontSize: 12, fontWeight: '600', color: '#334155', flex: 1 },
+  moreGridLabelActive: { color: '#2563EB', fontWeight: '700' },
 });
 
-// ── Payments Tab — Gradient & Glow Styles ────────────────────────────────────
+// ─ Payments Tab — Gradient & Glow Styles ─
 const payStyles = StyleSheet.create({
   // Hero summary card
   heroWrap: {
@@ -3827,7 +3913,7 @@ const payStyles = StyleSheet.create({
     borderRadius: radius.full,
   },
 
-  // ── Add Payment Modal ────────────────────────────────────────────────
+  // ─ Add Payment Modal ─
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(30, 24, 21, 0.65)',
@@ -3967,7 +4053,7 @@ const payStyles = StyleSheet.create({
     fontFamily: fontFamily.semiBold,
   },
 
-  // ── Empty State ──────────────────────────────────────────────────────
+  // ─ Empty State ─
   emptyWrap: {
     marginTop: spacing.xl,
     marginBottom: spacing.xl,
@@ -4006,7 +4092,7 @@ const payStyles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  // ── Milestone cards ──────────────────────────────────────────────────
+  // ─ Milestone cards ─
   milestoneWrap: {
     marginBottom: spacing.sm,
     borderRadius: radius.lg,
@@ -4077,7 +4163,7 @@ const payStyles = StyleSheet.create({
   },
 });
 
-// ── Overview Tab Styles ─────────────────────────────────────────────────────────
+// ─ Overview Tab Styles ─
 const ovStyles = StyleSheet.create({
   content: { gap: 14 },
   glassCard: {

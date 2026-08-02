@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
+import * as Location from 'expo-location';
 import { colors } from '../theme/colors';
 import { typography, fontFamily } from '../theme/typography';
 import { spacing, radius } from '../theme/spacing';
@@ -23,22 +24,95 @@ interface AddressAutocompleteProps {
   placeholder?: string;
 }
 
+function safeFetchJson(url: string): Promise<any> {
+  return new Promise((resolve) => {
+    try {
+      if (typeof XMLHttpRequest === 'undefined') return resolve(null);
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.timeout = 4000;
+      xhr.onload = function () {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch {
+            resolve(null);
+          }
+        } else {
+          resolve(null);
+        }
+      };
+      xhr.onerror = function () {
+        resolve(null);
+      };
+      xhr.ontimeout = function () {
+        resolve(null);
+      };
+      xhr.send();
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 export function AddressAutocomplete({
   value,
   onChangeText,
   onLocationSelected,
   city = '',
-  placeholder = 'Search site address on OpenStreetMap...',
+  placeholder = 'Type site address, paste Google Maps link or Lat, Lng...',
 }: AddressAutocompleteProps) {
   const [query, setQuery] = useState(value);
   const [predictions, setPredictions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [locatingGPS, setLocatingGPS] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showManualCoords, setShowManualCoords] = useState(false);
+  const [manualLat, setManualLat] = useState('');
+  const [manualLng, setManualLng] = useState('');
   const debounceTimer = useRef<any>(null);
 
   useEffect(() => {
     setQuery(value);
   }, [value]);
+
+  const parseAndExtractCoordinates = (text: string): { lat: string; lng: string } | null => {
+    if (!text) return null;
+
+    // 1. Google Maps @lat,lng (e.g. @19.0968032,72.8404112)
+    const atMatch = text.match(/@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/);
+    if (atMatch) {
+      return { lat: atMatch[1], lng: atMatch[2] };
+    }
+
+    // 2. Query param q=lat,lng or ll=lat,lng or destination=lat,lng or point=lat,lng
+    const qMatch = text.match(/(?:q|ll|destination|center|point|query)=(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/i);
+    if (qMatch) {
+      return { lat: qMatch[1], lng: qMatch[2] };
+    }
+
+    // 3. Decimal coordinates "19.0968, 72.8404" or "19.0968,72.8404" or "19.0968 72.8404"
+    const decMatch = text.match(/(-?\d{1,2}\.\d+)\s*[\s,]\s*(-?\d{1,3}\.\d+)/);
+    if (decMatch) {
+      const lat = parseFloat(decMatch[1]);
+      const lng = parseFloat(decMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return { lat: decMatch[1], lng: decMatch[2] };
+      }
+    }
+
+    // 4. DMS format: 19°05'48.5"N 72°50'25.5"E
+    const dmsMatch = text.match(/(\d+)[°\s]\s*(\d+)['\s]\s*([\d.]+)"?\s*([NS])\s*(\d+)[°\s]\s*(\d+)['\s]\s*([\d.]+)"?\s*([EW])/i);
+    if (dmsMatch) {
+      let lat = Number(dmsMatch[1]) + Number(dmsMatch[2]) / 60 + Number(dmsMatch[3]) / 3600;
+      if (dmsMatch[4].toUpperCase() === 'S') lat = -lat;
+      let lng = Number(dmsMatch[5]) + Number(dmsMatch[6]) / 60 + Number(dmsMatch[7]) / 3600;
+      if (dmsMatch[8].toUpperCase() === 'W') lng = -lng;
+      return { lat: lat.toFixed(6), lng: lng.toFixed(6) };
+    }
+
+    return null;
+  };
 
   const searchAddress = async (text: string) => {
     setQuery(text);
@@ -53,43 +127,67 @@ export function AddressAutocomplete({
       return;
     }
 
-    setLoading(true);
-    debounceTimer.current = setTimeout(async () => {
-      try {
-        const searchInput = city ? `${text}, ${city}` : text;
-        // Use Photon by Komoot, which provides much better type-ahead autocomplete on OSM data than plain Nominatim
-        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(searchInput)}&limit=5`;
+    // 1. Direct coordinate match (@lat,lng or lat,lng or q=lat,lng)
+    const directCoords = parseAndExtractCoordinates(text);
+    if (directCoords) {
+      onLocationSelected(directCoords.lat, directCoords.lng, text);
+      setPredictions([]);
+      setShowDropdown(false);
+      return;
+    }
 
-        const response = await fetch(url);
-        const json = await response.json();
-        
-        if (json.features && json.features.length > 0) {
-          // Map GeoJSON features to our expected format
-          const mapped = json.features.map((f: any) => {
-            const props = f.properties;
-            const coords = f.geometry.coordinates; // [lon, lat]
-            // Build a nice display name
-            const parts = [props.name, props.street, props.city, props.state, props.country].filter(Boolean);
-            const displayName = Array.from(new Set(parts)).join(', ');
-            
-            return {
-              place_id: props.osm_id || Math.random().toString(),
-              display_name: displayName,
-              lat: coords[1].toString(),
-              lon: coords[0].toString(),
-            };
-          });
-          setPredictions(mapped);
-          setShowDropdown(true);
-        } else {
-          setPredictions([]);
-        }
-      } catch (e) {
-        console.error('Error fetching OSM places:', e);
-      } finally {
-        setLoading(false);
+    // 2. If short Google Share link pasted without embedded coordinates, auto show manual coords helper
+    if (text.includes('share.google') || text.includes('goo.gl') || text.includes('maps.app')) {
+      setShowManualCoords(true);
+    }
+
+    setLoading(true);
+
+    debounceTimer.current = setTimeout(async () => {
+      // 3. Clean search input if text contained a link + place name
+      let cleanQuery = text.replace(/https?:\/\/[^\s]+/g, '').trim();
+      const searchInput = city && cleanQuery ? `${cleanQuery}, ${city}` : (cleanQuery || text);
+
+      let mapped: any[] = [];
+
+      // Try Photon API safely
+      const json1 = await safeFetchJson(`https://photon.komoot.io/api/?q=${encodeURIComponent(searchInput)}&limit=5`);
+      if (json1?.features?.length > 0) {
+        mapped = json1.features.map((f: any) => {
+          const props = f.properties;
+          const c = f.geometry.coordinates; // [lon, lat]
+          const parts = [props.name, props.street, props.city, props.state, props.country].filter(Boolean);
+          return {
+            place_id: props.osm_id || Math.random().toString(),
+            display_name: Array.from(new Set(parts)).join(', '),
+            lat: c[1].toString(),
+            lon: c[0].toString(),
+          };
+        });
       }
-    }, 400); // 400ms debounce
+
+      // Fallback to Nominatim API safely
+      if (mapped.length === 0) {
+        const json2 = await safeFetchJson(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchInput)}&format=json&limit=5`);
+        if (Array.isArray(json2) && json2.length > 0) {
+          mapped = json2.map((item: any) => ({
+            place_id: item.place_id || Math.random().toString(),
+            display_name: item.display_name,
+            lat: item.lat.toString(),
+            lon: item.lon.toString(),
+          }));
+        }
+      }
+
+      if (mapped.length > 0) {
+        setPredictions(mapped);
+        setShowDropdown(true);
+        onLocationSelected(mapped[0].lat, mapped[0].lon, text);
+      } else {
+        setPredictions([]);
+      }
+      setLoading(false);
+    }, 400);
   };
 
   const handleSelect = (item: any) => {
@@ -104,9 +202,73 @@ export function AddressAutocomplete({
     onLocationSelected(lat, lon, displayName);
   };
 
+  const useGPSLocation = async () => {
+    try {
+      setLocatingGPS(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Permission Denied: Location access is required to capture current GPS coordinates.');
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const lat = loc.coords.latitude.toString();
+      const lon = loc.coords.longitude.toString();
+
+      let addrName = query || `Lat: ${lat.slice(0, 7)}, Lng: ${lon.slice(0, 7)}`;
+      try {
+        const rev = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+        if (rev && rev[0]) {
+          const r = rev[0];
+          const parts = [r.name, r.street, r.district, r.city, r.region, r.postalCode].filter(Boolean);
+          if (parts.length > 0) addrName = parts.join(', ');
+        }
+      } catch (revErr) {
+        console.warn('Reverse geocode fallback:', revErr);
+      }
+
+      setQuery(addrName);
+      onChangeText(addrName);
+      onLocationSelected(lat, lon, addrName);
+    } catch (e: any) {
+      alert('Could not fetch GPS location: ' + (e.message || 'Please check device location settings.'));
+    } finally {
+      setLocatingGPS(false);
+    }
+  };
+
+  const applyManualCoords = () => {
+    if (!manualLat || !manualLng) {
+      alert('Please enter valid numeric Latitude and Longitude values.');
+      return;
+    }
+    const latNum = Number(manualLat);
+    const lngNum = Number(manualLng);
+    if (isNaN(latNum) || isNaN(lngNum)) {
+      alert('Latitude and Longitude must be valid numbers.');
+      return;
+    }
+    const addr = query || `Custom Coordinates (${manualLat}, ${manualLng})`;
+    onLocationSelected(manualLat.trim(), manualLng.trim(), addr);
+    alert('Geofence location coordinates set manually.');
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Full Site Address *</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
+        <Text style={styles.label}>Full Site Address *</Text>
+        <TouchableOpacity onPress={useGPSLocation} disabled={locatingGPS} style={styles.gpsBtn}>
+          {locatingGPS ? (
+            <ActivityIndicator size="small" color="#2563EB" />
+          ) : (
+            <>
+              <Ionicons name="navigate-circle" size={16} color="#2563EB" />
+              <Text style={styles.gpsBtnText}>Use My GPS Location</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.inputWrapper}>
         <TextInput
           style={styles.input}
@@ -124,6 +286,52 @@ export function AddressAutocomplete({
           />
         )}
       </View>
+
+      {/* Manual Coordinates Toggle Link */}
+      <TouchableOpacity
+        onPress={() => setShowManualCoords(!showManualCoords)}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}
+      >
+        <Ionicons name={showManualCoords ? 'chevron-down' : 'add-circle-outline'} size={14} color="#695030" />
+        <Text style={{ fontSize: 11, fontFamily: fontFamily.bold, color: '#695030' }}>
+          {showManualCoords ? 'Hide Manual Coordinates' : 'Location not found? Enter Manual Lat & Lng / Paste Google Maps link'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Manual Coordinates Fields */}
+      {showManualCoords && (
+        <View style={{ marginTop: 8, padding: 10, backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', gap: 8 }}>
+          <Text style={{ fontSize: 11, color: '#64748B', fontFamily: fontFamily.medium }}>
+            Copy coordinates from Google Maps (e.g. 19.0968, 72.8404) or paste them below:
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 10, fontFamily: fontFamily.bold, color: '#475569', marginBottom: 2 }}>Latitude (Lat)</Text>
+              <TextInput
+                style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 6, backgroundColor: '#FFF', fontSize: 12 }}
+                placeholder="19.096803"
+                value={manualLat}
+                onChangeText={setManualLat}
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 10, fontFamily: fontFamily.bold, color: '#475569', marginBottom: 2 }}>Longitude (Lng)</Text>
+              <TextInput
+                style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 6, backgroundColor: '#FFF', fontSize: 12 }}
+                placeholder="72.840411"
+                value={manualLng}
+                onChangeText={setManualLng}
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+          <TouchableOpacity onPress={applyManualCoords} style={{ backgroundColor: '#695030', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}>
+            <Text style={{ color: '#FFF', fontSize: 12, fontFamily: fontFamily.bold }}>Set Geofence Coordinates</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {showDropdown && predictions.length > 0 && (
         <View style={styles.dropdown}>
           {predictions.map((item, idx) => (
@@ -168,18 +376,18 @@ export function StaticMapPreview({ lat, lng }: StaticMapPreviewProps) {
       {Platform.OS === 'web' ? (
         <iframe
           src={embedUrl}
-          style={{ width: '100%', height: 160, border: 'none' }}
+          style={{ width: '100%', height: 170, border: 'none' }}
           title="OpenStreetMap Location"
         />
       ) : (
         <WebView
           source={{ uri: embedUrl }}
-          style={{ width: '100%', height: 160 }}
+          style={{ width: '100%', height: 170 }}
         />
       )}
       <View style={styles.mapOverlay}>
-        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
-        <Text style={styles.mapOverlayText}>Location captured via OpenStreetMap</Text>
+        <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
+        <Text style={styles.mapOverlayText}>Geofence Center: {lat.slice(0, 8)}, {lng.slice(0, 8)}</Text>
       </View>
     </Card>
   );
@@ -187,13 +395,28 @@ export function StaticMapPreview({ lat, lng }: StaticMapPreviewProps) {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
     zIndex: 10,
   },
   label: {
     ...typography.label,
     color: colors.ink,
-    marginBottom: spacing.sm,
+  },
+  gpsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  gpsBtnText: {
+    fontSize: 11,
+    fontFamily: fontFamily.bold,
+    color: '#2563EB',
   },
   inputWrapper: {
     position: 'relative',
@@ -208,7 +431,7 @@ const styles = StyleSheet.create({
     paddingRight: 40,
     ...typography.bodyMedium,
     color: colors.ink,
-    minHeight: 100,
+    minHeight: 80,
     textAlignVertical: 'top',
   },
   loader: {
@@ -256,7 +479,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
     padding: spacing.sm,
-    backgroundColor: colors.neutral[100],
+    backgroundColor: '#F8FAFC',
     borderTopWidth: 1,
     borderTopColor: colors.neutral[200],
   },

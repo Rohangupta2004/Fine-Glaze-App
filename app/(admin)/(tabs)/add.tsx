@@ -12,17 +12,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 
-import { Card } from '../../src/components';
-import { colors } from '../../src/theme/colors';
-import { typography, fontFamily } from '../../src/theme/typography';
-import { spacing, radius } from '../../src/theme/spacing';
+import { Card } from '../../../src/components';
+import { colors } from '../../../src/theme/colors';
+import { typography, fontFamily } from '../../../src/theme/typography';
+import { spacing, radius } from '../../../src/theme/spacing';
 
 const ACTIONS: { icon: string; label: string; description: string; route: string; color: string }[] = [
   { icon: 'person-add', label: 'Add Employee', description: 'Create a new team member account', route: '/(admin)/add-employee', color: colors.info },
   { icon: 'business', label: 'New Project', description: 'Start a new project workspace', route: '/(admin)/create-project', color: colors.primary },
-  { icon: 'list', label: 'Create Task', description: 'Assign a new task to a team member', route: '/(admin)/create-task', color: colors.success },
+  { icon: 'list', label: 'Create Task', description: 'Assign a new task to a team member', route: '/create-task', color: colors.success },
   { icon: 'cube', label: 'Request Material', description: 'Submit a material request', route: '/(admin)/projects?intent=material', color: colors.pending },
-  { icon: 'document-text', label: 'Submit DPR', description: 'Create a daily progress report', route: '/(admin)/projects?intent=dpr', color: colors.warning },
   { icon: 'cash', label: 'Add Payment', description: 'Record a payment milestone', route: '/(admin)/projects?intent=payment', color: colors.success },
 ];
 

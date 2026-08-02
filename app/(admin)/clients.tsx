@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Input, Avatar, StatusChip } from '../../src/components';
@@ -86,15 +87,17 @@ export default function ClientsScreen() {
       {/* Light Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
         <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={20} color="#1E1815" />
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+            <Ionicons name="arrow-back-sharp" size={20} color="#1E1815" />
           </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerLabel}>CRM</Text>
+          <View style={{ flex: 1, marginLeft: spacing.md }}>
+            <Text style={styles.headerLabel}>CRM Management</Text>
             <Text style={styles.headerTitle}>Clients</Text>
           </View>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)}>
-            <Ionicons name="add" size={24} color="#1E1815" />
+          <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.8}>
+            <LinearGradient colors={['#5B4122', '#8B6840']} style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', borderRadius: 22 }]}>
+              <Ionicons name="add-sharp" size={22} color="#FFFFFF" />
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
@@ -118,40 +121,40 @@ export default function ClientsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#2563EB" />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#695030" />}
       >
         {orgs.length === 0 && (
           <View style={styles.empty}>
-            <View style={styles.emptyIconBg}>
-              <Ionicons name="business" size={40} color="#2563EB" />
-            </View>
+            <LinearGradient colors={['#0D9488', '#14B8A6']} style={styles.emptyIconBg}>
+              <Ionicons name="briefcase-sharp" size={38} color="#FFFFFF" />
+            </LinearGradient>
             <Text style={styles.emptyTitle}>No Clients Found</Text>
             <Text style={styles.emptyText}>Tap + to add your first client organisation.</Text>
           </View>
         )}
 
         {orgs.map((org) => (
-          <TouchableOpacity key={org.id} activeOpacity={0.8} onPress={() => setSelected(org)}>
-            <View style={styles.card}>
-              <View style={styles.cardIcon}>
-                <Ionicons name="business" size={20} color="#695030" />
-              </View>
+          <TouchableOpacity key={org.id} activeOpacity={0.85} onPress={() => setSelected(org)}>
+            <LinearGradient colors={['#FFFFFF', '#FDFBF7']} start={{x:0, y:0}} end={{x:1, y:1}} style={styles.card}>
+              <LinearGradient colors={['#0D9488', '#14B8A6']} style={styles.cardIcon}>
+                <Ionicons name="briefcase-sharp" size={18} color="#FFFFFF" />
+              </LinearGradient>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>{org.name}</Text>
                 <Text style={styles.cardMeta}>{org.contact_name || 'No contact'}{org.contact_phone ? ` • ${org.contact_phone}` : ''}</Text>
                 <View style={styles.cardStats}>
                   <View style={styles.cardStat}>
-                    <Ionicons name="business-outline" size={13} color={colors.neutral[400]} />
+                    <Ionicons name="business-sharp" size={13} color="#695030" />
                     <Text style={styles.cardStatText}>{org.projects.length} project{org.projects.length !== 1 ? 's' : ''}</Text>
                   </View>
                   <View style={styles.cardStat}>
-                    <Ionicons name="person-outline" size={13} color={colors.neutral[400]} />
+                    <Ionicons name="person-sharp" size={13} color="#695030" />
                     <Text style={styles.cardStatText}>{org.users.length} login{org.users.length !== 1 ? 's' : ''}</Text>
                   </View>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.neutral[300]} />
-            </View>
+              <Ionicons name="chevron-forward-sharp" size={18} color={colors.neutral[300]} />
+            </LinearGradient>
           </TouchableOpacity>
         ))}
       </ScrollView>

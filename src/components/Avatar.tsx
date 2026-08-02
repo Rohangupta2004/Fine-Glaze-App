@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../theme/colors';
 import { typography, fontFamily } from '../theme/typography';
 
@@ -12,6 +13,7 @@ interface AvatarProps {
 
 /** Extract up to 2 initials from a full name */
 function getInitials(name: string): string {
+  if (!name) return 'W';
   return name
     .split(' ')
     .filter(Boolean)
@@ -22,14 +24,16 @@ function getInitials(name: string): string {
 
 export function Avatar({ uri, name, size = 44 }: AvatarProps) {
   const borderRadius = size / 2;
+  const [hasError, setHasError] = useState(false);
 
-  if (uri) {
+  if (uri && !hasError) {
     return (
       <Image
         source={{ uri }}
         style={[styles.image, { width: size, height: size, borderRadius }]}
         contentFit="cover"
         transition={200}
+        onError={() => setHasError(true)}
       />
     );
   }
@@ -38,11 +42,16 @@ export function Avatar({ uri, name, size = 44 }: AvatarProps) {
   const fontSize = size * 0.38;
 
   return (
-    <View style={[styles.initialsContainer, { width: size, height: size, borderRadius }]}>
+    <LinearGradient
+      colors={['#5B4122', '#8B6840']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.initialsContainer, { width: size, height: size, borderRadius }]}
+    >
       <Text style={[styles.initials, { fontSize, lineHeight: fontSize * 1.2 }]}>
         {initials}
       </Text>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -53,12 +62,11 @@ const styles = StyleSheet.create({
   initialsContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(105, 80, 48, 0.12)',
     borderWidth: 1.2,
-    borderColor: 'rgba(184, 144, 71, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   initials: {
-    color: '#695030',
-    fontFamily: fontFamily.semiBold,
+    color: '#FFFFFF',
+    fontFamily: fontFamily.bold,
   },
 });

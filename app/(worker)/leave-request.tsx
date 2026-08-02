@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Card, Button, Input, StatusChip } from '../../src/components';
+import { DatePickerField } from '../../src/components/DatePickerField';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useMyLeaveRequests, useSubmitLeave } from '../../src/hooks/useLeave';
 import { colors } from '../../src/theme/colors';
@@ -195,22 +196,23 @@ export default function LeaveRequestScreen() {
               ))}
             </View>
 
-            {/* Dates */}
-            <Text style={styles.fieldLabel}>From Date</Text>
-            <Input
-              value={fromDate}
-              onChangeText={setFromDate}
-              placeholder="YYYY-MM-DD"
-              keyboardType="numeric"
-            />
+            {/* Dates with DatePickerField */}
+            <View style={{ gap: spacing.md, marginVertical: spacing.sm }}>
+              <DatePickerField
+                label="From Date"
+                value={fromDate}
+                onChange={setFromDate}
+                placeholder="Select start date"
+              />
 
-            <Text style={styles.fieldLabel}>To Date</Text>
-            <Input
-              value={toDate}
-              onChangeText={setToDate}
-              placeholder="YYYY-MM-DD"
-              keyboardType="numeric"
-            />
+              <DatePickerField
+                label="To Date"
+                value={toDate}
+                onChange={setToDate}
+                placeholder="Select end date"
+                minDate={fromDate}
+              />
+            </View>
 
             {/* Reason */}
             <Text style={styles.fieldLabel}>Reason (optional)</Text>

@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 
@@ -107,14 +108,9 @@ function useAnalytics() {
           weeklyLabels,
           weeklyCounts: dprCounts,
         },
-        materials: {
-          pending: matPending,
-          approved: matApproved,
-          rejected: matRejected,
-          ordered: matOrdered,
-        },
+        materials: { pending: matPending, approved: matApproved, rejected: matRejected, ordered: matOrdered },
         projectCompletion: {
-          projects: (projects as any[]).map(p => ({ name: p.name, progress: p.progress_pct, status: p.status })),
+          projects: projects.map((p: any) => ({ name: p.name, progress: p.progress_pct || 0, status: p.status })),
         },
         payments: {
           totalBilled,
@@ -184,11 +180,11 @@ export default function AnalyticsScreen() {
       {/* Light Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
         <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={20} color="#1E1815" />
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+            <Ionicons name="arrow-back-sharp" size={20} color="#1E1815" />
           </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerLabel}>Performance & Reports</Text>
+          <View style={{ flex: 1, marginLeft: spacing.md }}>
+            <Text style={styles.headerLabel}>Performance & Intelligence</Text>
             <Text style={styles.headerTitle}>Analytics</Text>
           </View>
         </View>
@@ -197,7 +193,7 @@ export default function AnalyticsScreen() {
         <View style={styles.statusBar}>
           <View style={styles.statusItem}>
             <Text style={styles.statusVal}>{data?.projectCompletion.projects.length || 0}</Text>
-            <Text style={styles.statusLbl}>Active Projects</Text>
+            <Text style={styles.statusLbl}>Active Sites</Text>
           </View>
           <View style={styles.statusItem}>
             <Text style={styles.statusVal}>{data?.attendanceTrend.rate || 0}%</Text>
@@ -217,9 +213,9 @@ export default function AnalyticsScreen() {
         {/* 1. Attendance Trend (30 days) */}
         <View style={styles.chartCard}>
           <View style={styles.chartHeader}>
-            <View style={[styles.chartIcon, { backgroundColor: 'rgba(59,130,246,0.1)' }]}>
-              <Ionicons name="people" size={20} color="#3B82F6" />
-            </View>
+            <LinearGradient colors={['#059669', '#10B981']} style={styles.chartIcon}>
+              <Ionicons name="people-sharp" size={18} color="#FFFFFF" />
+            </LinearGradient>
             <Text style={styles.chartTitle}>Attendance Weekly Trend</Text>
           </View>
           <View style={styles.chartContentContainer}>
@@ -244,9 +240,9 @@ export default function AnalyticsScreen() {
         {/* 2. DPR Completion Rate */}
         <View style={styles.chartCard}>
           <View style={styles.chartHeader}>
-            <View style={[styles.chartIcon, { backgroundColor: 'rgba(139,92,246,0.1)' }]}>
-              <Ionicons name="document-text" size={20} color="#8B5CF6" />
-            </View>
+            <LinearGradient colors={['#4F46E5', '#6366F1']} style={styles.chartIcon}>
+              <Ionicons name="document-text-sharp" size={18} color="#FFFFFF" />
+            </LinearGradient>
             <Text style={styles.chartTitle}>DPR Submissions Trend</Text>
           </View>
           <View style={styles.chartContentContainer}>
@@ -271,9 +267,9 @@ export default function AnalyticsScreen() {
         {/* 3. Material Requests */}
         <View style={styles.chartCard}>
           <View style={styles.chartHeader}>
-            <View style={[styles.chartIcon, { backgroundColor: 'rgba(245,158,11,0.1)' }]}>
-              <Ionicons name="cube" size={20} color="#F59E0B" />
-            </View>
+            <LinearGradient colors={['#D97706', '#F59E0B']} style={styles.chartIcon}>
+              <Ionicons name="cube-sharp" size={18} color="#FFFFFF" />
+            </LinearGradient>
             <Text style={styles.chartTitle}>Material Requests</Text>
           </View>
           <View style={styles.chartContentContainer}>
@@ -295,9 +291,9 @@ export default function AnalyticsScreen() {
         {/* 4. Project Completion */}
         <View style={styles.chartCard}>
           <View style={styles.chartHeader}>
-            <View style={[styles.chartIcon, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
-              <Ionicons name="business" size={20} color="#10B981" />
-            </View>
+            <LinearGradient colors={['#5B4122', '#8B6840']} style={styles.chartIcon}>
+              <Ionicons name="business-sharp" size={18} color="#FFFFFF" />
+            </LinearGradient>
             <Text style={styles.chartTitle}>Project Completion</Text>
           </View>
           {(data?.projectCompletion.projects || []).map((proj, idx) => (
