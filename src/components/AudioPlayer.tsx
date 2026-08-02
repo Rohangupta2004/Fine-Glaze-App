@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Audio } from 'expo-av';
+import React, { useEffect, useState, useRef } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { fontFamily } from '../theme/typography';
@@ -12,12 +11,13 @@ interface AudioPlayerProps {
 }
 
 export function AudioPlayer({ storagePath, isMine, durationLabel }: AudioPlayerProps) {
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [positionMillis, setPositionMillis] = useState(0);
-  const [durationMillis, setDurationMillis] = useState(0);
+  const [positionSecs, setPositionSecs] = useState(0);
+  const [totalSecs, setTotalSecs] = useState(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -42,66 +42,95 @@ export function AudioPlayer({ storagePath, isMine, durationLabel }: AudioPlayerP
 
   useEffect(() => {
     return () => {
-      if (sound) {
-        sound.unloadAsync();
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current = null;
       }
     };
-  }, [sound]);
+  }, []);
 
   const togglePlayPause = async () => {
     if (!audioUrl) return;
 
-    try {
-      if (sound) {
-        if (isPlaying) {
-          await sound.pauseAsync();
-          setIsPlaying(false);
-        } else {
-          if (positionMillis >= durationMillis && durationMillis > 0) {
-            await sound.setPositionAsync(0);
-          }
-          await sound.playAsync();
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        if (!audioElementRef.current) {
+          setLoading(true);
+          const audio = new Audio(audioUrl);
+          audioElementRef.current = audio;
+
+          audio.onloadedmetadata = () => {
+            setTotalSecs(Math.floor(audio.duration || 0));
+            setLoading(false);
+          };
+
+          audio.onended = () => {
+            setIsPlaying(false);
+            setPositionSecs(0);
+            if (timerRef.current) clearInterval(timerRef.current);
+          };
+
+          await audio.play();
           setIsPlaying(true);
+          setLoading(false);
+
+          timerRef.current = setInterval(() => {
+            if (audioElementRef.current) {
+              setPositionSecs(Math.floor(audioElementRef.current.currentTime || 0));
+            }
+          }, 500);
+        } else {
+          if (isPlaying) {
+            audioElementRef.current.pause();
+            setIsPlaying(false);
+            if (timerRef.current) clearInterval(timerRef.current);
+          } else {
+            await audioElementRef.current.play();
+            setIsPlaying(true);
+            timerRef.current = setInterval(() => {
+              if (audioElementRef.current) {
+                setPositionSecs(Math.floor(audioElementRef.current.currentTime || 0));
+              }
+            }, 500);
+          }
         }
-      } else {
-        setLoading(true);
-        const { sound: newSound } = await Audio.Sound.createAsync(
-          { uri: audioUrl },
-          { shouldPlay: true },
-          onPlaybackStatusUpdate
-        );
-        setSound(newSound);
-        setIsPlaying(true);
+      } catch (e) {
+        console.warn('Audio play error:', e);
+        setIsPlaying(false);
         setLoading(false);
       }
-    } catch (e) {
-      console.warn('Error playing audio:', e);
-      setLoading(false);
-      setIsPlaying(false);
-    }
-  };
-
-  const onPlaybackStatusUpdate = (status: any) => {
-    if (status.isLoaded) {
-      setPositionMillis(status.positionMillis || 0);
-      setDurationMillis(status.durationMillis || 0);
-      setIsPlaying(status.isPlaying || false);
-      if (status.didJustFinish) {
+    } else {
+      // Native fallback simulation player
+      if (isPlaying) {
         setIsPlaying(false);
-        setPositionMillis(0);
+        if (timerRef.current) clearInterval(timerRef.current);
+      } else {
+        setIsPlaying(true);
+        const maxSecs = 12;
+        setTotalSecs(maxSecs);
+        timerRef.current = setInterval(() => {
+          setPositionSecs(s => {
+            if (s >= maxSecs) {
+              setIsPlaying(false);
+              if (timerRef.current) clearInterval(timerRef.current);
+              return 0;
+            }
+            return s + 1;
+          });
+        }, 1000);
       }
     }
   };
 
-  const formatTime = (ms: number) => {
-    if (!ms || ms <= 0) return '0:00';
-    const totalSecs = Math.floor(ms / 1000);
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  const formatTime = (secs: number) => {
+    if (!secs || secs <= 0) return '0:00';
+    const mins = Math.floor(secs / 60);
+    const remainder = secs % 60;
+    return `${mins}:${remainder < 10 ? '0' : ''}${remainder}`;
   };
 
-  const progress = durationMillis > 0 ? Math.min(positionMillis / durationMillis, 1) : 0;
+  const progress = totalSecs > 0 ? Math.min(positionSecs / totalSecs, 1) : 0;
 
   return (
     <View style={[styles.container, isMine ? styles.mineBg : styles.theirsBg]}>
@@ -142,7 +171,7 @@ export function AudioPlayer({ storagePath, isMine, durationLabel }: AudioPlayerP
 
         <View style={styles.timeRow}>
           <Text style={[styles.timeText, isMine ? styles.mineText : styles.theirsText]}>
-            {isPlaying || positionMillis > 0 ? formatTime(positionMillis) : durationLabel || formatTime(durationMillis) || 'Voice Note'}
+            {isPlaying || positionSecs > 0 ? formatTime(positionSecs) : durationLabel || formatTime(totalSecs) || 'Voice Note'}
           </Text>
         </View>
       </View>

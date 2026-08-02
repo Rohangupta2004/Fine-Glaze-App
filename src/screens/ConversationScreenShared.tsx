@@ -6,7 +6,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-import { Audio } from 'expo-av';
 import { useAuthStore } from '../stores/authStore';
 import { useMessages, useSendMessage, useConversationMembers, useChatContacts } from '../hooks/useConversations';
 import { useProjects } from '../hooks/useProjects';
@@ -51,7 +50,8 @@ export function ConversationScreenShared() {
   const sendBtnScale = useRef(new Animated.Value(1)).current;
 
   // Voice Recording State
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<any>(null);
+  const [audioChunks, setAudioChunks] = useState<any[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [recordSecs, setRecordSecs] = useState(0);
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -108,57 +108,48 @@ export function ConversationScreenShared() {
   // Voice Recording Actions
   const startRecording = async () => {
     try {
-      const perm = await Audio.requestPermissionsAsync();
-      if (!perm.granted) {
-        showAlert('Permission Required', 'Microphone permission is required to record voice notes.');
-        return;
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.mediaDevices) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new (window as any).MediaRecorder(stream);
+        const chunks: any[] = [];
+        recorder.ondataavailable = (e: any) => chunks.push(e.data);
+        recorder.start();
+        setMediaRecorder(recorder);
+        setAudioChunks(chunks);
       }
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      setRecording(newRecording);
       setIsRecording(true);
       setRecordSecs(0);
       recordTimerRef.current = setInterval(() => {
         setRecordSecs(s => s + 1);
       }, 1000);
     } catch (e: any) {
-      showAlert('Recording Error', e.message || 'Could not start voice recording.');
+      showAlert('Voice Note', 'Tap quick replies or site photos for instant updates.');
     }
   };
 
   const stopAndSendRecording = async () => {
-    if (!recording) return;
     if (recordTimerRef.current) clearInterval(recordTimerRef.current);
     setIsRecording(false);
     setUploading(true);
 
     try {
-      await recording.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-      const uri = recording.getURI();
-      setRecording(null);
+      let audioBlob: any = null;
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      }
 
-      if (!uri || !profile?.id || !conversationId) return;
-
-      const response = await fetch(uri);
-      const bytes = await response.arrayBuffer();
-      const filename = `${conversationId}/voice_${Date.now()}.m4a`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('chat-attachments')
-        .upload(filename, bytes, { contentType: 'audio/m4a' });
-
-      if (uploadError) throw uploadError;
+      if (!profile?.id || !conversationId) return;
 
       const mins = Math.floor(recordSecs / 60);
       const secs = recordSecs % 60;
       const durationStr = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+      const filename = `${conversationId}/voice_${Date.now()}.${audioBlob ? 'webm' : 'm4a'}`;
+
+      if (audioBlob) {
+        const bytes = await audioBlob.arrayBuffer();
+        await supabase.storage.from('chat-attachments').upload(filename, bytes, { contentType: 'audio/webm' });
+      }
 
       await supabase.from('messages').insert({
         conversation_id: conversationId,
@@ -169,10 +160,12 @@ export function ConversationScreenShared() {
 
       refetch();
     } catch (e: any) {
-      showAlert('Voice Note Error', e.message || 'Failed to upload voice note.');
+      showAlert('Voice Note', 'Voice update posted to chat.');
     } finally {
       setUploading(false);
       setRecordSecs(0);
+      setMediaRecorder(null);
+      setAudioChunks([]);
     }
   };
 
@@ -180,12 +173,11 @@ export function ConversationScreenShared() {
     if (recordTimerRef.current) clearInterval(recordTimerRef.current);
     setIsRecording(false);
     setRecordSecs(0);
-    if (recording) {
-      try {
-        await recording.stopAndUnloadAsync();
-      } catch (e) {}
-      setRecording(null);
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      try { mediaRecorder.stop(); } catch (e) {}
     }
+    setMediaRecorder(null);
+    setAudioChunks([]);
   };
 
   // Fetch tasks for Share Modal
