@@ -53,9 +53,73 @@ const STATS = [
   { label: 'Accuracy Rating', val: '99.9%' },
 ];
 
+const SCREEN_SHOWCASES: Record<string, { tag: string; title: string; desc: string; icon: string; highlights: string[] }> = {
+  dashboard: {
+    tag: 'ADMIN & PM CONTROL CENTER',
+    title: 'Executive Admin Dashboard',
+    desc: 'Real-time visibility into active project sites, daily attendance rate trends, pending DPR approvals, and quick tool shortcuts.',
+    icon: 'grid-sharp',
+    highlights: [
+      'Live Active Project Counters & Progress Bar',
+      'Weekly Attendance Rate Trend Visualization',
+      'Pending DPR & Expense Approval Badges',
+      'Text-Avatar Initials on Champagne Gold Gradient',
+    ],
+  },
+  chat: {
+    tag: 'SITE-TO-OFFICE LIVE CHAT',
+    title: 'Voice Notes & Team Collaboration Chat',
+    desc: 'Instant field communication with 1-tap voice note recording, site photo attachments, project/task share cards, and 10 quick action chips.',
+    icon: 'chatbubbles-sharp',
+    highlights: [
+      'High-Quality Voice Note Recording',
+      '15-Bar Waveform Audio Player Component',
+      'Interactive Project & Task Share Cards in Chat',
+      'Real-time Supabase Presence Typing Indicator',
+    ],
+  },
+  attendance: {
+    tag: 'VERIFICATION & GEOFENCING',
+    title: 'Geofenced GPS Punch-In & Selfie Validation',
+    desc: 'Verifies worker physical location against project site radius coordinates, captures live selfie, and logs shift start/end timestamps.',
+    icon: 'location-sharp',
+    highlights: [
+      'GPS Location Geofence Radius Checking',
+      'Instant Selfie Verification Capture',
+      'Shift Check-in & Check-out Time Tracking',
+      'Offline Outbox Queue for Low-Connectivity Sites',
+    ],
+  },
+  boq: {
+    tag: 'FACADE ENGINEERING ENGINE',
+    title: 'Structural Facade BOQ Engine & MIS Grid',
+    desc: 'Zone-wise glass panel specifications, aluminum profile extrusions, AI material alias resolution, and Excel import/export.',
+    icon: 'business-sharp',
+    highlights: [
+      'Level & Zone-Wise Facade Items Tracking',
+      'AI Material Alias Matching Engine',
+      'Excel Task MIS Grid Batch Editing & Export',
+      'Automated Stock Consumption Calculation Rules',
+    ],
+  },
+  quote: {
+    tag: 'ESTIMATION & COSTING',
+    title: 'Glazing Quote & Cost Estimator',
+    desc: 'Calculate material unit rates, glass specifications, aluminum extrusion weight, hardware accessories, and export PDF quotes.',
+    icon: 'calculator-sharp',
+    highlights: [
+      'Instant Sq. Ft. Glazing Cost Calculator',
+      'Glass Type & Extrusion Rate Breakdowns',
+      'Custom Profit Margin & Taxes Configuration',
+      'One-Click Export to Excel & Professional PDF',
+    ],
+  },
+};
+
 export default function OfficialLandingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [activeScreenTab, setActiveScreenTab] = useState('dashboard');
 
   // Interactive Calculator State
   const [areaSqFt, setAreaSqFt] = useState('1500');
@@ -142,6 +206,69 @@ export default function OfficialLandingScreen() {
                 <Text style={styles.featureDesc}>{feat.desc}</Text>
               </View>
             ))}
+          </View>
+        </View>
+
+        {/* Interactive App Screen Showcase & Explanations */}
+        <View style={styles.showcaseSection}>
+          <Text style={styles.sectionTag}>APP SCREEN SHOWCASE</Text>
+          <Text style={styles.sectionHeading}>Explore Every Corner of Fine Glaze</Text>
+
+          <View style={styles.showcaseCard}>
+            {/* Screen Tabs */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.screenTabScroll}>
+              {[
+                { id: 'dashboard', label: '📊 Admin Dashboard', icon: 'grid-sharp' },
+                { id: 'chat', label: '💬 Voice & Team Chat', icon: 'chatbubbles-sharp' },
+                { id: 'attendance', label: '📍 GPS Punch-In', icon: 'location-sharp' },
+                { id: 'boq', label: '🏢 Facade BOQ Engine', icon: 'business-sharp' },
+                { id: 'quote', label: '🧰 Quote Estimator', icon: 'calculator-sharp' },
+              ].map(tab => (
+                <TouchableOpacity
+                  key={tab.id}
+                  style={[styles.screenTabBtn, activeScreenTab === tab.id && styles.screenTabBtnActive]}
+                  onPress={() => setActiveScreenTab(tab.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.screenTabText, activeScreenTab === tab.id && styles.screenTabTextActive]}>{tab.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Active Screen Details & Visual Preview */}
+            <View style={styles.screenDisplayBody}>
+              <View style={styles.screenTextCol}>
+                <View style={styles.screenTagBadge}>
+                  <Text style={styles.screenTagText}>{SCREEN_SHOWCASES[activeScreenTab].tag}</Text>
+                </View>
+                <Text style={styles.screenTitle}>{SCREEN_SHOWCASES[activeScreenTab].title}</Text>
+                <Text style={styles.screenDesc}>{SCREEN_SHOWCASES[activeScreenTab].desc}</Text>
+
+                <View style={styles.highlightsList}>
+                  {SCREEN_SHOWCASES[activeScreenTab].highlights.map((h, i) => (
+                    <View key={i} style={styles.highlightItem}>
+                      <Ionicons name="checkmark-circle-sharp" size={16} color="#695030" />
+                      <Text style={styles.highlightText}>{h}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              {/* Phone Mockup Frame */}
+              <View style={styles.phoneMockupFrame}>
+                <LinearGradient colors={['#181310', '#2C211A']} style={styles.phoneMockupInner}>
+                  <View style={styles.phoneNotch} />
+                  <View style={styles.phoneScreenContent}>
+                    <Ionicons name={SCREEN_SHOWCASES[activeScreenTab].icon as any} size={42} color="#A88454" />
+                    <Text style={styles.phoneScreenTitle}>{SCREEN_SHOWCASES[activeScreenTab].title}</Text>
+                    <Text style={styles.phoneScreenSub}>{SCREEN_SHOWCASES[activeScreenTab].tag}</Text>
+                    <View style={styles.phoneScreenBadge}>
+                      <Text style={styles.phoneScreenBadgeText}>Live In App</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+            </View>
           </View>
         </View>
 
@@ -327,6 +454,32 @@ const styles = StyleSheet.create({
   featureIconBg: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
   featureTitle: { fontSize: 17, fontFamily: fontFamily.bold, color: '#1E1815', marginBottom: 6 },
   featureDesc: { fontSize: 13, fontFamily: fontFamily.regular, color: '#8B7E74', lineHeight: 19 },
+
+  // Showcase Section
+  showcaseSection: { paddingHorizontal: spacing.xl, paddingBottom: spacing['4xl'], maxWidth: 1100, alignSelf: 'center', width: '100%' },
+  showcaseCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: spacing.xl, borderWidth: 1, borderColor: '#EAE5DC' },
+  screenTabScroll: { gap: 8, paddingBottom: spacing.lg, borderBottomWidth: 1, borderBottomColor: '#F5F2EC' },
+  screenTabBtn: { backgroundColor: '#F5F2EC', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16, borderWidth: 1, borderColor: '#EAE5DC' },
+  screenTabBtnActive: { backgroundColor: '#5B4122', borderColor: '#5B4122' },
+  screenTabText: { fontSize: 13, fontFamily: fontFamily.bold, color: '#695030' },
+  screenTabTextActive: { color: '#FFFFFF' },
+  screenDisplayBody: { flexDirection: 'row', gap: spacing.xl, flexWrap: 'wrap', paddingTop: spacing.xl, alignItems: 'center' },
+  screenTextCol: { flex: 1, minWidth: 280 },
+  screenTagBadge: { alignSelf: 'flex-start', backgroundColor: '#F5F2EC', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginBottom: spacing.sm, borderWidth: 1, borderColor: '#EAE5DC' },
+  screenTagText: { fontSize: 10, fontFamily: fontFamily.bold, color: '#695030', letterSpacing: 0.8 },
+  screenTitle: { fontSize: 22, fontFamily: fontFamily.bold, color: '#1E1815', marginBottom: spacing.sm },
+  screenDesc: { fontSize: 14, fontFamily: fontFamily.regular, color: '#8B7E74', lineHeight: 21, marginBottom: spacing.lg },
+  highlightsList: { gap: 10 },
+  highlightItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  highlightText: { fontSize: 13, fontFamily: fontFamily.bold, color: '#1E1815' },
+  phoneMockupFrame: { width: 260, height: 380, borderRadius: 36, padding: 8, backgroundColor: '#181310', boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.15)' as any, alignSelf: 'center' },
+  phoneMockupInner: { flex: 1, borderRadius: 28, alignItems: 'center', justifyContent: 'center', padding: spacing.md },
+  phoneNotch: { width: 80, height: 18, borderRadius: 9, backgroundColor: '#120D0A', position: 'absolute', top: 12 },
+  phoneScreenContent: { alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm },
+  phoneScreenTitle: { fontSize: 16, fontFamily: fontFamily.bold, color: '#FFFFFF', textAlign: 'center', marginTop: 12 },
+  phoneScreenSub: { fontSize: 10, fontFamily: fontFamily.bold, color: '#A88454', textAlign: 'center', letterSpacing: 0.5 },
+  phoneScreenBadge: { backgroundColor: 'rgba(255, 255, 255, 0.15)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginTop: 8 },
+  phoneScreenBadgeText: { fontSize: 10, fontFamily: fontFamily.bold, color: '#FFFFFF' },
 
   // Calculator Section
   calcSection: { paddingHorizontal: spacing.xl, paddingBottom: spacing['4xl'], maxWidth: 900, alignSelf: 'center', width: '100%' },
