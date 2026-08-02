@@ -461,7 +461,7 @@ export default function CreateProjectScreen() {
       const taskTitles: string[] = payload.tasks || [];
       if (taskTitles.length) {
         const { error: taskError } = await supabase.from('tasks').insert(taskTitles.map((title) => ({
-          project_id: project.id, title, priority: 'medium', status: 'pending', created_by: profile.id,
+          project_id: project.id, title, priority: 'medium', status: 'pending', created_by: profile?.id || null,
         })));
         if (taskError) throw taskError;
       }
@@ -469,7 +469,7 @@ export default function CreateProjectScreen() {
       const recurring: string[] = payload.recurring_tasks || [];
       if (recurring.length) {
         const { error: recurringError } = await supabase.from('recurring_tasks').insert(recurring.map((title) => ({
-          company_id: profile.company_id, project_id: project.id, title, priority: 'medium', frequency: 'daily', active: true,
+          company_id: targetCompanyId, project_id: project.id, title, priority: 'medium', frequency: 'daily', active: true,
         })));
         if (recurringError) throw recurringError;
       }
