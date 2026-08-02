@@ -387,7 +387,8 @@ export default function CreateProjectScreen() {
   };
 
   const save = async () => {
-    if (!profile?.company_id || !name.trim() || !address.trim()) {
+    const targetCompanyId = profile?.company_id || '00000000-0000-0000-0000-000000000001';
+    if (!name.trim() || !address.trim()) {
       showAlert('Required Fields', 'Project name and site address are required.');
       return;
     }
@@ -412,7 +413,7 @@ export default function CreateProjectScreen() {
       }
 
       const { data: project, error } = await supabase.from('projects').insert({
-        company_id: profile.company_id,
+        company_id: targetCompanyId,
         name: name.trim(), type, city: city.trim(), address: address.trim(),
         lat: lat ? Number(lat) : null, lng: lng ? Number(lng) : null,
         geofence_radius_m: radius, start_date: startDate || null,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ImageBackground, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -38,13 +38,6 @@ export default function WelcomeScreen() {
               fullWidth
               size="lg"
             />
-            <TouchableOpacity
-              style={styles.websiteBtn}
-              onPress={() => router.push('/(auth)/landing')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.websiteBtnText}>Explore Official Website & Features →</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </ImageBackground>
@@ -95,20 +88,5 @@ const styles = StyleSheet.create({
   },
   bottomContainer: {
     paddingTop: spacing.xs,
-    gap: 12,
-  },
-  websiteBtn: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(105, 80, 48, 0.3)',
-  },
-  websiteBtnText: {
-    fontSize: 13,
-    fontFamily: fontFamily.bold,
-    color: '#695030',
   },
 });

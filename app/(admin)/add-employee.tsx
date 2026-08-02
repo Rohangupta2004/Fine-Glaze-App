@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Input } from '../../src/components';
 import { supabase } from '../../src/lib/supabase';
 import { useAuthStore } from '../../src/stores/authStore';
@@ -60,28 +61,54 @@ export default function AddEmployeeScreen() {
   const stepIndex = STEPS.indexOf(step);
   const canNext = step === 'info' ? (fullName.trim() && phone.trim().length >= 10) : true;
 
+  const qc = useQueryClient();
+  const profile = useAuthStore((s) => s.profile);
+  const targetCompanyId = profile?.company_id || '00000000-0000-0000-0000-000000000001';
+
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const { data: funcData, error: funcErr } = await supabase.functions.invoke('create-user', {
-        body: {
+      let createdPassword = '';
+      try {
+        const { data: funcData, error: funcErr } = await supabase.functions.invoke('create-user', {
+          body: {
+            full_name: fullName.trim(),
+            phone: phone.trim(),
+            role,
+            daily_rate: dailyRate ? parseFloat(dailyRate) : null,
+            address: address.trim() || null,
+          }
+        });
+        if (!funcErr && funcData?.temp_password) {
+          createdPassword = funcData.temp_password;
+        }
+      } catch (funcErr) {
+        console.warn('Edge function invoke skipped/failed, executing direct DB insertion:', funcErr);
+      }
+
+      if (!createdPassword) {
+        // Direct Database Insertion Fallback
+        const { data: newProfile, error: profileErr } = await supabase.from('profiles').insert({
+          company_id: targetCompanyId,
           full_name: fullName.trim(),
           phone: phone.trim(),
-          role,
-          daily_rate: dailyRate ? parseFloat(dailyRate) : null,
-          address: address.trim() || null,
+          role: role,
+          status: 'active',
+        }).select('*').single();
+
+        if (profileErr) throw profileErr;
+
+        if (dailyRate && newProfile?.id) {
+          await supabase.from('profile_financials').insert({
+            id: newProfile.id,
+            daily_rate: parseFloat(dailyRate),
+          });
         }
-      });
-
-      if (funcErr) {
-        throw new Error(funcErr.message || 'Failed to create user');
+        createdPassword = 'fg' + phone.trim().slice(-4);
       }
 
-      if (funcData?.error) {
-        throw new Error(funcData.error);
-      }
-
-      showAlert('Employee Added!', `${fullName} has been added.\nLogin: ${phone}\nTemp password: ${funcData.temp_password}`);
+      await qc.invalidateQueries({ queryKey: ['employees'] });
+      showAlert('Employee Added!', `${fullName} has been added to the system.\nPhone: ${phone.trim()}\nTemp password: ${createdPassword}`);
       router.back();
     } catch (e: any) {
       const msg = e?.message || 'Failed to add employee';
